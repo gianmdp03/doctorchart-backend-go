@@ -1,0 +1,14 @@
+{
+  "restore_full_dump_equal": true,
+  "restore_schema_equal": true,
+  "database": "restore_367d22",
+  "source_database": "target_558b8c",
+  "tables": 20,
+  "nonroot_user": "65532:65532",
+  "linux_clinical_preview": true,
+  "inflight_request_status": 200,
+  "graceful_exit_code": 0,
+  "shutdown_seconds": 0.9380000000019209,
+  "worker_joined": true,
+  "passed": true
+}

@@ -1,0 +1,3841 @@
+{
+  "summary": {
+    "cases": 30,
+    "passed": 30,
+    "database": "integration_481edf1d",
+    "scope": "actual Gateway snapshot and Go HTTP processes; synthetic auth/Billing/S3; BASIC quota cases explicitly use trusted Go boundary"
+  },
+  "cases": [
+    {
+      "case": "public-health",
+      "through": "actual-gateway",
+      "method": "GET",
+      "path": "/api/doctorchart/health",
+      "status": 200,
+      "passed": true,
+      "body": {
+        "service": "doctorchart",
+        "status": "UP"
+      }
+    },
+    {
+      "case": "missing-session",
+      "through": "actual-gateway",
+      "method": "GET",
+      "path": "/api/doctorchart/patients",
+      "status": 401,
+      "passed": true,
+      "body": {
+        "error": "Sesión inválida o expirada"
+      }
+    },
+    {
+      "case": "forged-browser-identity",
+      "through": "actual-gateway",
+      "method": "GET",
+      "path": "/api/doctorchart/patients",
+      "status": 401,
+      "passed": true,
+      "body": {
+        "error": "Sesión inválida o expirada"
+      }
+    },
+    {
+      "case": "invalid-jwt",
+      "through": "actual-gateway",
+      "method": "GET",
+      "path": "/api/doctorchart/patients",
+      "status": 401,
+      "passed": true,
+      "body": {
+        "error": "Sesión inválida o expirada"
+      }
+    },
+    {
+      "case": "benefit-pointly",
+      "through": "actual-gateway",
+      "method": "GET",
+      "path": "/api/doctorchart/patients",
+      "status": 403,
+      "passed": true,
+      "body": {
+        "code": "DOCTORCHART_PLAN_REQUIRED",
+        "message": "Tu acceso a DoctorChart no está vigente. Revisá tu suscripción.",
+        "errors": []
+      }
+    },
+    {
+      "case": "benefit-expired",
+      "through": "actual-gateway",
+      "method": "GET",
+      "path": "/api/doctorchart/patients",
+      "status": 403,
+      "passed": true,
+      "body": {
+        "code": "DOCTORCHART_PLAN_REQUIRED",
+        "message": "Tu acceso a DoctorChart no está vigente. Revisá tu suscripción.",
+        "errors": []
+      }
+    },
+    {
+      "case": "benefit-inactive",
+      "through": "actual-gateway",
+      "method": "GET",
+      "path": "/api/doctorchart/patients",
+      "status": 403,
+      "passed": true,
+      "body": {
+        "code": "DOCTORCHART_PLAN_REQUIRED",
+        "message": "Tu acceso a DoctorChart no está vigente. Revisá tu suscripción.",
+        "errors": []
+      }
+    },
+    {
+      "case": "benefit-invalid",
+      "through": "actual-gateway",
+      "method": "GET",
+      "path": "/api/doctorchart/patients",
+      "status": 403,
+      "passed": true,
+      "body": {
+        "code": "DOCTORCHART_PLAN_REQUIRED",
+        "message": "Tu acceso a DoctorChart no está vigente. Revisá tu suscripción.",
+        "errors": []
+      }
+    },
+    {
+      "case": "benefit-missing-expiry",
+      "through": "actual-gateway",
+      "method": "GET",
+      "path": "/api/doctorchart/patients",
+      "status": 403,
+      "passed": true,
+      "body": {
+        "code": "DOCTORCHART_PLAN_REQUIRED",
+        "message": "Tu acceso a DoctorChart no está vigente. Revisá tu suscripción.",
+        "errors": []
+      }
+    },
+    {
+      "case": "benefit-string-active",
+      "through": "actual-gateway",
+      "method": "GET",
+      "path": "/api/doctorchart/patients",
+      "status": 403,
+      "passed": true,
+      "body": {
+        "code": "DOCTORCHART_PLAN_REQUIRED",
+        "message": "Tu acceso a DoctorChart no está vigente. Revisá tu suscripción.",
+        "errors": []
+      }
+    },
+    {
+      "case": "browser-cors",
+      "through": "actual-gateway",
+      "method": "OPTIONS",
+      "path": "/api/doctorchart/patients",
+      "status": 204,
+      "passed": true,
+      "body": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "case": "foreign-origin",
+      "through": "actual-gateway",
+      "method": "OPTIONS",
+      "path": "/api/doctorchart/patients",
+      "status": 403,
+      "passed": true,
+      "body": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "case": "nonadmin-denied",
+      "through": "actual-gateway",
+      "method": "GET",
+      "path": "/api/doctorchart/admin/specialties",
+      "status": 403,
+      "passed": true,
+      "body": {
+        "code": "FORBIDDEN",
+        "message": "Acceso denegado.",
+        "errors": []
+      }
+    },
+    {
+      "case": "administrator",
+      "through": "actual-gateway",
+      "method": "GET",
+      "path": "/api/doctorchart/admin/specialties",
+      "status": 200,
+      "passed": true,
+      "body": [
+        {
+          "id": 1,
+          "code": "pediatrics",
+          "name": "Pediatría",
+          "description": "Configuración inicial para la atención pediátrica.",
+          "active": true,
+          "version": 1
+        }
+      ]
+    },
+    {
+      "case": "specialty-catalog",
+      "through": "actual-gateway",
+      "method": "GET",
+      "path": "/api/doctorchart/specialties",
+      "status": 200,
+      "passed": true,
+      "body": [
+        {
+          "id": 1,
+          "code": "pediatrics",
+          "name": "Pediatría",
+          "description": "Configuración inicial para la atención pediátrica."
+        }
+      ]
+    },
+    {
+      "case": "specialty-selection-a",
+      "through": "actual-gateway",
+      "method": "PUT",
+      "path": "/api/doctorchart/workspace/specialty",
+      "status": 200,
+      "passed": true,
+      "body": {
+        "id": 3,
+        "version": 0,
+        "specialty": {
+          "id": 1,
+          "code": "pediatrics",
+          "name": "Pediatría",
+          "description": "Configuración inicial para la atención pediátrica."
+        },
+        "sourceWizardVersion": null,
+        "draftSourceWizardVersion": 1,
+        "onboardingCompleted": false,
+        "currentStepKey": "patient:sys_patient_profile",
+        "definition": null,
+        "draftDefinition": {
+          "patientForm": {
+            "categories": [
+              {
+                "key": "sys_patient_profile",
+                "title": "Datos Personales",
+                "fields": [
+                  {
+                    "key": "sys_firstName",
+                    "type": "TEXT",
+                    "label": "Nombre",
+                    "system": true,
+                    "required": true
+                  },
+                  {
+                    "key": "sys_lastName",
+                    "type": "TEXT",
+                    "label": "Apellido",
+                    "system": true,
+                    "required": true
+                  },
+                  {
+                    "key": "sys_dni",
+                    "type": "TEXT",
+                    "label": "DNI",
+                    "system": true,
+                    "required": true
+                  },
+                  {
+                    "key": "sys_dob",
+                    "type": "DATE",
+                    "label": "Fecha de nacimiento",
+                    "system": true,
+                    "required": true
+                  },
+                  {
+                    "key": "sys_sex",
+                    "type": "SELECT",
+                    "label": "Sexo",
+                    "system": true,
+                    "options": [
+                      {
+                        "label": "Masculino",
+                        "value": "MALE"
+                      },
+                      {
+                        "label": "Femenino",
+                        "value": "FEMALE"
+                      },
+                      {
+                        "label": "Otro",
+                        "value": "OTHER"
+                      },
+                      {
+                        "label": "Sin información",
+                        "value": "UNKNOWN"
+                      }
+                    ],
+                    "required": true
+                  },
+                  {
+                    "key": "sys_phone",
+                    "type": "TEXT",
+                    "label": "Teléfono",
+                    "system": true,
+                    "required": false
+                  },
+                  {
+                    "key": "sys_email",
+                    "type": "TEXT",
+                    "label": "Email",
+                    "system": true,
+                    "required": false
+                  },
+                  {
+                    "key": "sys_insurance",
+                    "type": "TEXT",
+                    "label": "Obra social / Cobertura",
+                    "system": true,
+                    "required": false
+                  },
+                  {
+                    "key": "address",
+                    "type": "TEXT",
+                    "label": "Dirección",
+                    "required": false
+                  },
+                  {
+                    "key": "nationality",
+                    "type": "TEXT",
+                    "label": "Nacionalidad",
+                    "required": false
+                  }
+                ],
+                "system": true,
+                "enabled": true
+              },
+              {
+                "key": "family_history",
+                "title": "ANTECEDENTES FAMILIARES",
+                "fields": [
+                  {
+                    "key": "paternalDiseases",
+                    "type": "TEXTAREA",
+                    "label": "Enfermedades del padre",
+                    "required": false
+                  },
+                  {
+                    "key": "maternalDiseases",
+                    "type": "TEXTAREA",
+                    "label": "Enfermedades de la madre",
+                    "required": false
+                  },
+                  {
+                    "key": "siblingDiseases",
+                    "type": "TEXTAREA",
+                    "label": "Enfermedades de hermanos",
+                    "required": false
+                  }
+                ],
+                "enabled": true
+              },
+              {
+                "key": "guardians",
+                "title": "DATOS FAMILIARES Y TUTORES",
+                "fields": [
+                  {
+                    "key": "primaryGuardian",
+                    "type": "SELECT",
+                    "label": "Tutor o responsable principal",
+                    "options": [
+                      {
+                        "label": "Madre",
+                        "value": "Madre"
+                      },
+                      {
+                        "label": "Padre",
+                        "value": "Padre"
+                      },
+                      {
+                        "label": "Ambos",
+                        "value": "Ambos"
+                      },
+                      {
+                        "label": "Abuelo/a",
+                        "value": "Abuelo/a"
+                      },
+                      {
+                        "label": "Tutor legal / Otro",
+                        "value": "Tutor legal / Otro"
+                      }
+                    ],
+                    "required": false
+                  },
+                  {
+                    "key": "motherFullName",
+                    "type": "TEXT",
+                    "label": "Nombre de la madre",
+                    "required": false
+                  },
+                  {
+                    "key": "fatherFullName",
+                    "type": "TEXT",
+                    "label": "Nombre del padre",
+                    "required": false
+                  },
+                  {
+                    "key": "primaryContactPhone",
+                    "type": "TEXT",
+                    "label": "Teléfono de contacto principal",
+                    "required": false
+                  },
+                  {
+                    "key": "hasSiblings",
+                    "type": "BOOLEAN",
+                    "label": "¿Tiene hermanos?",
+                    "required": false
+                  },
+                  {
+                    "key": "siblingsCount",
+                    "type": "NUMBER",
+                    "label": "Cantidad de hermanos",
+                    "minimum": 0,
+                    "required": false,
+                    "visibleWhen": {
+                      "equals": true,
+                      "fieldKey": "hasSiblings"
+                    }
+                  },
+                  {
+                    "key": "siblingOrder",
+                    "type": "NUMBER",
+                    "label": "Lugar que ocupa entre hermanos",
+                    "minimum": 1,
+                    "required": false,
+                    "visibleWhen": {
+                      "equals": true,
+                      "fieldKey": "hasSiblings"
+                    }
+                  },
+                  {
+                    "key": "livingArrangement",
+                    "type": "SELECT",
+                    "label": "Convivencia",
+                    "options": [
+                      {
+                        "label": "Ambos padres",
+                        "value": "Ambos padres"
+                      },
+                      {
+                        "label": "Solo con la madre",
+                        "value": "Solo con la madre"
+                      },
+                      {
+                        "label": "Solo con el padre",
+                        "value": "Solo con el padre"
+                      },
+                      {
+                        "label": "Cuidado compartido",
+                        "value": "Cuidado compartido"
+                      },
+                      {
+                        "label": "Otros familiares",
+                        "value": "Otros familiares"
+                      }
+                    ],
+                    "required": false
+                  }
+                ],
+                "enabled": true
+              }
+            ]
+          },
+          "encounterForm": {
+            "categories": [
+              {
+                "key": "reason",
+                "title": "Motivo de consulta",
+                "fields": [
+                  {
+                    "key": "chiefComplaint",
+                    "type": "TEXTAREA",
+                    "label": "Motivo de consulta",
+                    "required": true
+                  },
+                  {
+                    "key": "presentIllness",
+                    "type": "TEXTAREA",
+                    "label": "Evolución",
+                    "required": false
+                  }
+                ],
+                "enabled": true
+              },
+              {
+                "key": "measurements",
+                "title": "Antropometría",
+                "fields": [
+                  {
+                    "key": "weightKg",
+                    "type": "NUMBER",
+                    "unit": "kg",
+                    "label": "Peso",
+                    "minimum": 0,
+                    "required": true
+                  },
+                  {
+                    "key": "heightCm",
+                    "type": "NUMBER",
+                    "unit": "cm",
+                    "label": "Longitud / talla",
+                    "minimum": 0,
+                    "required": true
+                  },
+                  {
+                    "key": "headCircumferenceCm",
+                    "type": "NUMBER",
+                    "unit": "cm",
+                    "label": "Perímetro cefálico",
+                    "minimum": 0,
+                    "required": false
+                  },
+                  {
+                    "key": "bloodPressure",
+                    "type": "TEXT",
+                    "label": "Tensión arterial",
+                    "required": false
+                  }
+                ],
+                "enabled": true
+              },
+              {
+                "key": "physical_exam",
+                "title": "Examen físico",
+                "fields": [
+                  {
+                    "key": "physicalExam",
+                    "type": "TEXTAREA",
+                    "label": "Examen físico",
+                    "required": false
+                  }
+                ],
+                "enabled": true
+              },
+              {
+                "key": "development",
+                "title": "Desarrollo",
+                "fields": [
+                  {
+                    "key": "meetsMilestones",
+                    "type": "BOOLEAN",
+                    "label": "Cumple pautas de desarrollo",
+                    "required": false
+                  },
+                  {
+                    "key": "milestoneNotes",
+                    "type": "TEXTAREA",
+                    "label": "Detalle de las pautas pendientes",
+                    "required": false,
+                    "visibleWhen": {
+                      "equals": false,
+                      "fieldKey": "meetsMilestones"
+                    }
+                  }
+                ],
+                "enabled": true
+              },
+              {
+                "key": "assessment",
+                "title": "Evaluación",
+                "fields": [
+                  {
+                    "key": "diagnosis",
+                    "type": "TEXTAREA",
+                    "label": "Evaluación / diagnóstico",
+                    "required": false
+                  }
+                ],
+                "enabled": true
+              },
+              {
+                "key": "plan",
+                "title": "Plan e indicaciones",
+                "fields": [
+                  {
+                    "key": "treatment",
+                    "type": "TEXTAREA",
+                    "label": "Plan terapéutico",
+                    "required": false
+                  },
+                  {
+                    "key": "followUpDate",
+                    "type": "DATE",
+                    "label": "Próximo control",
+                    "required": false
+                  }
+                ],
+                "enabled": true
+              }
+            ]
+          },
+          "modulesConfig": {
+            "AI_ASSISTANT": true,
+            "GROWTH_CHARTS": true,
+            "MEDICATION_CATALOG": true
+          },
+          "schemaVersion": 1
+        },
+        "experience": {
+          "specialtyId": 1,
+          "specialtyVersion": 1,
+          "navigation": [
+            "DASHBOARD",
+            "PATIENTS",
+            "CALCULATORS",
+            "VACCINATION",
+            "WIZARD"
+          ],
+          "patientRecordTabs": [
+            "SUMMARY",
+            "ENCOUNTERS",
+            "VACCINATION",
+            "GROWTH",
+            "PRESCRIPTIONS",
+            "STUDIES"
+          ],
+          "patientRecordActions": [
+            "EDIT_PATIENT",
+            "NEW_ENCOUNTER",
+            "VIEW_GROWTH",
+            "PRINT_DOCUMENT"
+          ]
+        }
+      }
+    },
+    {
+      "case": "wizard-draft-a",
+      "through": "actual-gateway",
+      "method": "PUT",
+      "path": "/api/doctorchart/workspace/wizard/draft",
+      "status": 200,
+      "passed": true,
+      "body": {
+        "id": 3,
+        "version": 1,
+        "specialty": {
+          "id": 1,
+          "code": "pediatrics",
+          "name": "Pediatría",
+          "description": "Configuración inicial para la atención pediátrica."
+        },
+        "sourceWizardVersion": null,
+        "draftSourceWizardVersion": 1,
+        "onboardingCompleted": false,
+        "currentStepKey": "patient:sys_patient_profile",
+        "definition": null,
+        "draftDefinition": {
+          "encounterForm": {
+            "categories": [
+              {
+                "enabled": true,
+                "fields": [
+                  {
+                    "key": "chiefComplaint",
+                    "label": "Motivo de consulta",
+                    "required": true,
+                    "type": "TEXTAREA"
+                  },
+                  {
+                    "key": "presentIllness",
+                    "label": "Evolución",
+                    "required": false,
+                    "type": "TEXTAREA"
+                  }
+                ],
+                "key": "reason",
+                "title": "Motivo de consulta"
+              },
+              {
+                "enabled": true,
+                "fields": [
+                  {
+                    "key": "weightKg",
+                    "label": "Peso",
+                    "minimum": 0,
+                    "required": true,
+                    "type": "NUMBER",
+                    "unit": "kg"
+                  },
+                  {
+                    "key": "heightCm",
+                    "label": "Longitud / talla",
+                    "minimum": 0,
+                    "required": true,
+                    "type": "NUMBER",
+                    "unit": "cm"
+                  },
+                  {
+                    "key": "headCircumferenceCm",
+                    "label": "Perímetro cefálico",
+                    "minimum": 0,
+                    "required": false,
+                    "type": "NUMBER",
+                    "unit": "cm"
+                  },
+                  {
+                    "key": "bloodPressure",
+                    "label": "Tensión arterial",
+                    "required": false,
+                    "type": "TEXT"
+                  }
+                ],
+                "key": "measurements",
+                "title": "Antropometría"
+              },
+              {
+                "enabled": true,
+                "fields": [
+                  {
+                    "key": "physicalExam",
+                    "label": "Examen físico",
+                    "required": false,
+                    "type": "TEXTAREA"
+                  }
+                ],
+                "key": "physical_exam",
+                "title": "Examen físico"
+              },
+              {
+                "enabled": true,
+                "fields": [
+                  {
+                    "key": "meetsMilestones",
+                    "label": "Cumple pautas de desarrollo",
+                    "required": false,
+                    "type": "BOOLEAN"
+                  },
+                  {
+                    "key": "milestoneNotes",
+                    "label": "Detalle de las pautas pendientes",
+                    "required": false,
+                    "type": "TEXTAREA",
+                    "visibleWhen": {
+                      "equals": false,
+                      "fieldKey": "meetsMilestones"
+                    }
+                  }
+                ],
+                "key": "development",
+                "title": "Desarrollo"
+              },
+              {
+                "enabled": true,
+                "fields": [
+                  {
+                    "key": "diagnosis",
+                    "label": "Evaluación / diagnóstico",
+                    "required": false,
+                    "type": "TEXTAREA"
+                  }
+                ],
+                "key": "assessment",
+                "title": "Evaluación"
+              },
+              {
+                "enabled": true,
+                "fields": [
+                  {
+                    "key": "treatment",
+                    "label": "Plan terapéutico",
+                    "required": false,
+                    "type": "TEXTAREA"
+                  },
+                  {
+                    "key": "followUpDate",
+                    "label": "Próximo control",
+                    "required": false,
+                    "type": "DATE"
+                  }
+                ],
+                "key": "plan",
+                "title": "Plan e indicaciones"
+              }
+            ]
+          },
+          "modulesConfig": {
+            "AI_ASSISTANT": true,
+            "GROWTH_CHARTS": true,
+            "MEDICATION_CATALOG": true
+          },
+          "patientForm": {
+            "categories": [
+              {
+                "enabled": true,
+                "fields": [
+                  {
+                    "key": "sys_firstName",
+                    "label": "Nombre",
+                    "required": true,
+                    "system": true,
+                    "type": "TEXT"
+                  },
+                  {
+                    "key": "sys_lastName",
+                    "label": "Apellido",
+                    "required": true,
+                    "system": true,
+                    "type": "TEXT"
+                  },
+                  {
+                    "key": "sys_dni",
+                    "label": "DNI",
+                    "required": true,
+                    "system": true,
+                    "type": "TEXT"
+                  },
+                  {
+                    "key": "sys_dob",
+                    "label": "Fecha de nacimiento",
+                    "required": true,
+                    "system": true,
+                    "type": "DATE"
+                  },
+                  {
+                    "key": "sys_sex",
+                    "label": "Sexo",
+                    "options": [
+                      {
+                        "label": "Masculino",
+                        "value": "MALE"
+                      },
+                      {
+                        "label": "Femenino",
+                        "value": "FEMALE"
+                      },
+                      {
+                        "label": "Otro",
+                        "value": "OTHER"
+                      },
+                      {
+                        "label": "Sin información",
+                        "value": "UNKNOWN"
+                      }
+                    ],
+                    "required": true,
+                    "system": true,
+                    "type": "SELECT"
+                  },
+                  {
+                    "key": "sys_phone",
+                    "label": "Teléfono",
+                    "required": false,
+                    "system": true,
+                    "type": "TEXT"
+                  },
+                  {
+                    "key": "sys_email",
+                    "label": "Email",
+                    "required": false,
+                    "system": true,
+                    "type": "TEXT"
+                  },
+                  {
+                    "key": "sys_insurance",
+                    "label": "Obra social / Cobertura",
+                    "required": false,
+                    "system": true,
+                    "type": "TEXT"
+                  },
+                  {
+                    "key": "address",
+                    "label": "Dirección",
+                    "required": false,
+                    "type": "TEXT"
+                  },
+                  {
+                    "key": "nationality",
+                    "label": "Nacionalidad",
+                    "required": false,
+                    "type": "TEXT"
+                  }
+                ],
+                "key": "sys_patient_profile",
+                "system": true,
+                "title": "Datos Personales"
+              },
+              {
+                "enabled": true,
+                "fields": [
+                  {
+                    "key": "paternalDiseases",
+                    "label": "Enfermedades del padre",
+                    "required": false,
+                    "type": "TEXTAREA"
+                  },
+                  {
+                    "key": "maternalDiseases",
+                    "label": "Enfermedades de la madre",
+                    "required": false,
+                    "type": "TEXTAREA"
+                  },
+                  {
+                    "key": "siblingDiseases",
+                    "label": "Enfermedades de hermanos",
+                    "required": false,
+                    "type": "TEXTAREA"
+                  }
+                ],
+                "key": "family_history",
+                "title": "ANTECEDENTES FAMILIARES"
+              },
+              {
+                "enabled": true,
+                "fields": [
+                  {
+                    "key": "primaryGuardian",
+                    "label": "Tutor o responsable principal",
+                    "options": [
+                      {
+                        "label": "Madre",
+                        "value": "Madre"
+                      },
+                      {
+                        "label": "Padre",
+                        "value": "Padre"
+                      },
+                      {
+                        "label": "Ambos",
+                        "value": "Ambos"
+                      },
+                      {
+                        "label": "Abuelo/a",
+                        "value": "Abuelo/a"
+                      },
+                      {
+                        "label": "Tutor legal / Otro",
+                        "value": "Tutor legal / Otro"
+                      }
+                    ],
+                    "required": false,
+                    "type": "SELECT"
+                  },
+                  {
+                    "key": "motherFullName",
+                    "label": "Nombre de la madre",
+                    "required": false,
+                    "type": "TEXT"
+                  },
+                  {
+                    "key": "fatherFullName",
+                    "label": "Nombre del padre",
+                    "required": false,
+                    "type": "TEXT"
+                  },
+                  {
+                    "key": "primaryContactPhone",
+                    "label": "Teléfono de contacto principal",
+                    "required": false,
+                    "type": "TEXT"
+                  },
+                  {
+                    "key": "hasSiblings",
+                    "label": "¿Tiene hermanos?",
+                    "required": false,
+                    "type": "BOOLEAN"
+                  },
+                  {
+                    "key": "siblingsCount",
+                    "label": "Cantidad de hermanos",
+                    "minimum": 0,
+                    "required": false,
+                    "type": "NUMBER",
+                    "visibleWhen": {
+                      "equals": true,
+                      "fieldKey": "hasSiblings"
+                    }
+                  },
+                  {
+                    "key": "siblingOrder",
+                    "label": "Lugar que ocupa entre hermanos",
+                    "minimum": 1,
+                    "required": false,
+                    "type": "NUMBER",
+                    "visibleWhen": {
+                      "equals": true,
+                      "fieldKey": "hasSiblings"
+                    }
+                  },
+                  {
+                    "key": "livingArrangement",
+                    "label": "Convivencia",
+                    "options": [
+                      {
+                        "label": "Ambos padres",
+                        "value": "Ambos padres"
+                      },
+                      {
+                        "label": "Solo con la madre",
+                        "value": "Solo con la madre"
+                      },
+                      {
+                        "label": "Solo con el padre",
+                        "value": "Solo con el padre"
+                      },
+                      {
+                        "label": "Cuidado compartido",
+                        "value": "Cuidado compartido"
+                      },
+                      {
+                        "label": "Otros familiares",
+                        "value": "Otros familiares"
+                      }
+                    ],
+                    "required": false,
+                    "type": "SELECT"
+                  }
+                ],
+                "key": "guardians",
+                "title": "DATOS FAMILIARES Y TUTORES"
+              }
+            ]
+          },
+          "schemaVersion": 1
+        },
+        "experience": {
+          "specialtyId": 1,
+          "specialtyVersion": 1,
+          "navigation": [
+            "DASHBOARD",
+            "PATIENTS",
+            "CALCULATORS",
+            "VACCINATION",
+            "WIZARD"
+          ],
+          "patientRecordTabs": [
+            "SUMMARY",
+            "ENCOUNTERS",
+            "VACCINATION",
+            "GROWTH",
+            "PRESCRIPTIONS",
+            "STUDIES"
+          ],
+          "patientRecordActions": [
+            "EDIT_PATIENT",
+            "NEW_ENCOUNTER",
+            "VIEW_GROWTH",
+            "PRINT_DOCUMENT"
+          ]
+        }
+      }
+    },
+    {
+      "case": "wizard-finish-a",
+      "through": "actual-gateway",
+      "method": "POST",
+      "path": "/api/doctorchart/workspace/finish-onboarding",
+      "status": 200,
+      "passed": true,
+      "body": {
+        "id": 3,
+        "version": 2,
+        "specialty": {
+          "id": 1,
+          "code": "pediatrics",
+          "name": "Pediatría",
+          "description": "Configuración inicial para la atención pediátrica."
+        },
+        "sourceWizardVersion": 1,
+        "draftSourceWizardVersion": null,
+        "onboardingCompleted": true,
+        "currentStepKey": "completed",
+        "definition": {
+          "patientForm": {
+            "categories": [
+              {
+                "key": "sys_patient_profile",
+                "title": "Datos Personales",
+                "fields": [
+                  {
+                    "key": "sys_firstName",
+                    "type": "TEXT",
+                    "label": "Nombre",
+                    "system": true,
+                    "required": true
+                  },
+                  {
+                    "key": "sys_lastName",
+                    "type": "TEXT",
+                    "label": "Apellido",
+                    "system": true,
+                    "required": true
+                  },
+                  {
+                    "key": "sys_dni",
+                    "type": "TEXT",
+                    "label": "DNI",
+                    "system": true,
+                    "required": true
+                  },
+                  {
+                    "key": "sys_dob",
+                    "type": "DATE",
+                    "label": "Fecha de nacimiento",
+                    "system": true,
+                    "required": true
+                  },
+                  {
+                    "key": "sys_sex",
+                    "type": "SELECT",
+                    "label": "Sexo",
+                    "system": true,
+                    "options": [
+                      {
+                        "label": "Masculino",
+                        "value": "MALE"
+                      },
+                      {
+                        "label": "Femenino",
+                        "value": "FEMALE"
+                      },
+                      {
+                        "label": "Otro",
+                        "value": "OTHER"
+                      },
+                      {
+                        "label": "Sin información",
+                        "value": "UNKNOWN"
+                      }
+                    ],
+                    "required": true
+                  },
+                  {
+                    "key": "sys_phone",
+                    "type": "TEXT",
+                    "label": "Teléfono",
+                    "system": true,
+                    "required": false
+                  },
+                  {
+                    "key": "sys_email",
+                    "type": "TEXT",
+                    "label": "Email",
+                    "system": true,
+                    "required": false
+                  },
+                  {
+                    "key": "sys_insurance",
+                    "type": "TEXT",
+                    "label": "Obra social / Cobertura",
+                    "system": true,
+                    "required": false
+                  },
+                  {
+                    "key": "address",
+                    "type": "TEXT",
+                    "label": "Dirección",
+                    "required": false
+                  },
+                  {
+                    "key": "nationality",
+                    "type": "TEXT",
+                    "label": "Nacionalidad",
+                    "required": false
+                  }
+                ],
+                "system": true,
+                "enabled": true
+              },
+              {
+                "key": "family_history",
+                "title": "ANTECEDENTES FAMILIARES",
+                "fields": [
+                  {
+                    "key": "paternalDiseases",
+                    "type": "TEXTAREA",
+                    "label": "Enfermedades del padre",
+                    "required": false
+                  },
+                  {
+                    "key": "maternalDiseases",
+                    "type": "TEXTAREA",
+                    "label": "Enfermedades de la madre",
+                    "required": false
+                  },
+                  {
+                    "key": "siblingDiseases",
+                    "type": "TEXTAREA",
+                    "label": "Enfermedades de hermanos",
+                    "required": false
+                  }
+                ],
+                "enabled": true
+              },
+              {
+                "key": "guardians",
+                "title": "DATOS FAMILIARES Y TUTORES",
+                "fields": [
+                  {
+                    "key": "primaryGuardian",
+                    "type": "SELECT",
+                    "label": "Tutor o responsable principal",
+                    "options": [
+                      {
+                        "label": "Madre",
+                        "value": "Madre"
+                      },
+                      {
+                        "label": "Padre",
+                        "value": "Padre"
+                      },
+                      {
+                        "label": "Ambos",
+                        "value": "Ambos"
+                      },
+                      {
+                        "label": "Abuelo/a",
+                        "value": "Abuelo/a"
+                      },
+                      {
+                        "label": "Tutor legal / Otro",
+                        "value": "Tutor legal / Otro"
+                      }
+                    ],
+                    "required": false
+                  },
+                  {
+                    "key": "motherFullName",
+                    "type": "TEXT",
+                    "label": "Nombre de la madre",
+                    "required": false
+                  },
+                  {
+                    "key": "fatherFullName",
+                    "type": "TEXT",
+                    "label": "Nombre del padre",
+                    "required": false
+                  },
+                  {
+                    "key": "primaryContactPhone",
+                    "type": "TEXT",
+                    "label": "Teléfono de contacto principal",
+                    "required": false
+                  },
+                  {
+                    "key": "hasSiblings",
+                    "type": "BOOLEAN",
+                    "label": "¿Tiene hermanos?",
+                    "required": false
+                  },
+                  {
+                    "key": "siblingsCount",
+                    "type": "NUMBER",
+                    "label": "Cantidad de hermanos",
+                    "minimum": 0,
+                    "required": false,
+                    "visibleWhen": {
+                      "equals": true,
+                      "fieldKey": "hasSiblings"
+                    }
+                  },
+                  {
+                    "key": "siblingOrder",
+                    "type": "NUMBER",
+                    "label": "Lugar que ocupa entre hermanos",
+                    "minimum": 1,
+                    "required": false,
+                    "visibleWhen": {
+                      "equals": true,
+                      "fieldKey": "hasSiblings"
+                    }
+                  },
+                  {
+                    "key": "livingArrangement",
+                    "type": "SELECT",
+                    "label": "Convivencia",
+                    "options": [
+                      {
+                        "label": "Ambos padres",
+                        "value": "Ambos padres"
+                      },
+                      {
+                        "label": "Solo con la madre",
+                        "value": "Solo con la madre"
+                      },
+                      {
+                        "label": "Solo con el padre",
+                        "value": "Solo con el padre"
+                      },
+                      {
+                        "label": "Cuidado compartido",
+                        "value": "Cuidado compartido"
+                      },
+                      {
+                        "label": "Otros familiares",
+                        "value": "Otros familiares"
+                      }
+                    ],
+                    "required": false
+                  }
+                ],
+                "enabled": true
+              }
+            ]
+          },
+          "encounterForm": {
+            "categories": [
+              {
+                "key": "reason",
+                "title": "Motivo de consulta",
+                "fields": [
+                  {
+                    "key": "chiefComplaint",
+                    "type": "TEXTAREA",
+                    "label": "Motivo de consulta",
+                    "required": true
+                  },
+                  {
+                    "key": "presentIllness",
+                    "type": "TEXTAREA",
+                    "label": "Evolución",
+                    "required": false
+                  }
+                ],
+                "enabled": true
+              },
+              {
+                "key": "measurements",
+                "title": "Antropometría",
+                "fields": [
+                  {
+                    "key": "weightKg",
+                    "type": "NUMBER",
+                    "unit": "kg",
+                    "label": "Peso",
+                    "minimum": 0,
+                    "required": true
+                  },
+                  {
+                    "key": "heightCm",
+                    "type": "NUMBER",
+                    "unit": "cm",
+                    "label": "Longitud / talla",
+                    "minimum": 0,
+                    "required": true
+                  },
+                  {
+                    "key": "headCircumferenceCm",
+                    "type": "NUMBER",
+                    "unit": "cm",
+                    "label": "Perímetro cefálico",
+                    "minimum": 0,
+                    "required": false
+                  },
+                  {
+                    "key": "bloodPressure",
+                    "type": "TEXT",
+                    "label": "Tensión arterial",
+                    "required": false
+                  }
+                ],
+                "enabled": true
+              },
+              {
+                "key": "physical_exam",
+                "title": "Examen físico",
+                "fields": [
+                  {
+                    "key": "physicalExam",
+                    "type": "TEXTAREA",
+                    "label": "Examen físico",
+                    "required": false
+                  }
+                ],
+                "enabled": true
+              },
+              {
+                "key": "development",
+                "title": "Desarrollo",
+                "fields": [
+                  {
+                    "key": "meetsMilestones",
+                    "type": "BOOLEAN",
+                    "label": "Cumple pautas de desarrollo",
+                    "required": false
+                  },
+                  {
+                    "key": "milestoneNotes",
+                    "type": "TEXTAREA",
+                    "label": "Detalle de las pautas pendientes",
+                    "required": false,
+                    "visibleWhen": {
+                      "equals": false,
+                      "fieldKey": "meetsMilestones"
+                    }
+                  }
+                ],
+                "enabled": true
+              },
+              {
+                "key": "assessment",
+                "title": "Evaluación",
+                "fields": [
+                  {
+                    "key": "diagnosis",
+                    "type": "TEXTAREA",
+                    "label": "Evaluación / diagnóstico",
+                    "required": false
+                  }
+                ],
+                "enabled": true
+              },
+              {
+                "key": "plan",
+                "title": "Plan e indicaciones",
+                "fields": [
+                  {
+                    "key": "treatment",
+                    "type": "TEXTAREA",
+                    "label": "Plan terapéutico",
+                    "required": false
+                  },
+                  {
+                    "key": "followUpDate",
+                    "type": "DATE",
+                    "label": "Próximo control",
+                    "required": false
+                  }
+                ],
+                "enabled": true
+              }
+            ]
+          },
+          "modulesConfig": {
+            "AI_ASSISTANT": true,
+            "GROWTH_CHARTS": true,
+            "MEDICATION_CATALOG": true
+          },
+          "schemaVersion": 1
+        },
+        "draftDefinition": null,
+        "experience": {
+          "specialtyId": 1,
+          "specialtyVersion": 1,
+          "navigation": [
+            "DASHBOARD",
+            "PATIENTS",
+            "CALCULATORS",
+            "VACCINATION",
+            "WIZARD"
+          ],
+          "patientRecordTabs": [
+            "SUMMARY",
+            "ENCOUNTERS",
+            "VACCINATION",
+            "GROWTH",
+            "PRESCRIPTIONS",
+            "STUDIES"
+          ],
+          "patientRecordActions": [
+            "EDIT_PATIENT",
+            "NEW_ENCOUNTER",
+            "VIEW_GROWTH",
+            "PRINT_DOCUMENT"
+          ]
+        }
+      }
+    },
+    {
+      "case": "specialty-selection-b",
+      "through": "actual-gateway",
+      "method": "PUT",
+      "path": "/api/doctorchart/workspace/specialty",
+      "status": 200,
+      "passed": true,
+      "body": {
+        "id": 4,
+        "version": 0,
+        "specialty": {
+          "id": 1,
+          "code": "pediatrics",
+          "name": "Pediatría",
+          "description": "Configuración inicial para la atención pediátrica."
+        },
+        "sourceWizardVersion": null,
+        "draftSourceWizardVersion": 1,
+        "onboardingCompleted": false,
+        "currentStepKey": "patient:sys_patient_profile",
+        "definition": null,
+        "draftDefinition": {
+          "patientForm": {
+            "categories": [
+              {
+                "key": "sys_patient_profile",
+                "title": "Datos Personales",
+                "fields": [
+                  {
+                    "key": "sys_firstName",
+                    "type": "TEXT",
+                    "label": "Nombre",
+                    "system": true,
+                    "required": true
+                  },
+                  {
+                    "key": "sys_lastName",
+                    "type": "TEXT",
+                    "label": "Apellido",
+                    "system": true,
+                    "required": true
+                  },
+                  {
+                    "key": "sys_dni",
+                    "type": "TEXT",
+                    "label": "DNI",
+                    "system": true,
+                    "required": true
+                  },
+                  {
+                    "key": "sys_dob",
+                    "type": "DATE",
+                    "label": "Fecha de nacimiento",
+                    "system": true,
+                    "required": true
+                  },
+                  {
+                    "key": "sys_sex",
+                    "type": "SELECT",
+                    "label": "Sexo",
+                    "system": true,
+                    "options": [
+                      {
+                        "label": "Masculino",
+                        "value": "MALE"
+                      },
+                      {
+                        "label": "Femenino",
+                        "value": "FEMALE"
+                      },
+                      {
+                        "label": "Otro",
+                        "value": "OTHER"
+                      },
+                      {
+                        "label": "Sin información",
+                        "value": "UNKNOWN"
+                      }
+                    ],
+                    "required": true
+                  },
+                  {
+                    "key": "sys_phone",
+                    "type": "TEXT",
+                    "label": "Teléfono",
+                    "system": true,
+                    "required": false
+                  },
+                  {
+                    "key": "sys_email",
+                    "type": "TEXT",
+                    "label": "Email",
+                    "system": true,
+                    "required": false
+                  },
+                  {
+                    "key": "sys_insurance",
+                    "type": "TEXT",
+                    "label": "Obra social / Cobertura",
+                    "system": true,
+                    "required": false
+                  },
+                  {
+                    "key": "address",
+                    "type": "TEXT",
+                    "label": "Dirección",
+                    "required": false
+                  },
+                  {
+                    "key": "nationality",
+                    "type": "TEXT",
+                    "label": "Nacionalidad",
+                    "required": false
+                  }
+                ],
+                "system": true,
+                "enabled": true
+              },
+              {
+                "key": "family_history",
+                "title": "ANTECEDENTES FAMILIARES",
+                "fields": [
+                  {
+                    "key": "paternalDiseases",
+                    "type": "TEXTAREA",
+                    "label": "Enfermedades del padre",
+                    "required": false
+                  },
+                  {
+                    "key": "maternalDiseases",
+                    "type": "TEXTAREA",
+                    "label": "Enfermedades de la madre",
+                    "required": false
+                  },
+                  {
+                    "key": "siblingDiseases",
+                    "type": "TEXTAREA",
+                    "label": "Enfermedades de hermanos",
+                    "required": false
+                  }
+                ],
+                "enabled": true
+              },
+              {
+                "key": "guardians",
+                "title": "DATOS FAMILIARES Y TUTORES",
+                "fields": [
+                  {
+                    "key": "primaryGuardian",
+                    "type": "SELECT",
+                    "label": "Tutor o responsable principal",
+                    "options": [
+                      {
+                        "label": "Madre",
+                        "value": "Madre"
+                      },
+                      {
+                        "label": "Padre",
+                        "value": "Padre"
+                      },
+                      {
+                        "label": "Ambos",
+                        "value": "Ambos"
+                      },
+                      {
+                        "label": "Abuelo/a",
+                        "value": "Abuelo/a"
+                      },
+                      {
+                        "label": "Tutor legal / Otro",
+                        "value": "Tutor legal / Otro"
+                      }
+                    ],
+                    "required": false
+                  },
+                  {
+                    "key": "motherFullName",
+                    "type": "TEXT",
+                    "label": "Nombre de la madre",
+                    "required": false
+                  },
+                  {
+                    "key": "fatherFullName",
+                    "type": "TEXT",
+                    "label": "Nombre del padre",
+                    "required": false
+                  },
+                  {
+                    "key": "primaryContactPhone",
+                    "type": "TEXT",
+                    "label": "Teléfono de contacto principal",
+                    "required": false
+                  },
+                  {
+                    "key": "hasSiblings",
+                    "type": "BOOLEAN",
+                    "label": "¿Tiene hermanos?",
+                    "required": false
+                  },
+                  {
+                    "key": "siblingsCount",
+                    "type": "NUMBER",
+                    "label": "Cantidad de hermanos",
+                    "minimum": 0,
+                    "required": false,
+                    "visibleWhen": {
+                      "equals": true,
+                      "fieldKey": "hasSiblings"
+                    }
+                  },
+                  {
+                    "key": "siblingOrder",
+                    "type": "NUMBER",
+                    "label": "Lugar que ocupa entre hermanos",
+                    "minimum": 1,
+                    "required": false,
+                    "visibleWhen": {
+                      "equals": true,
+                      "fieldKey": "hasSiblings"
+                    }
+                  },
+                  {
+                    "key": "livingArrangement",
+                    "type": "SELECT",
+                    "label": "Convivencia",
+                    "options": [
+                      {
+                        "label": "Ambos padres",
+                        "value": "Ambos padres"
+                      },
+                      {
+                        "label": "Solo con la madre",
+                        "value": "Solo con la madre"
+                      },
+                      {
+                        "label": "Solo con el padre",
+                        "value": "Solo con el padre"
+                      },
+                      {
+                        "label": "Cuidado compartido",
+                        "value": "Cuidado compartido"
+                      },
+                      {
+                        "label": "Otros familiares",
+                        "value": "Otros familiares"
+                      }
+                    ],
+                    "required": false
+                  }
+                ],
+                "enabled": true
+              }
+            ]
+          },
+          "encounterForm": {
+            "categories": [
+              {
+                "key": "reason",
+                "title": "Motivo de consulta",
+                "fields": [
+                  {
+                    "key": "chiefComplaint",
+                    "type": "TEXTAREA",
+                    "label": "Motivo de consulta",
+                    "required": true
+                  },
+                  {
+                    "key": "presentIllness",
+                    "type": "TEXTAREA",
+                    "label": "Evolución",
+                    "required": false
+                  }
+                ],
+                "enabled": true
+              },
+              {
+                "key": "measurements",
+                "title": "Antropometría",
+                "fields": [
+                  {
+                    "key": "weightKg",
+                    "type": "NUMBER",
+                    "unit": "kg",
+                    "label": "Peso",
+                    "minimum": 0,
+                    "required": true
+                  },
+                  {
+                    "key": "heightCm",
+                    "type": "NUMBER",
+                    "unit": "cm",
+                    "label": "Longitud / talla",
+                    "minimum": 0,
+                    "required": true
+                  },
+                  {
+                    "key": "headCircumferenceCm",
+                    "type": "NUMBER",
+                    "unit": "cm",
+                    "label": "Perímetro cefálico",
+                    "minimum": 0,
+                    "required": false
+                  },
+                  {
+                    "key": "bloodPressure",
+                    "type": "TEXT",
+                    "label": "Tensión arterial",
+                    "required": false
+                  }
+                ],
+                "enabled": true
+              },
+              {
+                "key": "physical_exam",
+                "title": "Examen físico",
+                "fields": [
+                  {
+                    "key": "physicalExam",
+                    "type": "TEXTAREA",
+                    "label": "Examen físico",
+                    "required": false
+                  }
+                ],
+                "enabled": true
+              },
+              {
+                "key": "development",
+                "title": "Desarrollo",
+                "fields": [
+                  {
+                    "key": "meetsMilestones",
+                    "type": "BOOLEAN",
+                    "label": "Cumple pautas de desarrollo",
+                    "required": false
+                  },
+                  {
+                    "key": "milestoneNotes",
+                    "type": "TEXTAREA",
+                    "label": "Detalle de las pautas pendientes",
+                    "required": false,
+                    "visibleWhen": {
+                      "equals": false,
+                      "fieldKey": "meetsMilestones"
+                    }
+                  }
+                ],
+                "enabled": true
+              },
+              {
+                "key": "assessment",
+                "title": "Evaluación",
+                "fields": [
+                  {
+                    "key": "diagnosis",
+                    "type": "TEXTAREA",
+                    "label": "Evaluación / diagnóstico",
+                    "required": false
+                  }
+                ],
+                "enabled": true
+              },
+              {
+                "key": "plan",
+                "title": "Plan e indicaciones",
+                "fields": [
+                  {
+                    "key": "treatment",
+                    "type": "TEXTAREA",
+                    "label": "Plan terapéutico",
+                    "required": false
+                  },
+                  {
+                    "key": "followUpDate",
+                    "type": "DATE",
+                    "label": "Próximo control",
+                    "required": false
+                  }
+                ],
+                "enabled": true
+              }
+            ]
+          },
+          "modulesConfig": {
+            "AI_ASSISTANT": true,
+            "GROWTH_CHARTS": true,
+            "MEDICATION_CATALOG": true
+          },
+          "schemaVersion": 1
+        },
+        "experience": {
+          "specialtyId": 1,
+          "specialtyVersion": 1,
+          "navigation": [
+            "DASHBOARD",
+            "PATIENTS",
+            "CALCULATORS",
+            "VACCINATION",
+            "WIZARD"
+          ],
+          "patientRecordTabs": [
+            "SUMMARY",
+            "ENCOUNTERS",
+            "VACCINATION",
+            "GROWTH",
+            "PRESCRIPTIONS",
+            "STUDIES"
+          ],
+          "patientRecordActions": [
+            "EDIT_PATIENT",
+            "NEW_ENCOUNTER",
+            "VIEW_GROWTH",
+            "PRINT_DOCUMENT"
+          ]
+        }
+      }
+    },
+    {
+      "case": "wizard-draft-b",
+      "through": "actual-gateway",
+      "method": "PUT",
+      "path": "/api/doctorchart/workspace/wizard/draft",
+      "status": 200,
+      "passed": true,
+      "body": {
+        "id": 4,
+        "version": 1,
+        "specialty": {
+          "id": 1,
+          "code": "pediatrics",
+          "name": "Pediatría",
+          "description": "Configuración inicial para la atención pediátrica."
+        },
+        "sourceWizardVersion": null,
+        "draftSourceWizardVersion": 1,
+        "onboardingCompleted": false,
+        "currentStepKey": "patient:sys_patient_profile",
+        "definition": null,
+        "draftDefinition": {
+          "encounterForm": {
+            "categories": [
+              {
+                "enabled": true,
+                "fields": [
+                  {
+                    "key": "chiefComplaint",
+                    "label": "Motivo de consulta",
+                    "required": true,
+                    "type": "TEXTAREA"
+                  },
+                  {
+                    "key": "presentIllness",
+                    "label": "Evolución",
+                    "required": false,
+                    "type": "TEXTAREA"
+                  }
+                ],
+                "key": "reason",
+                "title": "Motivo de consulta"
+              },
+              {
+                "enabled": true,
+                "fields": [
+                  {
+                    "key": "weightKg",
+                    "label": "Peso",
+                    "minimum": 0,
+                    "required": true,
+                    "type": "NUMBER",
+                    "unit": "kg"
+                  },
+                  {
+                    "key": "heightCm",
+                    "label": "Longitud / talla",
+                    "minimum": 0,
+                    "required": true,
+                    "type": "NUMBER",
+                    "unit": "cm"
+                  },
+                  {
+                    "key": "headCircumferenceCm",
+                    "label": "Perímetro cefálico",
+                    "minimum": 0,
+                    "required": false,
+                    "type": "NUMBER",
+                    "unit": "cm"
+                  },
+                  {
+                    "key": "bloodPressure",
+                    "label": "Tensión arterial",
+                    "required": false,
+                    "type": "TEXT"
+                  }
+                ],
+                "key": "measurements",
+                "title": "Antropometría"
+              },
+              {
+                "enabled": true,
+                "fields": [
+                  {
+                    "key": "physicalExam",
+                    "label": "Examen físico",
+                    "required": false,
+                    "type": "TEXTAREA"
+                  }
+                ],
+                "key": "physical_exam",
+                "title": "Examen físico"
+              },
+              {
+                "enabled": true,
+                "fields": [
+                  {
+                    "key": "meetsMilestones",
+                    "label": "Cumple pautas de desarrollo",
+                    "required": false,
+                    "type": "BOOLEAN"
+                  },
+                  {
+                    "key": "milestoneNotes",
+                    "label": "Detalle de las pautas pendientes",
+                    "required": false,
+                    "type": "TEXTAREA",
+                    "visibleWhen": {
+                      "equals": false,
+                      "fieldKey": "meetsMilestones"
+                    }
+                  }
+                ],
+                "key": "development",
+                "title": "Desarrollo"
+              },
+              {
+                "enabled": true,
+                "fields": [
+                  {
+                    "key": "diagnosis",
+                    "label": "Evaluación / diagnóstico",
+                    "required": false,
+                    "type": "TEXTAREA"
+                  }
+                ],
+                "key": "assessment",
+                "title": "Evaluación"
+              },
+              {
+                "enabled": true,
+                "fields": [
+                  {
+                    "key": "treatment",
+                    "label": "Plan terapéutico",
+                    "required": false,
+                    "type": "TEXTAREA"
+                  },
+                  {
+                    "key": "followUpDate",
+                    "label": "Próximo control",
+                    "required": false,
+                    "type": "DATE"
+                  }
+                ],
+                "key": "plan",
+                "title": "Plan e indicaciones"
+              }
+            ]
+          },
+          "modulesConfig": {
+            "AI_ASSISTANT": true,
+            "GROWTH_CHARTS": true,
+            "MEDICATION_CATALOG": true
+          },
+          "patientForm": {
+            "categories": [
+              {
+                "enabled": true,
+                "fields": [
+                  {
+                    "key": "sys_firstName",
+                    "label": "Nombre",
+                    "required": true,
+                    "system": true,
+                    "type": "TEXT"
+                  },
+                  {
+                    "key": "sys_lastName",
+                    "label": "Apellido",
+                    "required": true,
+                    "system": true,
+                    "type": "TEXT"
+                  },
+                  {
+                    "key": "sys_dni",
+                    "label": "DNI",
+                    "required": true,
+                    "system": true,
+                    "type": "TEXT"
+                  },
+                  {
+                    "key": "sys_dob",
+                    "label": "Fecha de nacimiento",
+                    "required": true,
+                    "system": true,
+                    "type": "DATE"
+                  },
+                  {
+                    "key": "sys_sex",
+                    "label": "Sexo",
+                    "options": [
+                      {
+                        "label": "Masculino",
+                        "value": "MALE"
+                      },
+                      {
+                        "label": "Femenino",
+                        "value": "FEMALE"
+                      },
+                      {
+                        "label": "Otro",
+                        "value": "OTHER"
+                      },
+                      {
+                        "label": "Sin información",
+                        "value": "UNKNOWN"
+                      }
+                    ],
+                    "required": true,
+                    "system": true,
+                    "type": "SELECT"
+                  },
+                  {
+                    "key": "sys_phone",
+                    "label": "Teléfono",
+                    "required": false,
+                    "system": true,
+                    "type": "TEXT"
+                  },
+                  {
+                    "key": "sys_email",
+                    "label": "Email",
+                    "required": false,
+                    "system": true,
+                    "type": "TEXT"
+                  },
+                  {
+                    "key": "sys_insurance",
+                    "label": "Obra social / Cobertura",
+                    "required": false,
+                    "system": true,
+                    "type": "TEXT"
+                  },
+                  {
+                    "key": "address",
+                    "label": "Dirección",
+                    "required": false,
+                    "type": "TEXT"
+                  },
+                  {
+                    "key": "nationality",
+                    "label": "Nacionalidad",
+                    "required": false,
+                    "type": "TEXT"
+                  }
+                ],
+                "key": "sys_patient_profile",
+                "system": true,
+                "title": "Datos Personales"
+              },
+              {
+                "enabled": true,
+                "fields": [
+                  {
+                    "key": "paternalDiseases",
+                    "label": "Enfermedades del padre",
+                    "required": false,
+                    "type": "TEXTAREA"
+                  },
+                  {
+                    "key": "maternalDiseases",
+                    "label": "Enfermedades de la madre",
+                    "required": false,
+                    "type": "TEXTAREA"
+                  },
+                  {
+                    "key": "siblingDiseases",
+                    "label": "Enfermedades de hermanos",
+                    "required": false,
+                    "type": "TEXTAREA"
+                  }
+                ],
+                "key": "family_history",
+                "title": "ANTECEDENTES FAMILIARES"
+              },
+              {
+                "enabled": true,
+                "fields": [
+                  {
+                    "key": "primaryGuardian",
+                    "label": "Tutor o responsable principal",
+                    "options": [
+                      {
+                        "label": "Madre",
+                        "value": "Madre"
+                      },
+                      {
+                        "label": "Padre",
+                        "value": "Padre"
+                      },
+                      {
+                        "label": "Ambos",
+                        "value": "Ambos"
+                      },
+                      {
+                        "label": "Abuelo/a",
+                        "value": "Abuelo/a"
+                      },
+                      {
+                        "label": "Tutor legal / Otro",
+                        "value": "Tutor legal / Otro"
+                      }
+                    ],
+                    "required": false,
+                    "type": "SELECT"
+                  },
+                  {
+                    "key": "motherFullName",
+                    "label": "Nombre de la madre",
+                    "required": false,
+                    "type": "TEXT"
+                  },
+                  {
+                    "key": "fatherFullName",
+                    "label": "Nombre del padre",
+                    "required": false,
+                    "type": "TEXT"
+                  },
+                  {
+                    "key": "primaryContactPhone",
+                    "label": "Teléfono de contacto principal",
+                    "required": false,
+                    "type": "TEXT"
+                  },
+                  {
+                    "key": "hasSiblings",
+                    "label": "¿Tiene hermanos?",
+                    "required": false,
+                    "type": "BOOLEAN"
+                  },
+                  {
+                    "key": "siblingsCount",
+                    "label": "Cantidad de hermanos",
+                    "minimum": 0,
+                    "required": false,
+                    "type": "NUMBER",
+                    "visibleWhen": {
+                      "equals": true,
+                      "fieldKey": "hasSiblings"
+                    }
+                  },
+                  {
+                    "key": "siblingOrder",
+                    "label": "Lugar que ocupa entre hermanos",
+                    "minimum": 1,
+                    "required": false,
+                    "type": "NUMBER",
+                    "visibleWhen": {
+                      "equals": true,
+                      "fieldKey": "hasSiblings"
+                    }
+                  },
+                  {
+                    "key": "livingArrangement",
+                    "label": "Convivencia",
+                    "options": [
+                      {
+                        "label": "Ambos padres",
+                        "value": "Ambos padres"
+                      },
+                      {
+                        "label": "Solo con la madre",
+                        "value": "Solo con la madre"
+                      },
+                      {
+                        "label": "Solo con el padre",
+                        "value": "Solo con el padre"
+                      },
+                      {
+                        "label": "Cuidado compartido",
+                        "value": "Cuidado compartido"
+                      },
+                      {
+                        "label": "Otros familiares",
+                        "value": "Otros familiares"
+                      }
+                    ],
+                    "required": false,
+                    "type": "SELECT"
+                  }
+                ],
+                "key": "guardians",
+                "title": "DATOS FAMILIARES Y TUTORES"
+              }
+            ]
+          },
+          "schemaVersion": 1
+        },
+        "experience": {
+          "specialtyId": 1,
+          "specialtyVersion": 1,
+          "navigation": [
+            "DASHBOARD",
+            "PATIENTS",
+            "CALCULATORS",
+            "VACCINATION",
+            "WIZARD"
+          ],
+          "patientRecordTabs": [
+            "SUMMARY",
+            "ENCOUNTERS",
+            "VACCINATION",
+            "GROWTH",
+            "PRESCRIPTIONS",
+            "STUDIES"
+          ],
+          "patientRecordActions": [
+            "EDIT_PATIENT",
+            "NEW_ENCOUNTER",
+            "VIEW_GROWTH",
+            "PRINT_DOCUMENT"
+          ]
+        }
+      }
+    },
+    {
+      "case": "wizard-finish-b",
+      "through": "actual-gateway",
+      "method": "POST",
+      "path": "/api/doctorchart/workspace/finish-onboarding",
+      "status": 200,
+      "passed": true,
+      "body": {
+        "id": 4,
+        "version": 2,
+        "specialty": {
+          "id": 1,
+          "code": "pediatrics",
+          "name": "Pediatría",
+          "description": "Configuración inicial para la atención pediátrica."
+        },
+        "sourceWizardVersion": 1,
+        "draftSourceWizardVersion": null,
+        "onboardingCompleted": true,
+        "currentStepKey": "completed",
+        "definition": {
+          "patientForm": {
+            "categories": [
+              {
+                "key": "sys_patient_profile",
+                "title": "Datos Personales",
+                "fields": [
+                  {
+                    "key": "sys_firstName",
+                    "type": "TEXT",
+                    "label": "Nombre",
+                    "system": true,
+                    "required": true
+                  },
+                  {
+                    "key": "sys_lastName",
+                    "type": "TEXT",
+                    "label": "Apellido",
+                    "system": true,
+                    "required": true
+                  },
+                  {
+                    "key": "sys_dni",
+                    "type": "TEXT",
+                    "label": "DNI",
+                    "system": true,
+                    "required": true
+                  },
+                  {
+                    "key": "sys_dob",
+                    "type": "DATE",
+                    "label": "Fecha de nacimiento",
+                    "system": true,
+                    "required": true
+                  },
+                  {
+                    "key": "sys_sex",
+                    "type": "SELECT",
+                    "label": "Sexo",
+                    "system": true,
+                    "options": [
+                      {
+                        "label": "Masculino",
+                        "value": "MALE"
+                      },
+                      {
+                        "label": "Femenino",
+                        "value": "FEMALE"
+                      },
+                      {
+                        "label": "Otro",
+                        "value": "OTHER"
+                      },
+                      {
+                        "label": "Sin información",
+                        "value": "UNKNOWN"
+                      }
+                    ],
+                    "required": true
+                  },
+                  {
+                    "key": "sys_phone",
+                    "type": "TEXT",
+                    "label": "Teléfono",
+                    "system": true,
+                    "required": false
+                  },
+                  {
+                    "key": "sys_email",
+                    "type": "TEXT",
+                    "label": "Email",
+                    "system": true,
+                    "required": false
+                  },
+                  {
+                    "key": "sys_insurance",
+                    "type": "TEXT",
+                    "label": "Obra social / Cobertura",
+                    "system": true,
+                    "required": false
+                  },
+                  {
+                    "key": "address",
+                    "type": "TEXT",
+                    "label": "Dirección",
+                    "required": false
+                  },
+                  {
+                    "key": "nationality",
+                    "type": "TEXT",
+                    "label": "Nacionalidad",
+                    "required": false
+                  }
+                ],
+                "system": true,
+                "enabled": true
+              },
+              {
+                "key": "family_history",
+                "title": "ANTECEDENTES FAMILIARES",
+                "fields": [
+                  {
+                    "key": "paternalDiseases",
+                    "type": "TEXTAREA",
+                    "label": "Enfermedades del padre",
+                    "required": false
+                  },
+                  {
+                    "key": "maternalDiseases",
+                    "type": "TEXTAREA",
+                    "label": "Enfermedades de la madre",
+                    "required": false
+                  },
+                  {
+                    "key": "siblingDiseases",
+                    "type": "TEXTAREA",
+                    "label": "Enfermedades de hermanos",
+                    "required": false
+                  }
+                ],
+                "enabled": true
+              },
+              {
+                "key": "guardians",
+                "title": "DATOS FAMILIARES Y TUTORES",
+                "fields": [
+                  {
+                    "key": "primaryGuardian",
+                    "type": "SELECT",
+                    "label": "Tutor o responsable principal",
+                    "options": [
+                      {
+                        "label": "Madre",
+                        "value": "Madre"
+                      },
+                      {
+                        "label": "Padre",
+                        "value": "Padre"
+                      },
+                      {
+                        "label": "Ambos",
+                        "value": "Ambos"
+                      },
+                      {
+                        "label": "Abuelo/a",
+                        "value": "Abuelo/a"
+                      },
+                      {
+                        "label": "Tutor legal / Otro",
+                        "value": "Tutor legal / Otro"
+                      }
+                    ],
+                    "required": false
+                  },
+                  {
+                    "key": "motherFullName",
+                    "type": "TEXT",
+                    "label": "Nombre de la madre",
+                    "required": false
+                  },
+                  {
+                    "key": "fatherFullName",
+                    "type": "TEXT",
+                    "label": "Nombre del padre",
+                    "required": false
+                  },
+                  {
+                    "key": "primaryContactPhone",
+                    "type": "TEXT",
+                    "label": "Teléfono de contacto principal",
+                    "required": false
+                  },
+                  {
+                    "key": "hasSiblings",
+                    "type": "BOOLEAN",
+                    "label": "¿Tiene hermanos?",
+                    "required": false
+                  },
+                  {
+                    "key": "siblingsCount",
+                    "type": "NUMBER",
+                    "label": "Cantidad de hermanos",
+                    "minimum": 0,
+                    "required": false,
+                    "visibleWhen": {
+                      "equals": true,
+                      "fieldKey": "hasSiblings"
+                    }
+                  },
+                  {
+                    "key": "siblingOrder",
+                    "type": "NUMBER",
+                    "label": "Lugar que ocupa entre hermanos",
+                    "minimum": 1,
+                    "required": false,
+                    "visibleWhen": {
+                      "equals": true,
+                      "fieldKey": "hasSiblings"
+                    }
+                  },
+                  {
+                    "key": "livingArrangement",
+                    "type": "SELECT",
+                    "label": "Convivencia",
+                    "options": [
+                      {
+                        "label": "Ambos padres",
+                        "value": "Ambos padres"
+                      },
+                      {
+                        "label": "Solo con la madre",
+                        "value": "Solo con la madre"
+                      },
+                      {
+                        "label": "Solo con el padre",
+                        "value": "Solo con el padre"
+                      },
+                      {
+                        "label": "Cuidado compartido",
+                        "value": "Cuidado compartido"
+                      },
+                      {
+                        "label": "Otros familiares",
+                        "value": "Otros familiares"
+                      }
+                    ],
+                    "required": false
+                  }
+                ],
+                "enabled": true
+              }
+            ]
+          },
+          "encounterForm": {
+            "categories": [
+              {
+                "key": "reason",
+                "title": "Motivo de consulta",
+                "fields": [
+                  {
+                    "key": "chiefComplaint",
+                    "type": "TEXTAREA",
+                    "label": "Motivo de consulta",
+                    "required": true
+                  },
+                  {
+                    "key": "presentIllness",
+                    "type": "TEXTAREA",
+                    "label": "Evolución",
+                    "required": false
+                  }
+                ],
+                "enabled": true
+              },
+              {
+                "key": "measurements",
+                "title": "Antropometría",
+                "fields": [
+                  {
+                    "key": "weightKg",
+                    "type": "NUMBER",
+                    "unit": "kg",
+                    "label": "Peso",
+                    "minimum": 0,
+                    "required": true
+                  },
+                  {
+                    "key": "heightCm",
+                    "type": "NUMBER",
+                    "unit": "cm",
+                    "label": "Longitud / talla",
+                    "minimum": 0,
+                    "required": true
+                  },
+                  {
+                    "key": "headCircumferenceCm",
+                    "type": "NUMBER",
+                    "unit": "cm",
+                    "label": "Perímetro cefálico",
+                    "minimum": 0,
+                    "required": false
+                  },
+                  {
+                    "key": "bloodPressure",
+                    "type": "TEXT",
+                    "label": "Tensión arterial",
+                    "required": false
+                  }
+                ],
+                "enabled": true
+              },
+              {
+                "key": "physical_exam",
+                "title": "Examen físico",
+                "fields": [
+                  {
+                    "key": "physicalExam",
+                    "type": "TEXTAREA",
+                    "label": "Examen físico",
+                    "required": false
+                  }
+                ],
+                "enabled": true
+              },
+              {
+                "key": "development",
+                "title": "Desarrollo",
+                "fields": [
+                  {
+                    "key": "meetsMilestones",
+                    "type": "BOOLEAN",
+                    "label": "Cumple pautas de desarrollo",
+                    "required": false
+                  },
+                  {
+                    "key": "milestoneNotes",
+                    "type": "TEXTAREA",
+                    "label": "Detalle de las pautas pendientes",
+                    "required": false,
+                    "visibleWhen": {
+                      "equals": false,
+                      "fieldKey": "meetsMilestones"
+                    }
+                  }
+                ],
+                "enabled": true
+              },
+              {
+                "key": "assessment",
+                "title": "Evaluación",
+                "fields": [
+                  {
+                    "key": "diagnosis",
+                    "type": "TEXTAREA",
+                    "label": "Evaluación / diagnóstico",
+                    "required": false
+                  }
+                ],
+                "enabled": true
+              },
+              {
+                "key": "plan",
+                "title": "Plan e indicaciones",
+                "fields": [
+                  {
+                    "key": "treatment",
+                    "type": "TEXTAREA",
+                    "label": "Plan terapéutico",
+                    "required": false
+                  },
+                  {
+                    "key": "followUpDate",
+                    "type": "DATE",
+                    "label": "Próximo control",
+                    "required": false
+                  }
+                ],
+                "enabled": true
+              }
+            ]
+          },
+          "modulesConfig": {
+            "AI_ASSISTANT": true,
+            "GROWTH_CHARTS": true,
+            "MEDICATION_CATALOG": true
+          },
+          "schemaVersion": 1
+        },
+        "draftDefinition": null,
+        "experience": {
+          "specialtyId": 1,
+          "specialtyVersion": 1,
+          "navigation": [
+            "DASHBOARD",
+            "PATIENTS",
+            "CALCULATORS",
+            "VACCINATION",
+            "WIZARD"
+          ],
+          "patientRecordTabs": [
+            "SUMMARY",
+            "ENCOUNTERS",
+            "VACCINATION",
+            "GROWTH",
+            "PRESCRIPTIONS",
+            "STUDIES"
+          ],
+          "patientRecordActions": [
+            "EDIT_PATIENT",
+            "NEW_ENCOUNTER",
+            "VIEW_GROWTH",
+            "PRINT_DOCUMENT"
+          ]
+        }
+      }
+    },
+    {
+      "case": "doctor-profile",
+      "through": "actual-gateway",
+      "method": "GET",
+      "path": "/api/doctorchart/doctor/profile",
+      "status": 200,
+      "passed": true,
+      "body": {
+        "id": 3,
+        "userId": "2e10e3285567996e52b040ecf3de1331",
+        "specialty": {
+          "id": 1,
+          "code": "pediatrics",
+          "name": "Pediatría",
+          "description": "Configuración inicial para la atención pediátrica."
+        },
+        "isSpecialtyLocked": true,
+        "createdAt": "2026-10-09T10:41:18.885606Z"
+      }
+    },
+    {
+      "case": "workspace-preferences",
+      "through": "actual-gateway",
+      "method": "GET",
+      "path": "/api/doctorchart/workspace/preferences",
+      "status": 200,
+      "passed": true,
+      "body": {
+        "version": 2,
+        "patientColumnsConfig": null,
+        "quickNotes": null
+      }
+    },
+    {
+      "case": "workspace-preferences-write",
+      "through": "actual-gateway",
+      "method": "PUT",
+      "path": "/api/doctorchart/workspace/preferences",
+      "status": 200,
+      "passed": true,
+      "body": {
+        "version": 3,
+        "patientColumnsConfig": {
+          "phone": false
+        },
+        "quickNotes": null
+      }
+    },
+    {
+      "case": "workspace-notes",
+      "through": "actual-gateway",
+      "method": "PUT",
+      "path": "/api/doctorchart/workspace/quick-notes",
+      "status": 200,
+      "passed": true,
+      "body": {
+        "version": 4,
+        "patientColumnsConfig": {
+          "phone": false
+        },
+        "quickNotes": "Nota local sintética"
+      }
+    },
+    {
+      "case": "workspace-isolation",
+      "through": "actual-gateway",
+      "method": "GET",
+      "path": "/api/doctorchart/workspace/preferences",
+      "status": 200,
+      "passed": true,
+      "body": {
+        "version": 2,
+        "patientColumnsConfig": null,
+        "quickNotes": null
+      }
+    },
+    {
+      "case": "workspace-current-before-patient",
+      "through": "actual-gateway",
+      "method": "GET",
+      "path": "/api/doctorchart/workspace",
+      "status": 200,
+      "passed": true,
+      "body": {
+        "id": 3,
+        "version": 4,
+        "specialty": {
+          "id": 1,
+          "code": "pediatrics",
+          "name": "Pediatría",
+          "description": "Configuración inicial para la atención pediátrica."
+        },
+        "sourceWizardVersion": 1,
+        "draftSourceWizardVersion": null,
+        "onboardingCompleted": true,
+        "currentStepKey": "completed",
+        "definition": {
+          "patientForm": {
+            "categories": [
+              {
+                "key": "sys_patient_profile",
+                "title": "Datos Personales",
+                "fields": [
+                  {
+                    "key": "sys_firstName",
+                    "type": "TEXT",
+                    "label": "Nombre",
+                    "system": true,
+                    "required": true
+                  },
+                  {
+                    "key": "sys_lastName",
+                    "type": "TEXT",
+                    "label": "Apellido",
+                    "system": true,
+                    "required": true
+                  },
+                  {
+                    "key": "sys_dni",
+                    "type": "TEXT",
+                    "label": "DNI",
+                    "system": true,
+                    "required": true
+                  },
+                  {
+                    "key": "sys_dob",
+                    "type": "DATE",
+                    "label": "Fecha de nacimiento",
+                    "system": true,
+                    "required": true
+                  },
+                  {
+                    "key": "sys_sex",
+                    "type": "SELECT",
+                    "label": "Sexo",
+                    "system": true,
+                    "options": [
+                      {
+                        "label": "Masculino",
+                        "value": "MALE"
+                      },
+                      {
+                        "label": "Femenino",
+                        "value": "FEMALE"
+                      },
+                      {
+                        "label": "Otro",
+                        "value": "OTHER"
+                      },
+                      {
+                        "label": "Sin información",
+                        "value": "UNKNOWN"
+                      }
+                    ],
+                    "required": true
+                  },
+                  {
+                    "key": "sys_phone",
+                    "type": "TEXT",
+                    "label": "Teléfono",
+                    "system": true,
+                    "required": false
+                  },
+                  {
+                    "key": "sys_email",
+                    "type": "TEXT",
+                    "label": "Email",
+                    "system": true,
+                    "required": false
+                  },
+                  {
+                    "key": "sys_insurance",
+                    "type": "TEXT",
+                    "label": "Obra social / Cobertura",
+                    "system": true,
+                    "required": false
+                  },
+                  {
+                    "key": "address",
+                    "type": "TEXT",
+                    "label": "Dirección",
+                    "required": false
+                  },
+                  {
+                    "key": "nationality",
+                    "type": "TEXT",
+                    "label": "Nacionalidad",
+                    "required": false
+                  }
+                ],
+                "system": true,
+                "enabled": true
+              },
+              {
+                "key": "family_history",
+                "title": "ANTECEDENTES FAMILIARES",
+                "fields": [
+                  {
+                    "key": "paternalDiseases",
+                    "type": "TEXTAREA",
+                    "label": "Enfermedades del padre",
+                    "required": false
+                  },
+                  {
+                    "key": "maternalDiseases",
+                    "type": "TEXTAREA",
+                    "label": "Enfermedades de la madre",
+                    "required": false
+                  },
+                  {
+                    "key": "siblingDiseases",
+                    "type": "TEXTAREA",
+                    "label": "Enfermedades de hermanos",
+                    "required": false
+                  }
+                ],
+                "enabled": true
+              },
+              {
+                "key": "guardians",
+                "title": "DATOS FAMILIARES Y TUTORES",
+                "fields": [
+                  {
+                    "key": "primaryGuardian",
+                    "type": "SELECT",
+                    "label": "Tutor o responsable principal",
+                    "options": [
+                      {
+                        "label": "Madre",
+                        "value": "Madre"
+                      },
+                      {
+                        "label": "Padre",
+                        "value": "Padre"
+                      },
+                      {
+                        "label": "Ambos",
+                        "value": "Ambos"
+                      },
+                      {
+                        "label": "Abuelo/a",
+                        "value": "Abuelo/a"
+                      },
+                      {
+                        "label": "Tutor legal / Otro",
+                        "value": "Tutor legal / Otro"
+                      }
+                    ],
+                    "required": false
+                  },
+                  {
+                    "key": "motherFullName",
+                    "type": "TEXT",
+                    "label": "Nombre de la madre",
+                    "required": false
+                  },
+                  {
+                    "key": "fatherFullName",
+                    "type": "TEXT",
+                    "label": "Nombre del padre",
+                    "required": false
+                  },
+                  {
+                    "key": "primaryContactPhone",
+                    "type": "TEXT",
+                    "label": "Teléfono de contacto principal",
+                    "required": false
+                  },
+                  {
+                    "key": "hasSiblings",
+                    "type": "BOOLEAN",
+                    "label": "¿Tiene hermanos?",
+                    "required": false
+                  },
+                  {
+                    "key": "siblingsCount",
+                    "type": "NUMBER",
+                    "label": "Cantidad de hermanos",
+                    "minimum": 0,
+                    "required": false,
+                    "visibleWhen": {
+                      "equals": true,
+                      "fieldKey": "hasSiblings"
+                    }
+                  },
+                  {
+                    "key": "siblingOrder",
+                    "type": "NUMBER",
+                    "label": "Lugar que ocupa entre hermanos",
+                    "minimum": 1,
+                    "required": false,
+                    "visibleWhen": {
+                      "equals": true,
+                      "fieldKey": "hasSiblings"
+                    }
+                  },
+                  {
+                    "key": "livingArrangement",
+                    "type": "SELECT",
+                    "label": "Convivencia",
+                    "options": [
+                      {
+                        "label": "Ambos padres",
+                        "value": "Ambos padres"
+                      },
+                      {
+                        "label": "Solo con la madre",
+                        "value": "Solo con la madre"
+                      },
+                      {
+                        "label": "Solo con el padre",
+                        "value": "Solo con el padre"
+                      },
+                      {
+                        "label": "Cuidado compartido",
+                        "value": "Cuidado compartido"
+                      },
+                      {
+                        "label": "Otros familiares",
+                        "value": "Otros familiares"
+                      }
+                    ],
+                    "required": false
+                  }
+                ],
+                "enabled": true
+              }
+            ]
+          },
+          "encounterForm": {
+            "categories": [
+              {
+                "key": "reason",
+                "title": "Motivo de consulta",
+                "fields": [
+                  {
+                    "key": "chiefComplaint",
+                    "type": "TEXTAREA",
+                    "label": "Motivo de consulta",
+                    "required": true
+                  },
+                  {
+                    "key": "presentIllness",
+                    "type": "TEXTAREA",
+                    "label": "Evolución",
+                    "required": false
+                  }
+                ],
+                "enabled": true
+              },
+              {
+                "key": "measurements",
+                "title": "Antropometría",
+                "fields": [
+                  {
+                    "key": "weightKg",
+                    "type": "NUMBER",
+                    "unit": "kg",
+                    "label": "Peso",
+                    "minimum": 0,
+                    "required": true
+                  },
+                  {
+                    "key": "heightCm",
+                    "type": "NUMBER",
+                    "unit": "cm",
+                    "label": "Longitud / talla",
+                    "minimum": 0,
+                    "required": true
+                  },
+                  {
+                    "key": "headCircumferenceCm",
+                    "type": "NUMBER",
+                    "unit": "cm",
+                    "label": "Perímetro cefálico",
+                    "minimum": 0,
+                    "required": false
+                  },
+                  {
+                    "key": "bloodPressure",
+                    "type": "TEXT",
+                    "label": "Tensión arterial",
+                    "required": false
+                  }
+                ],
+                "enabled": true
+              },
+              {
+                "key": "physical_exam",
+                "title": "Examen físico",
+                "fields": [
+                  {
+                    "key": "physicalExam",
+                    "type": "TEXTAREA",
+                    "label": "Examen físico",
+                    "required": false
+                  }
+                ],
+                "enabled": true
+              },
+              {
+                "key": "development",
+                "title": "Desarrollo",
+                "fields": [
+                  {
+                    "key": "meetsMilestones",
+                    "type": "BOOLEAN",
+                    "label": "Cumple pautas de desarrollo",
+                    "required": false
+                  },
+                  {
+                    "key": "milestoneNotes",
+                    "type": "TEXTAREA",
+                    "label": "Detalle de las pautas pendientes",
+                    "required": false,
+                    "visibleWhen": {
+                      "equals": false,
+                      "fieldKey": "meetsMilestones"
+                    }
+                  }
+                ],
+                "enabled": true
+              },
+              {
+                "key": "assessment",
+                "title": "Evaluación",
+                "fields": [
+                  {
+                    "key": "diagnosis",
+                    "type": "TEXTAREA",
+                    "label": "Evaluación / diagnóstico",
+                    "required": false
+                  }
+                ],
+                "enabled": true
+              },
+              {
+                "key": "plan",
+                "title": "Plan e indicaciones",
+                "fields": [
+                  {
+                    "key": "treatment",
+                    "type": "TEXTAREA",
+                    "label": "Plan terapéutico",
+                    "required": false
+                  },
+                  {
+                    "key": "followUpDate",
+                    "type": "DATE",
+                    "label": "Próximo control",
+                    "required": false
+                  }
+                ],
+                "enabled": true
+              }
+            ]
+          },
+          "modulesConfig": {
+            "AI_ASSISTANT": true,
+            "GROWTH_CHARTS": true,
+            "MEDICATION_CATALOG": true
+          },
+          "schemaVersion": 1
+        },
+        "draftDefinition": null,
+        "experience": {
+          "specialtyId": 1,
+          "specialtyVersion": 1,
+          "navigation": [
+            "DASHBOARD",
+            "PATIENTS",
+            "CALCULATORS",
+            "VACCINATION",
+            "WIZARD"
+          ],
+          "patientRecordTabs": [
+            "SUMMARY",
+            "ENCOUNTERS",
+            "VACCINATION",
+            "GROWTH",
+            "PRESCRIPTIONS",
+            "STUDIES"
+          ],
+          "patientRecordActions": [
+            "EDIT_PATIENT",
+            "NEW_ENCOUNTER",
+            "VIEW_GROWTH",
+            "PRINT_DOCUMENT"
+          ]
+        }
+      }
+    },
+    {
+      "case": "patient-create",
+      "through": "actual-gateway",
+      "method": "POST",
+      "path": "/api/doctorchart/patients",
+      "status": 201,
+      "passed": true,
+      "body": {
+        "id": 1,
+        "version": 0,
+        "fullName": "Ana María Prueba",
+        "birthDate": "2020-02-29",
+        "nationalId": "fixture-001",
+        "gender": "FEMALE",
+        "bloodType": null,
+        "phone": null,
+        "email": null,
+        "address": null,
+        "emergencyContact": null,
+        "insuranceInfo": null,
+        "allergies": [],
+        "chronicConditions": [],
+        "guardianInfo": {
+          "address": null,
+          "fatherFullName": null,
+          "firstGuardianFullName": null,
+          "firstGuardianNationalId": null,
+          "firstGuardianPhone": null,
+          "hasSiblings": null,
+          "livingArrangement": null,
+          "motherFullName": null,
+          "primaryContactPhone": null,
+          "primaryGuardian": null,
+          "secondGuardianFullName": null,
+          "secondGuardianNationalId": null,
+          "secondGuardianPhone": null,
+          "siblingOrder": null,
+          "siblingsCount": null
+        },
+        "perinatalHistory": null,
+        "personalHistory": null,
+        "familyHistory": {
+          "familyAllergies": null,
+          "familyChronicDiseases": null,
+          "geneticDiseases": null,
+          "maternalDiseases": null,
+          "paternalDiseases": null,
+          "siblingDiseases": null
+        },
+        "immunizationAndNutrition": null,
+        "latestMeasurements": null,
+        "formValues": {
+          "address": null,
+          "fatherFullName": null,
+          "hasSiblings": null,
+          "livingArrangement": null,
+          "maternalDiseases": null,
+          "motherFullName": null,
+          "nationality": null,
+          "paternalDiseases": null,
+          "primaryContactPhone": null,
+          "primaryGuardian": null,
+          "siblingDiseases": null,
+          "siblingOrder": null,
+          "siblingsCount": null,
+          "sys_dni": "fixture-001",
+          "sys_dob": "2020-02-29",
+          "sys_email": null,
+          "sys_firstName": "Ana María",
+          "sys_insurance": null,
+          "sys_lastName": "Prueba",
+          "sys_phone": null,
+          "sys_sex": "FEMALE"
+        },
+        "formulaResults": {},
+        "formDefinitionSnapshot": {
+          "categories": [
+            {
+              "enabled": true,
+              "fields": [
+                {
+                  "key": "sys_firstName",
+                  "label": "Nombre",
+                  "required": true,
+                  "system": true,
+                  "type": "TEXT"
+                },
+                {
+                  "key": "sys_lastName",
+                  "label": "Apellido",
+                  "required": true,
+                  "system": true,
+                  "type": "TEXT"
+                },
+                {
+                  "key": "sys_dni",
+                  "label": "DNI",
+                  "required": true,
+                  "system": true,
+                  "type": "TEXT"
+                },
+                {
+                  "key": "sys_dob",
+                  "label": "Fecha de nacimiento",
+                  "required": true,
+                  "system": true,
+                  "type": "DATE"
+                },
+                {
+                  "key": "sys_sex",
+                  "label": "Sexo",
+                  "options": [
+                    {
+                      "label": "Masculino",
+                      "value": "MALE"
+                    },
+                    {
+                      "label": "Femenino",
+                      "value": "FEMALE"
+                    },
+                    {
+                      "label": "Otro",
+                      "value": "OTHER"
+                    },
+                    {
+                      "label": "Sin información",
+                      "value": "UNKNOWN"
+                    }
+                  ],
+                  "required": true,
+                  "system": true,
+                  "type": "SELECT"
+                },
+                {
+                  "key": "sys_phone",
+                  "label": "Teléfono",
+                  "required": false,
+                  "system": true,
+                  "type": "TEXT"
+                },
+                {
+                  "key": "sys_email",
+                  "label": "Email",
+                  "required": false,
+                  "system": true,
+                  "type": "TEXT"
+                },
+                {
+                  "key": "sys_insurance",
+                  "label": "Obra social / Cobertura",
+                  "required": false,
+                  "system": true,
+                  "type": "TEXT"
+                },
+                {
+                  "key": "address",
+                  "label": "Dirección",
+                  "required": false,
+                  "type": "TEXT"
+                },
+                {
+                  "key": "nationality",
+                  "label": "Nacionalidad",
+                  "required": false,
+                  "type": "TEXT"
+                }
+              ],
+              "key": "sys_patient_profile",
+              "system": true,
+              "title": "Datos Personales"
+            },
+            {
+              "enabled": true,
+              "fields": [
+                {
+                  "key": "paternalDiseases",
+                  "label": "Enfermedades del padre",
+                  "required": false,
+                  "type": "TEXTAREA"
+                },
+                {
+                  "key": "maternalDiseases",
+                  "label": "Enfermedades de la madre",
+                  "required": false,
+                  "type": "TEXTAREA"
+                },
+                {
+                  "key": "siblingDiseases",
+                  "label": "Enfermedades de hermanos",
+                  "required": false,
+                  "type": "TEXTAREA"
+                }
+              ],
+              "key": "family_history",
+              "title": "ANTECEDENTES FAMILIARES"
+            },
+            {
+              "enabled": true,
+              "fields": [
+                {
+                  "key": "primaryGuardian",
+                  "label": "Tutor o responsable principal",
+                  "options": [
+                    {
+                      "label": "Madre",
+                      "value": "Madre"
+                    },
+                    {
+                      "label": "Padre",
+                      "value": "Padre"
+                    },
+                    {
+                      "label": "Ambos",
+                      "value": "Ambos"
+                    },
+                    {
+                      "label": "Abuelo/a",
+                      "value": "Abuelo/a"
+                    },
+                    {
+                      "label": "Tutor legal / Otro",
+                      "value": "Tutor legal / Otro"
+                    }
+                  ],
+                  "required": false,
+                  "type": "SELECT"
+                },
+                {
+                  "key": "motherFullName",
+                  "label": "Nombre de la madre",
+                  "required": false,
+                  "type": "TEXT"
+                },
+                {
+                  "key": "fatherFullName",
+                  "label": "Nombre del padre",
+                  "required": false,
+                  "type": "TEXT"
+                },
+                {
+                  "key": "primaryContactPhone",
+                  "label": "Teléfono de contacto principal",
+                  "required": false,
+                  "type": "TEXT"
+                },
+                {
+                  "key": "hasSiblings",
+                  "label": "¿Tiene hermanos?",
+                  "required": false,
+                  "type": "BOOLEAN"
+                },
+                {
+                  "key": "siblingsCount",
+                  "label": "Cantidad de hermanos",
+                  "minimum": 0,
+                  "required": false,
+                  "type": "NUMBER",
+                  "visibleWhen": {
+                    "equals": true,
+                    "fieldKey": "hasSiblings"
+                  }
+                },
+                {
+                  "key": "siblingOrder",
+                  "label": "Lugar que ocupa entre hermanos",
+                  "minimum": 1,
+                  "required": false,
+                  "type": "NUMBER",
+                  "visibleWhen": {
+                    "equals": true,
+                    "fieldKey": "hasSiblings"
+                  }
+                },
+                {
+                  "key": "livingArrangement",
+                  "label": "Convivencia",
+                  "options": [
+                    {
+                      "label": "Ambos padres",
+                      "value": "Ambos padres"
+                    },
+                    {
+                      "label": "Solo con la madre",
+                      "value": "Solo con la madre"
+                    },
+                    {
+                      "label": "Solo con el padre",
+                      "value": "Solo con el padre"
+                    },
+                    {
+                      "label": "Cuidado compartido",
+                      "value": "Cuidado compartido"
+                    },
+                    {
+                      "label": "Otros familiares",
+                      "value": "Otros familiares"
+                    }
+                  ],
+                  "required": false,
+                  "type": "SELECT"
+                }
+              ],
+              "key": "guardians",
+              "title": "DATOS FAMILIARES Y TUTORES"
+            }
+          ]
+        },
+        "formulaContext": {
+          "patient.ageYears": 6,
+          "patient.gender": "FEMALE",
+          "patient.latestHeightCm": null,
+          "patient.latestWeightKg": null,
+          "referenceDate": "2026-10-09",
+          "zone": "America/Argentina/Buenos_Aires"
+        },
+        "workspaceVersion": 4
+      }
+    },
+    {
+      "case": "patient-get",
+      "through": "actual-gateway",
+      "method": "GET",
+      "path": "/api/doctorchart/patients/1",
+      "status": 200,
+      "passed": true,
+      "body": {
+        "id": 1,
+        "version": 0,
+        "fullName": "Ana María Prueba",
+        "birthDate": "2020-02-29",
+        "nationalId": "fixture-001",
+        "gender": "FEMALE",
+        "bloodType": null,
+        "phone": null,
+        "email": null,
+        "address": null,
+        "emergencyContact": null,
+        "insuranceInfo": null,
+        "allergies": [],
+        "chronicConditions": [],
+        "guardianInfo": {
+          "address": null,
+          "fatherFullName": null,
+          "firstGuardianFullName": null,
+          "firstGuardianNationalId": null,
+          "firstGuardianPhone": null,
+          "hasSiblings": null,
+          "livingArrangement": null,
+          "motherFullName": null,
+          "primaryContactPhone": null,
+          "primaryGuardian": null,
+          "secondGuardianFullName": null,
+          "secondGuardianNationalId": null,
+          "secondGuardianPhone": null,
+          "siblingOrder": null,
+          "siblingsCount": null
+        },
+        "perinatalHistory": null,
+        "personalHistory": null,
+        "familyHistory": {
+          "familyAllergies": null,
+          "familyChronicDiseases": null,
+          "geneticDiseases": null,
+          "maternalDiseases": null,
+          "paternalDiseases": null,
+          "siblingDiseases": null
+        },
+        "immunizationAndNutrition": null,
+        "latestMeasurements": null,
+        "formValues": {
+          "address": null,
+          "sys_dni": "fixture-001",
+          "sys_dob": "2020-02-29",
+          "sys_sex": "FEMALE",
+          "sys_email": null,
+          "sys_phone": null,
+          "hasSiblings": null,
+          "nationality": null,
+          "siblingOrder": null,
+          "sys_lastName": "Prueba",
+          "siblingsCount": null,
+          "sys_firstName": "Ana María",
+          "sys_insurance": null,
+          "fatherFullName": null,
+          "motherFullName": null,
+          "primaryGuardian": null,
+          "siblingDiseases": null,
+          "maternalDiseases": null,
+          "paternalDiseases": null,
+          "livingArrangement": null,
+          "primaryContactPhone": null
+        },
+        "formulaResults": {},
+        "formDefinitionSnapshot": {
+          "categories": [
+            {
+              "key": "sys_patient_profile",
+              "title": "Datos Personales",
+              "fields": [
+                {
+                  "key": "sys_firstName",
+                  "type": "TEXT",
+                  "label": "Nombre",
+                  "system": true,
+                  "required": true
+                },
+                {
+                  "key": "sys_lastName",
+                  "type": "TEXT",
+                  "label": "Apellido",
+                  "system": true,
+                  "required": true
+                },
+                {
+                  "key": "sys_dni",
+                  "type": "TEXT",
+                  "label": "DNI",
+                  "system": true,
+                  "required": true
+                },
+                {
+                  "key": "sys_dob",
+                  "type": "DATE",
+                  "label": "Fecha de nacimiento",
+                  "system": true,
+                  "required": true
+                },
+                {
+                  "key": "sys_sex",
+                  "type": "SELECT",
+                  "label": "Sexo",
+                  "system": true,
+                  "options": [
+                    {
+                      "label": "Masculino",
+                      "value": "MALE"
+                    },
+                    {
+                      "label": "Femenino",
+                      "value": "FEMALE"
+                    },
+                    {
+                      "label": "Otro",
+                      "value": "OTHER"
+                    },
+                    {
+                      "label": "Sin información",
+                      "value": "UNKNOWN"
+                    }
+                  ],
+                  "required": true
+                },
+                {
+                  "key": "sys_phone",
+                  "type": "TEXT",
+                  "label": "Teléfono",
+                  "system": true,
+                  "required": false
+                },
+                {
+                  "key": "sys_email",
+                  "type": "TEXT",
+                  "label": "Email",
+                  "system": true,
+                  "required": false
+                },
+                {
+                  "key": "sys_insurance",
+                  "type": "TEXT",
+                  "label": "Obra social / Cobertura",
+                  "system": true,
+                  "required": false
+                },
+                {
+                  "key": "address",
+                  "type": "TEXT",
+                  "label": "Dirección",
+                  "required": false
+                },
+                {
+                  "key": "nationality",
+                  "type": "TEXT",
+                  "label": "Nacionalidad",
+                  "required": false
+                }
+              ],
+              "system": true,
+              "enabled": true
+            },
+            {
+              "key": "family_history",
+              "title": "ANTECEDENTES FAMILIARES",
+              "fields": [
+                {
+                  "key": "paternalDiseases",
+                  "type": "TEXTAREA",
+                  "label": "Enfermedades del padre",
+                  "required": false
+                },
+                {
+                  "key": "maternalDiseases",
+                  "type": "TEXTAREA",
+                  "label": "Enfermedades de la madre",
+                  "required": false
+                },
+                {
+                  "key": "siblingDiseases",
+                  "type": "TEXTAREA",
+                  "label": "Enfermedades de hermanos",
+                  "required": false
+                }
+              ],
+              "enabled": true
+            },
+            {
+              "key": "guardians",
+              "title": "DATOS FAMILIARES Y TUTORES",
+              "fields": [
+                {
+                  "key": "primaryGuardian",
+                  "type": "SELECT",
+                  "label": "Tutor o responsable principal",
+                  "options": [
+                    {
+                      "label": "Madre",
+                      "value": "Madre"
+                    },
+                    {
+                      "label": "Padre",
+                      "value": "Padre"
+                    },
+                    {
+                      "label": "Ambos",
+                      "value": "Ambos"
+                    },
+                    {
+                      "label": "Abuelo/a",
+                      "value": "Abuelo/a"
+                    },
+                    {
+                      "label": "Tutor legal / Otro",
+                      "value": "Tutor legal / Otro"
+                    }
+                  ],
+                  "required": false
+                },
+                {
+                  "key": "motherFullName",
+                  "type": "TEXT",
+                  "label": "Nombre de la madre",
+                  "required": false
+                },
+                {
+                  "key": "fatherFullName",
+                  "type": "TEXT",
+                  "label": "Nombre del padre",
+                  "required": false
+                },
+                {
+                  "key": "primaryContactPhone",
+                  "type": "TEXT",
+                  "label": "Teléfono de contacto principal",
+                  "required": false
+                },
+                {
+                  "key": "hasSiblings",
+                  "type": "BOOLEAN",
+                  "label": "¿Tiene hermanos?",
+                  "required": false
+                },
+                {
+                  "key": "siblingsCount",
+                  "type": "NUMBER",
+                  "label": "Cantidad de hermanos",
+                  "minimum": 0,
+                  "required": false,
+                  "visibleWhen": {
+                    "equals": true,
+                    "fieldKey": "hasSiblings"
+                  }
+                },
+                {
+                  "key": "siblingOrder",
+                  "type": "NUMBER",
+                  "label": "Lugar que ocupa entre hermanos",
+                  "minimum": 1,
+                  "required": false,
+                  "visibleWhen": {
+                    "equals": true,
+                    "fieldKey": "hasSiblings"
+                  }
+                },
+                {
+                  "key": "livingArrangement",
+                  "type": "SELECT",
+                  "label": "Convivencia",
+                  "options": [
+                    {
+                      "label": "Ambos padres",
+                      "value": "Ambos padres"
+                    },
+                    {
+                      "label": "Solo con la madre",
+                      "value": "Solo con la madre"
+                    },
+                    {
+                      "label": "Solo con el padre",
+                      "value": "Solo con el padre"
+                    },
+                    {
+                      "label": "Cuidado compartido",
+                      "value": "Cuidado compartido"
+                    },
+                    {
+                      "label": "Otros familiares",
+                      "value": "Otros familiares"
+                    }
+                  ],
+                  "required": false
+                }
+              ],
+              "enabled": true
+            }
+          ]
+        },
+        "formulaContext": {
+          "zone": "America/Argentina/Buenos_Aires",
+          "referenceDate": "2026-10-09",
+          "patient.gender": "FEMALE",
+          "patient.ageYears": 6,
+          "patient.latestHeightCm": null,
+          "patient.latestWeightKg": null
+        },
+        "workspaceVersion": 4
+      }
+    },
+    {
+      "case": "patient-owner",
+      "through": "actual-gateway",
+      "method": "GET",
+      "path": "/api/doctorchart/patients/1",
+      "status": 403,
+      "passed": true,
+      "body": {
+        "code": "FORBIDDEN",
+        "message": "No tenés permiso para acceder a este paciente.",
+        "errors": []
+      }
+    }
+  ]
+}

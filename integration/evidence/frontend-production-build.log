@@ -1,0 +1,88 @@
+npm notice run doctorchart-frontend@0.0.0 prebuild
+npm notice run npm run config:production
+npm notice run doctorchart-frontend@0.0.0 config:production
+npm notice run node scripts/public-config.mjs production
+Configuración pública validada.
+npm notice run doctorchart-frontend@0.0.0 build
+npm notice run ng build --configuration production
+> Building...
+√ Building...
+Browser bundles     
+Initial chunk files  | Names                           |  Raw size | Estimated transfer size
+main-5DDCJLOY.js     | main                            | 425.94 kB |                83.27 kB
+chunk-sXReoKG1.js    | -                               | 258.87 kB |                59.21 kB
+chunk-zMDXYc-8.js    | -                               | 201.58 kB |                59.66 kB
+styles-AWKURSD7.css  | styles                          | 154.04 kB |                17.61 kB
+chunk-5ajbeQWv.js    | -                               |  80.31 kB |                20.09 kB
+chunk-n1l2NHhy.js    | -                               |  52.84 kB |                10.78 kB
+chunk-mq0N46HE.js    | -                               |  25.58 kB |                 8.12 kB
+chunk-DUZIq1PK.js    | -                               |  25.30 kB |                 6.97 kB
+
+                     | Initial total                   |   1.22 MB |               265.73 kB
+
+Lazy chunk files     | Names                           |  Raw size | Estimated transfer size
+chunk-Bo5Q8Xy8.js    | patient-record-component        | 368.20 kB |                89.02 kB
+chunk-B1H8gar-.js    | medical-calculators-component   | 103.59 kB |                18.97 kB
+chunk-CueZKkfD.js    | browser                         |  67.87 kB |                17.81 kB
+chunk-CesPJfqN.js    | dashboard-component             |  32.96 kB |                 7.83 kB
+chunk-DniJJxtl.js    | admin-specialties-component     |  30.72 kB |                 7.91 kB
+chunk-DYaBc182.js    | -                               |  30.33 kB |                 8.14 kB
+chunk-C9Sl82X0.js    | patient-list-component          |  27.92 kB |                 7.10 kB
+chunk-DSpW7b21.js    | onboarding-wizard-component     |  27.47 kB |                 6.51 kB
+chunk-BwEjxKr-.js    | calendario-vacunacion-component |  23.32 kB |                 5.61 kB
+chunk-Cys2i3j1.js    | patient-form-page-component     |  14.43 kB |                 3.99 kB
+chunk-CR8nC5OA.js    | specialty-selection-component   |  11.99 kB |                 3.50 kB
+chunk-cKm6GBk1.js    | consultas-component             |  11.93 kB |                 3.68 kB
+chunk-OkFtm8eA.js    | -                               | 324 bytes |               324 bytes
+
+
+Server bundles      
+Initial chunk files  | Names                           |  Raw size
+server.mjs           | server                          | 822.58 kB |                        
+main.server.mjs      | main.server                     | 602.96 kB |                        
+chunk-VFCCL43D.mjs   | -                               | 259.02 kB |                        
+polyfills.server.mjs | polyfills.server                | 235.04 kB |                        
+chunk-OPDNOPJC.mjs   | -                               | 213.52 kB |                        
+chunk-KFKTSM4Y.mjs   | -                               | 201.44 kB |                        
+chunk-WHFEPGON.mjs   | -                               |  80.14 kB |                        
+chunk-46OJEXYO.mjs   | -                               |  52.80 kB |                        
+chunk-XGEBFPZL.mjs   | -                               |  26.62 kB |                        
+chunk-ZIR6NZ5W.mjs   | -                               |  26.04 kB |                        
+chunk-WNH62ZTI.mjs   | -                               |  25.36 kB |                        
+chunk-OSNBTESN.mjs   | -                               |  13.04 kB |                        
+chunk-WFCTFQVG.mjs   | -                               |   9.01 kB |                        
+chunk-RF52EBPX.mjs   | -                               |   7.39 kB |                        
+chunk-TJEM4ECN.mjs   | -                               |   4.19 kB |                        
+chunk-6PY56C4Y.mjs   | -                               |   1.55 kB |                        
+chunk-ITOR7NUX.mjs   | -                               |   1.38 kB |                        
+chunk-35SK5UMZ.mjs   | -                               |   1.16 kB |                        
+chunk-KYQQYI4M.mjs   | -                               |   1.01 kB |                        
+chunk-ZNXG2PMT.mjs   | -                               | 963 bytes |                        
+chunk-L2N3ZURS.mjs   | -                               | 729 bytes |                        
+chunk-O4CPS364.mjs   | -                               | 148 bytes |                        
+
+Lazy chunk files     | Names                           |  Raw size
+chunk-LCCJPCLS.mjs   | patient-record-component        | 365.24 kB |                        
+chunk-GQFRLEQ4.mjs   | medical-calculators-component   | 102.46 kB |                        
+chunk-CRTOCZFU.mjs   | browser                         |  67.87 kB |                        
+chunk-GDM5GDIT.mjs   | dashboard-component             |  32.87 kB |                        
+chunk-VQRUZOC7.mjs   | admin-specialties-component     |  30.61 kB |                        
+chunk-IHB6KLS2.mjs   | -                               |  30.08 kB |                        
+chunk-B6MOOES4.mjs   | patient-list-component          |  27.85 kB |                        
+chunk-5D3UOPCH.mjs   | onboarding-wizard-component     |  27.43 kB |                        
+chunk-UVIBRZZG.mjs   | calendario-vacunacion-component |  23.19 kB |                        
+chunk-MQ7WZAKC.mjs   | patient-form-page-component     |  14.49 kB |                        
+chunk-RAKAREZO.mjs   | xhr2                            |  12.17 kB |                        
+chunk-XDZ7ZLR6.mjs   | xhr2                            |  12.08 kB |                        
+chunk-ECPBDFNU.mjs   | specialty-selection-component   |  12.03 kB |                        
+chunk-QWCVV37V.mjs   | consultas-component             |  11.95 kB |                        
+chunk-S44CTFEV.mjs   | -                               | 358 bytes |                        
+
+Prerendered 0 static routes.
+Application bundle generation complete. [14.772 seconds] - 2026-10-09T11:43:51.802Z
+
+▲ [WARNING] bundle initial exceeded maximum budget. Budget 1.00 MB was not met by 224.46 kB with a total of 1.22 MB.
+
+
+Output location: C:\Users\gcast\Documents\GitHub\doctorchart-frontend\dist\doctorchart-frontend
+

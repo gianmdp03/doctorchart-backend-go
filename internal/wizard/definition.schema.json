@@ -1,0 +1,728 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:doctorchart:wizard-definition:1",
+  "title": "DoctorChart WizardDefinition v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "patientForm",
+    "encounterForm",
+    "modulesConfig"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "patientForm": {
+      "$ref": "#/$defs/form"
+    },
+    "encounterForm": {
+      "$ref": "#/$defs/form"
+    },
+    "modulesConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "MEDICATION_CATALOG",
+        "AI_ASSISTANT",
+        "GROWTH_CHARTS"
+      ],
+      "properties": {
+        "MEDICATION_CATALOG": {
+          "type": "boolean"
+        },
+        "AI_ASSISTANT": {
+          "type": "boolean"
+        },
+        "GROWTH_CHARTS": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "key": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,79}$"
+    },
+    "label": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 150,
+      "pattern": "\\S"
+    },
+    "form": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "categories"
+      ],
+      "properties": {
+        "categories": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/category"
+          }
+        }
+      }
+    },
+    "category": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "title",
+        "enabled",
+        "fields"
+      ],
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/key"
+        },
+        "title": {
+          "$ref": "#/$defs/label"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "system": {
+          "type": "boolean"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/field"
+          }
+        }
+      }
+    },
+    "option": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "label"
+      ],
+      "properties": {
+        "value": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "\\S"
+        },
+        "label": {
+          "$ref": "#/$defs/label"
+        }
+      }
+    },
+    "visibleWhen": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fieldKey",
+        "equals"
+      ],
+      "properties": {
+        "fieldKey": {
+          "$ref": "#/$defs/key"
+        },
+        "equals": {
+          "type": "boolean"
+        }
+      }
+    },
+    "operand": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "fieldKey"
+          ],
+          "properties": {
+            "fieldKey": {
+              "$ref": "#/$defs/key"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "context"
+          ],
+          "properties": {
+            "context": {
+              "enum": [
+                "patient.ageYears",
+                "patient.gender",
+                "patient.latestWeightKg",
+                "patient.latestHeightCm"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "constant"
+          ],
+          "properties": {
+            "constant": {
+              "type": "number"
+            }
+          }
+        }
+      ]
+    },
+    "field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "label",
+        "type",
+        "required"
+      ],
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/key"
+        },
+        "label": {
+          "$ref": "#/$defs/label"
+        },
+        "type": {
+          "enum": [
+            "TEXT",
+            "TEXTAREA",
+            "NUMBER",
+            "DATE",
+            "SELECT",
+            "BOOLEAN",
+            "FORMULA"
+          ]
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "placeholder": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 300
+        },
+        "system": {
+          "type": "boolean"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30
+        },
+        "options": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/option"
+          }
+        },
+        "minimum": {
+          "type": "number"
+        },
+        "maximum": {
+          "type": "number"
+        },
+        "visibleWhen": {
+          "$ref": "#/$defs/visibleWhen"
+        },
+        "formula": {
+          "$ref": "#/$defs/formula"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "SELECT"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "options"
+            ],
+            "properties": {
+              "options": {}
+            }
+          },
+          "else": {
+            "not": {
+              "required": [
+                "options"
+              ],
+              "properties": {
+                "options": {}
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "FORMULA"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "formula"
+            ],
+            "properties": {
+              "required": {
+                "const": false
+              },
+              "formula": {}
+            }
+          },
+          "else": {
+            "not": {
+              "required": [
+                "formula"
+              ],
+              "properties": {
+                "formula": {}
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "not": {
+                  "const": "NUMBER"
+                }
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "minimum"
+                  ],
+                  "properties": {
+                    "minimum": {}
+                  }
+                },
+                {
+                  "required": [
+                    "maximum"
+                  ],
+                  "properties": {
+                    "maximum": {}
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "not": {
+                  "enum": [
+                    "NUMBER",
+                    "FORMULA"
+                  ]
+                }
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "required": [
+                "unit"
+              ],
+              "properties": {
+                "unit": {}
+              }
+            }
+          }
+        }
+      ]
+    },
+    "formula": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "inputs"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "IMC",
+            "BSA",
+            "TFGE",
+            "COCKCROFT",
+            "CALCIO_CORREGIDO",
+            "CUSTOM"
+          ]
+        },
+        "inputs": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/operand"
+          },
+          "minProperties": 1
+        },
+        "operation": {
+          "enum": [
+            "ADD",
+            "SUBTRACT",
+            "MULTIPLY",
+            "DIVIDE",
+            "AVERAGE"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "CUSTOM"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "operation"
+            ],
+            "properties": {
+              "operation": {}
+            }
+          },
+          "else": {
+            "not": {
+              "required": [
+                "operation"
+              ],
+              "properties": {
+                "operation": {}
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "IMC"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "inputs": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "weightKg",
+                  "heightCm"
+                ],
+                "properties": {
+                  "weightKg": {
+                    "$ref": "#/$defs/operand"
+                  },
+                  "heightCm": {
+                    "$ref": "#/$defs/operand"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "BSA"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "inputs": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "weightKg",
+                  "heightCm"
+                ],
+                "properties": {
+                  "weightKg": {
+                    "$ref": "#/$defs/operand"
+                  },
+                  "heightCm": {
+                    "$ref": "#/$defs/operand"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "TFGE"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "inputs": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "creatinineMgDl",
+                  "ageYears",
+                  "gender"
+                ],
+                "properties": {
+                  "creatinineMgDl": {
+                    "$ref": "#/$defs/operand"
+                  },
+                  "ageYears": {
+                    "$ref": "#/$defs/operand"
+                  },
+                  "gender": {
+                    "$ref": "#/$defs/operand"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "COCKCROFT"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "inputs": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "creatinineMgDl",
+                  "weightKg",
+                  "ageYears",
+                  "gender"
+                ],
+                "properties": {
+                  "creatinineMgDl": {
+                    "$ref": "#/$defs/operand"
+                  },
+                  "weightKg": {
+                    "$ref": "#/$defs/operand"
+                  },
+                  "ageYears": {
+                    "$ref": "#/$defs/operand"
+                  },
+                  "gender": {
+                    "$ref": "#/$defs/operand"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "CALCIO_CORREGIDO"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "inputs": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "serumCalciumMgDl",
+                  "serumAlbuminGDl"
+                ],
+                "properties": {
+                  "serumCalciumMgDl": {
+                    "$ref": "#/$defs/operand"
+                  },
+                  "serumAlbuminGDl": {
+                    "$ref": "#/$defs/operand"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "CUSTOM"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "inputs": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "a",
+                  "b"
+                ],
+                "properties": {
+                  "a": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "fieldKey"
+                    ],
+                    "properties": {
+                      "fieldKey": {
+                        "$ref": "#/$defs/key"
+                      }
+                    }
+                  },
+                  "b": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "fieldKey"
+                        ],
+                        "properties": {
+                          "fieldKey": {
+                            "$ref": "#/$defs/key"
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "constant"
+                        ],
+                        "properties": {
+                          "constant": {
+                            "type": "number"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "specialtyDraftRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "name",
+        "definition"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]{0,79}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "pattern": "\\S"
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "definition": {
+          "$ref": "#"
+        }
+      }
+    },
+    "formulaResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "status"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "status": {
+          "enum": [
+            "READY",
+            "MISSING_INPUT",
+            "DIVISION_BY_ZERO",
+            "NOT_APPLICABLE",
+            "INVALID_INPUT"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "READY"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "number"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

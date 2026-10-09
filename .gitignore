@@ -1,0 +1,7 @@
+/.migration/
+/bin/
+/coverage.out
+/.env
+/secrets.properties
+*.exe
+__pycache__/

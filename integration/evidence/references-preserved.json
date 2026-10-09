@@ -1,0 +1,21 @@
+{
+  "files": 68,
+  "changed": [
+    "api-gateway/auth.go",
+    "api-gateway/config.go",
+    "api-gateway/internal/ai/config.go",
+    "api-gateway/internal/ai/gemini.go",
+    "api-gateway/internal/ai/gemini_orchestration_test.go",
+    "api-gateway/internal/ai/handler.go",
+    "api-gateway/internal/ai/limiter.go",
+    "api-gateway/internal/ai/limiter_test.go",
+    "api-gateway/internal/ai/module.go",
+    "api-gateway/internal/ai/spring_client.go",
+    "api-gateway/internal/ai/spring_client_test.go",
+    "api-gateway/internal/ai/tools_registry.go",
+    "api-gateway/lifecycle_test.go",
+    "api-gateway/main.go",
+    "api-gateway/proxy.go"
+  ],
+  "read_only": true
+}

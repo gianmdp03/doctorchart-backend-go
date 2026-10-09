@@ -1,0 +1,189 @@
+{
+  "code": "contract_test_xyz",
+  "name": "Especialidad ficticia de validación",
+  "description": "Solo fixture: nunca se carga en el catálogo ni en el seeder.",
+  "definition": {
+    "schemaVersion": 1,
+    "patientForm": {
+      "categories": [
+        {
+          "key": "sys_patient_profile",
+          "title": "Datos Personales",
+          "enabled": true,
+          "system": true,
+          "fields": [
+            {
+              "key": "sys_firstName",
+              "label": "Nombre",
+              "type": "TEXT",
+              "required": true,
+              "system": true
+            },
+            {
+              "key": "sys_lastName",
+              "label": "Apellido",
+              "type": "TEXT",
+              "required": true,
+              "system": true
+            },
+            {
+              "key": "sys_dni",
+              "label": "DNI",
+              "type": "TEXT",
+              "required": true,
+              "system": true
+            },
+            {
+              "key": "sys_dob",
+              "label": "Fecha de nacimiento",
+              "type": "DATE",
+              "required": true,
+              "system": true
+            },
+            {
+              "key": "sys_sex",
+              "label": "Sexo",
+              "type": "SELECT",
+              "required": true,
+              "system": true,
+              "options": [
+                {
+                  "value": "MALE",
+                  "label": "Masculino"
+                },
+                {
+                  "value": "FEMALE",
+                  "label": "Femenino"
+                },
+                {
+                  "value": "OTHER",
+                  "label": "Otro"
+                },
+                {
+                  "value": "UNKNOWN",
+                  "label": "Sin información"
+                }
+              ]
+            },
+            {
+              "key": "sys_phone",
+              "label": "Teléfono",
+              "type": "TEXT",
+              "required": false,
+              "system": true
+            },
+            {
+              "key": "sys_email",
+              "label": "Email",
+              "type": "TEXT",
+              "required": false,
+              "system": true
+            },
+            {
+              "key": "sys_insurance",
+              "label": "Obra social / Cobertura",
+              "type": "TEXT",
+              "required": false,
+              "system": true
+            }
+          ]
+        },
+        {
+          "key": "new_patient_category",
+          "title": "Categoría inédita de prueba",
+          "enabled": true,
+          "fields": [
+            {
+              "key": "identity",
+              "label": "Nombre completo",
+              "type": "TEXT",
+              "required": false
+            },
+            {
+              "key": "born",
+              "label": "Nacimiento",
+              "type": "DATE",
+              "required": false
+            },
+            {
+              "key": "consent",
+              "label": "Respuesta obligatoria de prueba",
+              "type": "BOOLEAN",
+              "required": true
+            },
+            {
+              "key": "group",
+              "label": "Grupo de prueba",
+              "type": "SELECT",
+              "required": false,
+              "options": [
+                {
+                  "value": "a",
+                  "label": "Grupo A"
+                },
+                {
+                  "value": "b",
+                  "label": "Grupo B"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "encounterForm": {
+      "categories": [
+        {
+          "key": "new_encounter_category",
+          "title": "Consulta inédita",
+          "enabled": true,
+          "fields": [
+            {
+              "key": "readingA",
+              "label": "Lectura A",
+              "type": "NUMBER",
+              "required": false,
+              "minimum": -10,
+              "maximum": 100
+            },
+            {
+              "key": "readingB",
+              "label": "Lectura B",
+              "type": "NUMBER",
+              "required": false
+            },
+            {
+              "key": "result",
+              "label": "Promedio",
+              "type": "FORMULA",
+              "required": false,
+              "formula": {
+                "kind": "CUSTOM",
+                "operation": "AVERAGE",
+                "inputs": {
+                  "a": {
+                    "fieldKey": "readingA"
+                  },
+                  "b": {
+                    "fieldKey": "readingB"
+                  }
+                }
+              }
+            },
+            {
+              "key": "notes",
+              "label": "Observaciones",
+              "type": "TEXTAREA",
+              "required": false
+            }
+          ]
+        }
+      ]
+    },
+    "modulesConfig": {
+      "MEDICATION_CATALOG": false,
+      "AI_ASSISTANT": false,
+      "GROWTH_CHARTS": false
+    }
+  }
+}

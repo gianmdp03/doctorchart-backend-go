@@ -1,0 +1,137 @@
+[
+  {
+    "case": "empty",
+    "expected_start": true,
+    "observed_start": [
+      true,
+      true
+    ],
+    "same_catalog": true,
+    "schema_unchanged": true,
+    "passed": true,
+    "databases": [
+      "startup_13fd8b_spring",
+      "startup_13fd8b_go"
+    ]
+  },
+  {
+    "case": "existing",
+    "expected_start": true,
+    "observed_start": [
+      true,
+      true
+    ],
+    "same_catalog": true,
+    "schema_unchanged": true,
+    "passed": true,
+    "databases": [
+      "startup_a35ea6_spring",
+      "startup_a35ea6_go"
+    ]
+  },
+  {
+    "case": "missing-chart",
+    "expected_start": true,
+    "observed_start": [
+      true,
+      true
+    ],
+    "same_catalog": true,
+    "schema_unchanged": true,
+    "passed": true,
+    "databases": [
+      "startup_7ceffe_spring",
+      "startup_7ceffe_go"
+    ]
+  },
+  {
+    "case": "custom-catalog",
+    "expected_start": true,
+    "observed_start": [
+      true,
+      true
+    ],
+    "same_catalog": true,
+    "schema_unchanged": true,
+    "passed": true,
+    "databases": [
+      "startup_14b721_spring",
+      "startup_14b721_go"
+    ]
+  },
+  {
+    "case": "no-published-wizard",
+    "expected_start": false,
+    "observed_start": [
+      false,
+      false
+    ],
+    "same_catalog": true,
+    "schema_unchanged": true,
+    "passed": true,
+    "databases": [
+      "startup_2780a4_spring",
+      "startup_2780a4_go"
+    ]
+  },
+  {
+    "case": "changed-calendar",
+    "expected_start": false,
+    "observed_start": [
+      false,
+      false
+    ],
+    "same_catalog": true,
+    "schema_unchanged": true,
+    "passed": true,
+    "databases": [
+      "startup_5c877e_spring",
+      "startup_5c877e_go"
+    ]
+  },
+  {
+    "case": "missing-dose",
+    "expected_start": false,
+    "observed_start": [
+      false,
+      false
+    ],
+    "same_catalog": true,
+    "schema_unchanged": true,
+    "passed": true,
+    "databases": [
+      "startup_3d87ba_spring",
+      "startup_3d87ba_go"
+    ]
+  },
+  {
+    "case": "calendar-unknown-fields",
+    "expected_start": false,
+    "observed_start": [
+      false,
+      false
+    ],
+    "same_catalog": true,
+    "schema_unchanged": true,
+    "passed": true,
+    "databases": [
+      "startup_683eb9_spring",
+      "startup_683eb9_go"
+    ]
+  },
+  {
+    "case": "external-properties",
+    "expected_start": true,
+    "observed_start": [
+      true,
+      true
+    ],
+    "same_catalog": true,
+    "schema_unchanged": true,
+    "passed": true,
+    "databases": [
+      "startup_866c41_spring",
+      "startup_866c41_go"
+    ]
+  }
+]

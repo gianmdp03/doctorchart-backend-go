@@ -1,0 +1,226 @@
+npm notice run doctorchart-frontend@0.0.0 pretest
+npm notice run node scripts/public-config.mjs test
+Configuración pública validada.
+npm notice run doctorchart-frontend@0.0.0 test
+npm notice run ng test --watch=false
+> Building...
+√ Building...
+Application bundle generation complete. [15.055 seconds] - 2026-10-09T11:12:45.971Z
+
+
+ RUN  v4.1.11 C:/Users/gcast/Documents/GitHub/doctorchart-frontend
+
+ ❯ |doctorchart-frontend| src/app/features/new-encounter-dialog/new-encounter-dialog.component.spec.ts (6 tests | 6 failed) 1592ms
+     × pins the effective backend definition and sends no specialty, snapshot, projections or template identifier 1064ms
+     × does not invent a complaint or diagnosis when the encounter form has no categories 70ms
+     × keeps answers and pinned revision until explicit adoption after workspace conflict 93ms
+     × rejects future or invalid metadata and blocks simultaneous creates 133ms
+     × ignores late results and rejects a submit when the patient or identity changes before effects run 130ms
+     × does not populate another patient from a late workspace load 98ms
+ ❯ |doctorchart-frontend| src/app/features/dynamic-form-renderer/dynamic-form-renderer.component.spec.ts (8 tests | 8 failed) 1478ms
+     × renders unfamiliar stable categories and all seven field types with the shared date selector 734ms
+     × uses Argentine display and emits only an ISO date at the value boundary 169ms
+     × accepts zero and required false while rejecting wrong types, nonfinite numbers and invalid options 113ms
+     × checks real calendar dates, required whitespace and optional null values 63ms
+     × evaluates recursive strict boolean visibility and preserves hidden input values without formula or unknown keys 43ms
+     × fails closed on a visibility cycle and on a disabled controller category 116ms
+     × displays authoritative formula statuses, including zero, and never sends a computed value 122ms
+     × blocks mutations in readonly mode and reports initial validity 105ms
+ ❯ |doctorchart-frontend| src/app/features/patient-record/patient-vaccinations/patient-vaccinations.component.spec.ts (14 tests | 4 failed) 2301ms
+     × publishes the saved patient revision and reloads saved applications when reopening the tab 170ms
+     × removes the selected application without replacing other records 166ms
+     × keeps server-confirmed status after a failed write and supports retry 200ms
+     × restores the confirmed date in the shared picker when saving fails 164ms
+ ❯ |doctorchart-frontend| src/app/features/new-patient-dialog/new-patient-dialog.component.spec.ts (6 tests | 3 failed) 552ms
+     × edits against the saved record snapshot and record version without loading the workspace 59ms
+     × keeps local record edits through conflict until explicit replacement, then uses the reviewed version 70ms
+     × ignores a response after patient context or authenticated identity changes 41ms
+Not implemented: Window's open() method
+Not implemented: Window's open() method
+ ❯ |doctorchart-frontend| src/app/features/patient-record/clinical-timeline/clinical-timeline.component.spec.ts (5 tests | 5 failed) 659ms
+     × should initialize and expand the first two encounters by default 342ms
+     × should collapse all encounters when collapseAll is called 67ms
+     × should expand all encounters when expandAll is called 118ms
+     × should toggle an encounter card open and closed 58ms
+     × translates UTC encounter timestamps to Argentine time (America/Argentina/Buenos_Aires) 73ms
+Not implemented: Window's open() method
+Not implemented: Window's open() method
+Not implemented: Window's open() method
+Not implemented: Window's open() method
+Not implemented: Window's open() method
+Not implemented: Window's open() method
+ ❯ |doctorchart-frontend| src/app/features/patient-record/patient-record.component.spec.ts (49 tests | 5 failed) 4726ms
+     × hides repeated edit and new consultation buttons and guards their output handlers 1063ms
+     × closes edit and new consultation dialogs if their actions are removed 96ms
+     × rejects omitted and unknown query tabs while accepting configured deep links 71ms
+     × retains the prescription draft and growth selection when tab components are recreated 83ms
+     × routes timeline actions through its module and refreshes the patient once after a confirmed deletion 121ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 31 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |doctorchart-frontend| src/app/features/dynamic-form-renderer/dynamic-form-renderer.component.spec.ts > DynamicFormRendererComponent canonical fields > renders unfamiliar stable categories and all seven field types with the shared date selector
+ FAIL  |doctorchart-frontend| src/app/features/dynamic-form-renderer/dynamic-form-renderer.component.spec.ts > DynamicFormRendererComponent canonical fields > uses Argentine display and emits only an ISO date at the value boundary
+ FAIL  |doctorchart-frontend| src/app/features/dynamic-form-renderer/dynamic-form-renderer.component.spec.ts > DynamicFormRendererComponent canonical fields > accepts zero and required false while rejecting wrong types, nonfinite numbers and invalid options
+ FAIL  |doctorchart-frontend| src/app/features/dynamic-form-renderer/dynamic-form-renderer.component.spec.ts > DynamicFormRendererComponent canonical fields > checks real calendar dates, required whitespace and optional null values
+ FAIL  |doctorchart-frontend| src/app/features/dynamic-form-renderer/dynamic-form-renderer.component.spec.ts > DynamicFormRendererComponent canonical fields > evaluates recursive strict boolean visibility and preserves hidden input values without formula or unknown keys
+ FAIL  |doctorchart-frontend| src/app/features/dynamic-form-renderer/dynamic-form-renderer.component.spec.ts > DynamicFormRendererComponent canonical fields > fails closed on a visibility cycle and on a disabled controller category
+ FAIL  |doctorchart-frontend| src/app/features/dynamic-form-renderer/dynamic-form-renderer.component.spec.ts > DynamicFormRendererComponent canonical fields > displays authoritative formula statuses, including zero, and never sends a computed value
+ FAIL  |doctorchart-frontend| src/app/features/dynamic-form-renderer/dynamic-form-renderer.component.spec.ts > DynamicFormRendererComponent canonical fields > blocks mutations in readonly mode and reports initial validity
+ FAIL  |doctorchart-frontend| src/app/features/new-encounter-dialog/new-encounter-dialog.component.spec.ts > NewEncounterDialogComponent canonical creation > pins the effective backend definition and sends no specialty, snapshot, projections or template identifier
+ FAIL  |doctorchart-frontend| src/app/features/new-encounter-dialog/new-encounter-dialog.component.spec.ts > NewEncounterDialogComponent canonical creation > does not invent a complaint or diagnosis when the encounter form has no categories
+ FAIL  |doctorchart-frontend| src/app/features/new-encounter-dialog/new-encounter-dialog.component.spec.ts > NewEncounterDialogComponent canonical creation > keeps answers and pinned revision until explicit adoption after workspace conflict
+ FAIL  |doctorchart-frontend| src/app/features/new-encounter-dialog/new-encounter-dialog.component.spec.ts > NewEncounterDialogComponent canonical creation > rejects future or invalid metadata and blocks simultaneous creates
+ FAIL  |doctorchart-frontend| src/app/features/new-encounter-dialog/new-encounter-dialog.component.spec.ts > NewEncounterDialogComponent canonical creation > ignores late results and rejects a submit when the patient or identity changes before effects run
+ FAIL  |doctorchart-frontend| src/app/features/new-encounter-dialog/new-encounter-dialog.component.spec.ts > NewEncounterDialogComponent canonical creation > does not populate another patient from a late workspace load
+ FAIL  |doctorchart-frontend| src/app/features/new-patient-dialog/new-patient-dialog.component.spec.ts > NewPatientDialogComponent canonical creates and edits > edits against the saved record snapshot and record version without loading the workspace
+ FAIL  |doctorchart-frontend| src/app/features/new-patient-dialog/new-patient-dialog.component.spec.ts > NewPatientDialogComponent canonical creates and edits > keeps local record edits through conflict until explicit replacement, then uses the reviewed version
+ FAIL  |doctorchart-frontend| src/app/features/new-patient-dialog/new-patient-dialog.component.spec.ts > NewPatientDialogComponent canonical creates and edits > ignores a response after patient context or authenticated identity changes
+ FAIL  |doctorchart-frontend| src/app/features/patient-record/patient-record.component.spec.ts > PatientRecordComponent > hides repeated edit and new consultation buttons and guards their output handlers
+ FAIL  |doctorchart-frontend| src/app/features/patient-record/patient-record.component.spec.ts > PatientRecordComponent > closes edit and new consultation dialogs if their actions are removed
+ FAIL  |doctorchart-frontend| src/app/features/patient-record/patient-record.component.spec.ts > PatientRecordComponent > rejects omitted and unknown query tabs while accepting configured deep links
+ FAIL  |doctorchart-frontend| src/app/features/patient-record/patient-record.component.spec.ts > PatientRecordComponent > retains the prescription draft and growth selection when tab components are recreated
+ FAIL  |doctorchart-frontend| src/app/features/patient-record/patient-record.component.spec.ts > PatientRecordComponent > routes timeline actions through its module and refreshes the patient once after a confirmed deletion
+ FAIL  |doctorchart-frontend| src/app/features/patient-record/clinical-timeline/clinical-timeline.component.spec.ts > ClinicalTimelineComponent > should initialize and expand the first two encounters by default
+ FAIL  |doctorchart-frontend| src/app/features/patient-record/clinical-timeline/clinical-timeline.component.spec.ts > ClinicalTimelineComponent > should collapse all encounters when collapseAll is called
+ FAIL  |doctorchart-frontend| src/app/features/patient-record/clinical-timeline/clinical-timeline.component.spec.ts > ClinicalTimelineComponent > should expand all encounters when expandAll is called
+ FAIL  |doctorchart-frontend| src/app/features/patient-record/clinical-timeline/clinical-timeline.component.spec.ts > ClinicalTimelineComponent > should toggle an encounter card open and closed
+ FAIL  |doctorchart-frontend| src/app/features/patient-record/clinical-timeline/clinical-timeline.component.spec.ts > ClinicalTimelineComponent > translates UTC encounter timestamps to Argentine time (America/Argentina/Buenos_Aires)
+ FAIL  |doctorchart-frontend| src/app/features/patient-record/patient-vaccinations/patient-vaccinations.component.spec.ts > Patient vaccination backend schedule and revision handoff > publishes the saved patient revision and reloads saved applications when reopening the tab
+ FAIL  |doctorchart-frontend| src/app/features/patient-record/patient-vaccinations/patient-vaccinations.component.spec.ts > Patient vaccination backend schedule and revision handoff > removes the selected application without replacing other records
+ FAIL  |doctorchart-frontend| src/app/features/patient-record/patient-vaccinations/patient-vaccinations.component.spec.ts > Patient vaccination backend schedule and revision handoff > keeps server-confirmed status after a failed write and supports retry
+ FAIL  |doctorchart-frontend| src/app/features/patient-record/patient-vaccinations/patient-vaccinations.component.spec.ts > Patient vaccination backend schedule and revision handoff > restores the confirmed date in the shared picker when saving fails
+Error: MatDatepicker: No provider found for DateAdapter. You must add one of the following to your app config: provideNativeDateAdapter, provideDateFnsAdapter, provideLuxonDateAdapter, provideMomentDateAdapter, or provide a custom implementation.
+ ❯ createMissingDateImplError ../darwin_arm64-fastbuild-ST-fdfa778d11ba/bin/src/material/datepicker/datepicker-errors.ts:11:9
+ ❯ new MatDatepickerInputBase ../darwin_arm64-fastbuild-ST-fdfa778d11ba/bin/src/material/datepicker/datepicker-input-base.ts:251:14
+ ❯ new MatDatepickerInput ../darwin_arm64-fastbuild-ST-fdfa778d11ba/bin/src/material/datepicker/datepicker-input.ts:136:4
+ ❯ NodeInjectorFactory.MatDatepickerInput_Factory [as factory] ng:/MatDatepickerInput/ɵfac.js:5:10
+ ❯ getNodeInjectable ../darwin_arm64-fastbuild-ST-fdfa778d11ba/bin/packages/core/src/render3/di.ts:785:37
+ ❯ instantiateAllDirectives ../darwin_arm64-fastbuild-ST-fdfa778d11ba/bin/packages/core/src/render3/instructions/shared.ts:408:22
+ ❯ createDirectivesInstances ../darwin_arm64-fastbuild-ST-fdfa778d11ba/bin/packages/core/src/render3/instructions/shared.ts:122:2
+ ❯ initializeElement ../darwin_arm64-fastbuild-ST-fdfa778d11ba/bin/packages/core/src/render3/instructions/element.ts:144:4
+ ❯ ɵɵelementStart ../darwin_arm64-fastbuild-ST-fdfa778d11ba/bin/packages/core/src/render3/instructions/element.ts:129:2
+ ❯ DatePickerComponent_Template src/app/shared/date-picker/date-picker.component.html:1:1
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/31]⎯
+
+⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯
+
+Vitest caught 6 unhandled errors during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: MatDatepicker: No provider found for DateAdapter. You must add one of the following to your app config: provideNativeDateAdapter, provideDateFnsAdapter, provideLuxonDateAdapter, provideMomentDateAdapter, or provide a custom implementation.
+ ❯ createMissingDateImplError node_modules/@angular/material/fesm2022/datepicker.mjs:34:10
+ ❯ new MatDatepickerInputBase node_modules/@angular/material/fesm2022/datepicker.mjs:3288:15
+ ❯ new MatDatepickerInput node_modules/@angular/material/fesm2022/datepicker.mjs:3537:5
+ ❯ NodeInjectorFactory.MatDatepickerInput_Factory [as factory] ng:/MatDatepickerInput/ɵfac.js:5:10
+ ❯ getNodeInjectable node_modules/@angular/core/fesm2022/_debug_node-chunk.mjs:751:38
+ ❯ instantiateAllDirectives node_modules/@angular/core/fesm2022/_debug_node-chunk.mjs:5511:23
+ ❯ createDirectivesInstances node_modules/@angular/core/fesm2022/_debug_node-chunk.mjs:5368:3
+ ❯ initializeElement node_modules/@angular/core/fesm2022/_debug_node-chunk.mjs:14820:5
+ ❯ ɵɵelementStart node_modules/@angular/core/fesm2022/_debug_node-chunk.mjs:14813:3
+ ❯ DatePickerComponent_Template src/app/shared/date-picker/date-picker.component.html:1:1
+
+This error originated in "src/app/features/new-patient-dialog/new-patient-dialog.component.spec.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "creates from effective workspace with only its pinned version and canonical values". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: MatDatepicker: No provider found for DateAdapter. You must add one of the following to your app config: provideNativeDateAdapter, provideDateFnsAdapter, provideLuxonDateAdapter, provideMomentDateAdapter, or provide a custom implementation.
+ ❯ createMissingDateImplError node_modules/@angular/material/fesm2022/datepicker.mjs:34:10
+ ❯ new MatDatepickerInputBase node_modules/@angular/material/fesm2022/datepicker.mjs:3288:15
+ ❯ new MatDatepickerInput node_modules/@angular/material/fesm2022/datepicker.mjs:3537:5
+ ❯ NodeInjectorFactory.MatDatepickerInput_Factory [as factory] ng:/MatDatepickerInput/ɵfac.js:5:10
+ ❯ getNodeInjectable node_modules/@angular/core/fesm2022/_debug_node-chunk.mjs:751:38
+ ❯ instantiateAllDirectives node_modules/@angular/core/fesm2022/_debug_node-chunk.mjs:5511:23
+ ❯ createDirectivesInstances node_modules/@angular/core/fesm2022/_debug_node-chunk.mjs:5368:3
+ ❯ initializeElement node_modules/@angular/core/fesm2022/_debug_node-chunk.mjs:14820:5
+ ❯ ɵɵelementStart node_modules/@angular/core/fesm2022/_debug_node-chunk.mjs:14813:3
+ ❯ DatePickerComponent_Template src/app/shared/date-picker/date-picker.component.html:1:1
+
+This error originated in "src/app/features/new-patient-dialog/new-patient-dialog.component.spec.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "preserves create answers through workspace conflict, reviews separately and retains only unchanged identities on adoption". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: MatDatepicker: No provider found for DateAdapter. You must add one of the following to your app config: provideNativeDateAdapter, provideDateFnsAdapter, provideLuxonDateAdapter, provideMomentDateAdapter, or provide a custom implementation.
+ ❯ createMissingDateImplError node_modules/@angular/material/fesm2022/datepicker.mjs:34:10
+ ❯ new MatDatepickerInputBase node_modules/@angular/material/fesm2022/datepicker.mjs:3288:15
+ ❯ new MatDatepickerInput node_modules/@angular/material/fesm2022/datepicker.mjs:3537:5
+ ❯ NodeInjectorFactory.MatDatepickerInput_Factory [as factory] ng:/MatDatepickerInput/ɵfac.js:5:10
+ ❯ getNodeInjectable node_modules/@angular/core/fesm2022/_debug_node-chunk.mjs:751:38
+ ❯ instantiateAllDirectives node_modules/@angular/core/fesm2022/_debug_node-chunk.mjs:5511:23
+ ❯ createDirectivesInstances node_modules/@angular/core/fesm2022/_debug_node-chunk.mjs:5368:3
+ ❯ initializeElement node_modules/@angular/core/fesm2022/_debug_node-chunk.mjs:14820:5
+ ❯ ɵɵelementStart node_modules/@angular/core/fesm2022/_debug_node-chunk.mjs:14813:3
+ ❯ DatePickerComponent_Template src/app/shared/date-picker/date-picker.component.html:1:1
+
+This error originated in "src/app/features/new-patient-dialog/new-patient-dialog.component.spec.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "keeps edits on non-conflict server failure and blocks duplicate writes while a request is pending". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: MatDatepicker: No provider found for DateAdapter. You must add one of the following to your app config: provideNativeDateAdapter, provideDateFnsAdapter, provideLuxonDateAdapter, provideMomentDateAdapter, or provide a custom implementation.
+ ❯ createMissingDateImplError node_modules/@angular/material/fesm2022/datepicker.mjs:34:10
+ ❯ new MatDatepickerInputBase node_modules/@angular/material/fesm2022/datepicker.mjs:3288:15
+ ❯ new MatDatepickerInput node_modules/@angular/material/fesm2022/datepicker.mjs:3537:5
+ ❯ NodeInjectorFactory.MatDatepickerInput_Factory [as factory] ng:/MatDatepickerInput/ɵfac.js:5:10
+ ❯ getNodeInjectable node_modules/@angular/core/fesm2022/_debug_node-chunk.mjs:751:38
+ ❯ instantiateAllDirectives node_modules/@angular/core/fesm2022/_debug_node-chunk.mjs:5511:23
+ ❯ createDirectivesInstances node_modules/@angular/core/fesm2022/_debug_node-chunk.mjs:5368:3
+ ❯ initializeElement node_modules/@angular/core/fesm2022/_debug_node-chunk.mjs:14820:5
+ ❯ ɵɵelementStart node_modules/@angular/core/fesm2022/_debug_node-chunk.mjs:14813:3
+ ❯ DatePickerComponent_Template src/app/shared/date-picker/date-picker.component.html:1:1
+
+This error originated in "src/app/features/patient-form/patient-form-page.component.spec.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "renders creation form as dedicated page without modal overlay". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: MatDatepicker: No provider found for DateAdapter. You must add one of the following to your app config: provideNativeDateAdapter, provideDateFnsAdapter, provideLuxonDateAdapter, provideMomentDateAdapter, or provide a custom implementation.
+ ❯ createMissingDateImplError node_modules/@angular/material/fesm2022/datepicker.mjs:34:10
+ ❯ new MatDatepickerInputBase node_modules/@angular/material/fesm2022/datepicker.mjs:3288:15
+ ❯ new MatDatepickerInput node_modules/@angular/material/fesm2022/datepicker.mjs:3537:5
+
+ ❯ NodeInjectorFactory.MatDatepickerInput_Factory [as factory] ng:/MatDatepickerInput/ɵfac.js:5:10
+ Test Files  6 failed | 53 passed (59)
+      Tests  31 failed | 537 passed (568)
+     Errors  6 errors
+   Start at  08:12:46
+   Duration  24.04s (transform 25.97s, setup 20.80s, import 66.48s, tests 44.86s, environment 151.04s)
+
+ ❯ getNodeInjectable node_modules/@angular/core/fesm2022/_debug_node-chunk.mjs:751:38
+ ❯ instantiateAllDirectives node_modules/@angular/core/fesm2022/_debug_node-chunk.mjs:5511:23
+ ❯ createDirectivesInstances node_modules/@angular/core/fesm2022/_debug_node-chunk.mjs:5368:3
+ ❯ initializeElement node_modules/@angular/core/fesm2022/_debug_node-chunk.mjs:14820:5
+ ❯ ɵɵelementStart node_modules/@angular/core/fesm2022/_debug_node-chunk.mjs:14813:3
+ ❯ DatePickerComponent_Template src/app/shared/date-picker/date-picker.component.html:1:1
+
+This error originated in "src/app/features/patient-form/patient-form-page.component.spec.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "navigates back to /pacientes when cancel is clicked in create mode". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: MatDatepicker: No provider found for DateAdapter. You must add one of the following to your app config: provideNativeDateAdapter, provideDateFnsAdapter, provideLuxonDateAdapter, provideMomentDateAdapter, or provide a custom implementation.
+ ❯ createMissingDateImplError node_modules/@angular/material/fesm2022/datepicker.mjs:34:10
+ ❯ new MatDatepickerInputBase node_modules/@angular/material/fesm2022/datepicker.mjs:3288:15
+ ❯ new MatDatepickerInput node_modules/@angular/material/fesm2022/datepicker.mjs:3537:5
+ ❯ NodeInjectorFactory.MatDatepickerInput_Factory [as factory] ng:/MatDatepickerInput/ɵfac.js:5:10
+ ❯ getNodeInjectable node_modules/@angular/core/fesm2022/_debug_node-chunk.mjs:751:38
+ ❯ instantiateAllDirectives node_modules/@angular/core/fesm2022/_debug_node-chunk.mjs:5511:23
+ ❯ createDirectivesInstances node_modules/@angular/core/fesm2022/_debug_node-chunk.mjs:5368:3
+ ❯ initializeElement node_modules/@angular/core/fesm2022/_debug_node-chunk.mjs:14820:5
+ ❯ ɵɵelementStart node_modules/@angular/core/fesm2022/_debug_node-chunk.mjs:14813:3
+ ❯ DatePickerComponent_Template src/app/shared/date-picker/date-picker.component.html:1:1
+
+This error originated in "src/app/features/patient-form/patient-form-page.component.spec.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "submits create and navigates to the created patient record". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+

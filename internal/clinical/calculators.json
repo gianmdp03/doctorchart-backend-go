@@ -1,0 +1,389 @@
+{
+  "imc": {
+    "name": "Índice de Masa Corporal (IMC) y BSA",
+    "ranges": [
+      {
+        "code": "bmi_underweight",
+        "min": 0.0,
+        "max": 18.49,
+        "label": "Bajo peso",
+        "severity": "warning",
+        "clinicalAction": "Investigar patología consuntiva, trastornos alimentarios o malnutrición."
+      },
+      {
+        "code": "bmi_normal",
+        "min": 18.5,
+        "max": 24.99,
+        "label": "Normopeso (Rango saludable)",
+        "severity": "normal",
+        "clinicalAction": "Mantener pautas dietéticas saludables y actividad física regular."
+      },
+      {
+        "code": "bmi_overweight",
+        "min": 25.0,
+        "max": 29.99,
+        "label": "Sobrepeso (Pre-obesidad)",
+        "severity": "warning",
+        "clinicalAction": "Fomentar cambios en el estilo de vida, nutrición guiada y cribado cardiometabólico."
+      },
+      {
+        "code": "bmi_obesity_1",
+        "min": 30.0,
+        "max": 34.99,
+        "label": "Obesidad Clase I",
+        "severity": "danger",
+        "clinicalAction": "Intervención clínica activa: perfil lipídico, glucemia/HbA1c y plan estructurado."
+      },
+      {
+        "code": "bmi_obesity_2",
+        "min": 35.0,
+        "max": 39.99,
+        "label": "Obesidad Clase II (Severa)",
+        "severity": "danger",
+        "clinicalAction": "Alto riesgo cardiovascular. Intervención médica multidisciplinar y farmacológica."
+      },
+      {
+        "code": "bmi_obesity_3",
+        "min": 40.0,
+        "max": null,
+        "label": "Obesidad Clase III (Mórbida)",
+        "severity": "critical",
+        "clinicalAction": "Riesgo vital elevado. Evaluar protocolo de cirugía bariátrica o manejo especializado."
+      }
+    ],
+    "evolution": "[Calculadora Médica DoctorChart - IMC & BSA]\nFecha: %s\nParámetros: Peso %s kg | Talla %s cm\n• IMC: %s kg/m² (%s)\n• Superficie Corporal (BSA): %s m² (Mosteller)\n• Rango de peso saludable estimado (18.5 - 24.9): %s kg - %s kg\nConducta: %s"
+  },
+  "calcio_corregido": {
+    "name": "Calcio Sérico Corregido por Albúmina",
+    "ranges": [
+      {
+        "code": "calcium_low",
+        "min": 0.0,
+        "max": 8.49,
+        "label": "Hipocalcemia Corregida (< 8.5 mg/dL)",
+        "severity": "danger",
+        "clinicalAction": "Evaluar síntomas neuromusculares (Chvostek, Trousseau), niveles de PTH, magnesio y vitamina D."
+      },
+      {
+        "code": "calcium_normal",
+        "min": 8.5,
+        "max": 10.5,
+        "label": "Normocalcemia (Rango normal 8.5 - 10.5 mg/dL)",
+        "severity": "normal",
+        "clinicalAction": "Calcio ionizado activo fisiológicamente adecuado."
+      },
+      {
+        "code": "calcium_mild_high",
+        "min": 10.51,
+        "max": 12.0,
+        "label": "Hipercalcemia Leve (10.6 - 12.0 mg/dL)",
+        "severity": "warning",
+        "clinicalAction": "Descartar hiperparatiroidismo primario, fármacos (tiazidas, litio) o neoplasias."
+      },
+      {
+        "code": "calcium_high",
+        "min": 12.01,
+        "max": null,
+        "label": "Hipercalcemia Moderada / Severa (> 12.0 mg/dL)",
+        "severity": "critical",
+        "clinicalAction": "Emergencia metabólica potencial: hidratación salina endovenosa vigorosa, furosemida y bifosfonatos."
+      }
+    ],
+    "evolution": "[Calculadora Médica DoctorChart - Calcio Corregido por Albúmina]\nFecha: %s\nParámetros: Calcio sérico total %s mg/dL | Albúmina %s g/dL\n• Calcio Corregido: %s mg/dL\n• Interpretación: %s\nRecomendación clínica: %s"
+  },
+  "chads_vasc": {
+    "name": "Score CHA₂DS₂-VASc",
+    "ranges": [
+      {
+        "code": "stroke_low",
+        "min": 0.0,
+        "max": 1.0,
+        "label": "Riesgo Tromboembólico Bajo",
+        "severity": "normal",
+        "clinicalAction": "No se recomienda terapia antitrombótica ni anticoagulante."
+      },
+      {
+        "code": "stroke_intermediate",
+        "min": 1.0,
+        "max": 2.0,
+        "label": "Riesgo Tromboembólico Intermedio",
+        "severity": "warning",
+        "clinicalAction": "Debe considerarse anticoagulación oral (anticoagulantes orales directos preferidos sobre AVK)."
+      },
+      {
+        "code": "stroke_high",
+        "min": 2.0,
+        "max": 9.0,
+        "label": "Riesgo Tromboembólico Alto",
+        "severity": "critical",
+        "clinicalAction": "Anticoagulación oral formalmente indicada salvo contraindicación absoluta (evaluar riesgo de sangrado HAS-BLED)."
+      }
+    ],
+    "evolution": "[Calculadora Médica DoctorChart - Score CHA₂DS₂-VASc]\nFecha: %s\nPuntaje Total: %d puntos (%s)\nRiesgo anual de ACV isquémico estimado: %s%% / año\nFactores identificados: %s\nRecomendación terapéutica: %s"
+  },
+  "cockcroft": {
+    "name": "Aclaramiento de Creatinina (Cockcroft-Gault)",
+    "ranges": [
+      {
+        "code": "clearance_normal",
+        "min": 90.0,
+        "max": null,
+        "label": "Aclaramiento Normal (≥ 90 mL/min)",
+        "severity": "normal",
+        "clinicalAction": "Dosis estándar para la gran mayoría de fármacos renales."
+      },
+      {
+        "code": "clearance_mild",
+        "min": 60.0,
+        "max": 89.99,
+        "label": "Insuficiencia Renal Leve (60 - 89 mL/min)",
+        "severity": "low",
+        "clinicalAction": "Generalmente no requiere ajuste salvo fármacos de margen terapéutico muy estrecho."
+      },
+      {
+        "code": "clearance_moderate",
+        "min": 30.0,
+        "max": 59.99,
+        "label": "Insuficiencia Renal Moderada (30 - 59 mL/min)",
+        "severity": "warning",
+        "clinicalAction": "Requiere ajuste de dosis o intervalo en antibióticos (ej. quinolonas, aminoglucósidos) y DOACs."
+      },
+      {
+        "code": "clearance_severe",
+        "min": 15.0,
+        "max": 29.99,
+        "label": "Insuficiencia Renal Severa (15 - 29 mL/min)",
+        "severity": "danger",
+        "clinicalAction": "Reducción marcada de posología o contraindicación de ciertos fármacos (metformina, AINEs, etc.)."
+      },
+      {
+        "code": "clearance_terminal",
+        "min": 0.0,
+        "max": 14.99,
+        "label": "Fallo Renal Terminal (< 15 mL/min)",
+        "severity": "critical",
+        "clinicalAction": "Ajuste estricto por diálisis o contraindicación formal en prospecto."
+      }
+    ],
+    "evolution": "[Calculadora Médica DoctorChart - Cockcroft-Gault (ClCr)]\nFecha: %s\nParámetros: Peso %s kg | Edad %d años | Creatinina %s mg/dL | Sexo %s\n• Aclaramiento de Creatinina: %s mL/min\n• Estado: %s\nGuía clínica: %s"
+  },
+  "holliday_segar": {
+    "name": "Requerimiento Hídrico Basal Pediátrico (Holliday-Segar)",
+    "ranges": [
+      {
+        "code": "fluid_maintenance",
+        "min": 0.0,
+        "max": 99999.0,
+        "label": "Mantenimiento Hidroelectrolítico Estándar",
+        "severity": "normal",
+        "clinicalAction": "Administrar solución basal parenteral (p. ej. Sol. Glucosada 5% con electrolitos) o enteral fraccionada."
+      }
+    ],
+    "evolution": "CALCULADORA CLÍNICA: Requerimiento Hídrico Basal (Holliday-Segar)\nFecha: %s\nPeso del Paciente: %s kg\nRequerimiento Total: %s mL/día (%s mL/h)\nAporte de Sodio estimado (3 mEq/100mL): %s mEq/día\nAporte de Potasio estimado (2 mEq/100mL): %s mEq/día\nFraccionamiento cada 8h: %s mL por turno\nInterpretación: Mantenimiento Hidroelectrolítico Estándar"
+  },
+  "bsa_mosteller": {
+    "name": "Superficie Corporal Pediátrica y Adulto (Mosteller)",
+    "ranges": [
+      {
+        "code": "body_surface",
+        "min": 0.0,
+        "max": 3.5,
+        "label": "Área de Superficie Corporal Calculada",
+        "severity": "normal",
+        "clinicalAction": "Utilizar este valor para dosificar quimioterapia, fluidoterapia o indexar parámetros hemodinámicos."
+      }
+    ],
+    "evolution": "CALCULADORA CLÍNICA: Superficie Corporal (BSA - Mosteller)\nFecha: %s\nPeso: %s kg | Talla: %s cm\nBSA Mosteller: %s m²\nFórmula: √[(Peso kg × Talla cm) / 3600]"
+  },
+  "pediatric_dosage": {
+    "name": "Dosificación Pediátrica por Peso (mg/kg)",
+    "ranges": [
+      {
+        "code": "pediatric_dosage",
+        "min": 0.0,
+        "max": 99999.0,
+        "label": "Dosificación Pediátrica Calculada",
+        "severity": "normal",
+        "clinicalAction": null
+      }
+    ],
+    "evolution": "CALCULADORA CLÍNICA: Dosificación Pediátrica\nFecha: %s\nPeso: %s kg\nDosis Objetivo: %s %s\nPresentación: %s mg / %s mL\nFrecuencia: Cada %s horas (%d veces al día)\nDosis por toma: %s mg (%s mL)\nDosis total diaria: %s mg/día (%s mL/día)"
+  },
+  "tfge": {
+    "name": "Filtrado Glomerular Estimado (CKD-EPI 2021)",
+    "ranges": [
+      {
+        "code": "renal_g1",
+        "min": 90.0,
+        "max": null,
+        "label": "Estadio G1: Función renal normal o elevada",
+        "severity": "normal",
+        "clinicalAction": "Monitoreo periódico si existen factores de riesgo (diabetes, HTA, proteinuria)."
+      },
+      {
+        "code": "renal_g2",
+        "min": 60.0,
+        "max": 89.99,
+        "label": "Estadio G2: Descenso ligero del filtrado",
+        "severity": "low",
+        "clinicalAction": "Control de progresión, ajuste de factores cardiovasculares y albuminuria."
+      },
+      {
+        "code": "renal_g3a",
+        "min": 45.0,
+        "max": 59.99,
+        "label": "Estadio G3a: Descenso ligero a moderado",
+        "severity": "warning",
+        "clinicalAction": "Evaluar complicaciones de ERC (anemia, metabolismo óseo-mineral). Vigilar nefrotoxinas."
+      },
+      {
+        "code": "renal_g3b",
+        "min": 30.0,
+        "max": 44.99,
+        "label": "Estadio G3b: Descenso moderado a severo",
+        "severity": "danger",
+        "clinicalAction": "Ajuste obligatorio de posología farmacológica y derivación a nefrología."
+      },
+      {
+        "code": "renal_g4",
+        "min": 15.0,
+        "max": 29.99,
+        "label": "Estadio G4: Descenso severo",
+        "severity": "critical",
+        "clinicalAction": "Manejo nefrológico activo intensivo, preparación para terapia de reemplazo renal."
+      },
+      {
+        "code": "renal_g5",
+        "min": 0.0,
+        "max": 14.99,
+        "label": "Estadio G5: Fallo renal terminal (IRCT)",
+        "severity": "critical",
+        "clinicalAction": "Urgencia de reemplazo renal (diálisis peritoneal, hemodiálisis o trasplante)."
+      }
+    ],
+    "evolution": "[Calculadora Médica DoctorChart - TFGe CKD-EPI 2021]\nFecha: %s\nParámetros: Creatinina %s mg/dL | Edad %d años | Sexo %s\n• TFGe: %s mL/min/1.73m²\n• Clasificación KDIGO: %s\nConducta sugerida: %s",
+    "ageFactors": [
+      1.0,
+      0.9938,
+      0.98763844,
+      0.9815150816720001,
+      0.9754296881656337,
+      0.9693820240990068,
+      0.9633718555495929,
+      0.9573989500451855,
+      0.9514630765549054,
+      0.945564005480265,
+      0.9397015086462873,
+      0.9338753592926804,
+      0.9280853320650657,
+      0.9223312030062624,
+      0.9166127495476235,
+      0.9109297505004282,
+      0.9052819860473257,
+      0.8996692377338322,
+      0.8940912884598825,
+      0.8885479224714312,
+      0.8830389253521084,
+      0.8775640840149254,
+      0.8721231866940328,
+      0.8667160229365298,
+      0.8613423835943234,
+      0.8560020608160386,
+      0.8506948480389791,
+      0.8454205399811374,
+      0.8401789326332544,
+      0.8349698232509283,
+      0.8297930103467726,
+      0.8246482936826226,
+      0.8195354742617903,
+      0.8144543543213673,
+      0.8094047373245747,
+      0.8043864279531624,
+      0.7993992320998529,
+      0.7944429568608338,
+      0.7895174105282966,
+      0.7846224025830212,
+      0.7797577436870065,
+      0.774923245676147,
+      0.7701187215529549,
+      0.7653439854793266,
+      0.7605988527693548,
+      0.7558831398821848,
+      0.7511966644149153,
+      0.7465392450955428,
+      0.7419107017759504,
+      0.7373108554249396,
+      0.7327395281213049,
+      0.7281965430469529,
+      0.7236817244800617,
+      0.7191948977882854,
+      0.7147358894219981,
+      0.7103045269075817,
+      0.7059006388407547,
+      0.7015240548799421,
+      0.6971746057396864,
+      0.6928521231841004,
+      0.688556440020359,
+      0.6842873900922327,
+      0.6800448082736609,
+      0.6758285304623642,
+      0.6716383935734975,
+      0.6674742355333418,
+      0.6633358952730352,
+      0.6592232127223424,
+      0.6551360288034639,
+      0.6510741854248824,
+      0.6470375254752482,
+      0.6430258928173016,
+      0.6390391322818344,
+      0.635077089661687,
+      0.6311396117057846,
+      0.6272265461132087,
+      0.6233377415273068,
+      0.6194730475298376,
+      0.6156323146351526,
+      0.6118153942844146,
+      0.6080221388398512,
+      0.6042524015790441,
+      0.6005060366892541,
+      0.5967828992617807,
+      0.5930828452863577,
+      0.5894057316455823,
+      0.5857514161093798,
+      0.5821197573295016,
+      0.5785106148340586,
+      0.5749238490220875,
+      0.5713593211581506,
+      0.56781689336697,
+      0.5642964286280948,
+      0.5607977907706007,
+      0.5573208444678229,
+      0.5538654552321225,
+      0.5504314894096833,
+      0.5470188141753433,
+      0.5436272975274562,
+      0.5402568082827859,
+      0.5369072160714327,
+      0.5335783913317897,
+      0.5302702053055327,
+      0.5269825300326384,
+      0.5237152383464361,
+      0.5204682038686882,
+      0.5172413010047023,
+      0.5140344049384732,
+      0.5108473916278546,
+      0.507680137799762,
+      0.5045325209454035,
+      0.5014044193155419,
+      0.4982957119157856,
+      0.49520627850190774,
+      0.49213599957519594,
+      0.4890847563778297,
+      0.48605243088828715,
+      0.4830389058167798,
+      0.48004406460071575,
+      0.47706779140019134,
+      0.47410997109351016
+    ]
+  }
+}

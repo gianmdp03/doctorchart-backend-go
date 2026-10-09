@@ -1,0 +1,95 @@
+{
+  "workload": [
+    [
+      "GET",
+      "/api/doctorchart/patients",
+      null
+    ],
+    [
+      "GET",
+      "/api/doctorchart/patients/1",
+      null
+    ],
+    [
+      "GET",
+      "/api/doctorchart/workspace",
+      null
+    ],
+    [
+      "GET",
+      "/api/doctorchart/workspace/preferences",
+      null
+    ],
+    [
+      "GET",
+      "/api/doctorchart/encounters?patientId=1",
+      null
+    ],
+    [
+      "GET",
+      "/api/doctorchart/calculators/catalog",
+      null
+    ],
+    [
+      "GET",
+      "/api/doctorchart/vaccination-calendar",
+      null
+    ],
+    [
+      "POST",
+      "/api/doctorchart/calculators/preview",
+      {
+        "calculationCode": "imc",
+        "inputSnapshot": {
+          "weightKg": 70,
+          "heightCm": 170
+        }
+      }
+    ]
+  ],
+  "results": [
+    {
+      "runtime": "spring",
+      "database": "perf_a3c886_spring",
+      "requests": 1024,
+      "concurrency": 8,
+      "errors": 0,
+      "seconds": 4.394140700002026,
+      "requests_per_second": 233.03759936488328,
+      "p50_ms": 24.870900000678375,
+      "p95_ms": 82.99219999753404,
+      "p99_ms": 140.165299999353,
+      "cpu_seconds": 19.140625,
+      "rss_bytes": 522596352,
+      "peak_process_rss_bytes": 714944512,
+      "database_delta": {
+        "xact_commit": 1652,
+        "xact_rollback": 0,
+        "tup_returned": 12784,
+        "tup_fetched": 9287
+      }
+    },
+    {
+      "runtime": "go",
+      "database": "perf_59c74a_go",
+      "requests": 1024,
+      "concurrency": 8,
+      "errors": 0,
+      "seconds": 1.4794032999998308,
+      "requests_per_second": 692.1709583858013,
+      "p50_ms": 10.633650003001094,
+      "p95_ms": 16.77429999836022,
+      "p99_ms": 27.45889999641804,
+      "cpu_seconds": 1.59375,
+      "rss_bytes": 28196864,
+      "peak_process_rss_bytes": 28356608,
+      "database_delta": {
+        "xact_commit": 781,
+        "xact_rollback": 0,
+        "tup_returned": 16858,
+        "tup_fetched": 12179
+      }
+    }
+  ],
+  "scope": "Windows native runtimes, identical disposable data, warm read/preview workload; no production capacity claim"
+}

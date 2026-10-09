@@ -1,0 +1,411 @@
+{
+  "source_revision": "828691433ac1057d4e7f132685884b5c9cb58e39",
+  "scope": "All existing *Test suites from target-owned pinned source copy; Maven Java 25",
+  "summary": {
+    "tests": 663,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "suites": [
+    {
+      "name": "com.syntah.doctorchart.config.ClinicalGatewaySecurityTest",
+      "tests": "12",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.config.DoctorchartRulesRegistryTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.config.GatewayHeaderAuthFilterTest",
+      "tests": "16",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.config.Phase3WizardSecurityTest",
+      "tests": "25",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.config.PrivateGatewaySecurityTest",
+      "tests": "17",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.config.RuntimeConfigurationValidatorTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.config.SpecialtyBootstrapServiceTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.controller.ClinicalCalculatorControllerTest",
+      "tests": "15",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.controller.ClinicalEncounterControllerTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.controller.DoctorProfileControllerTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.controller.internal.InternalBillingWebhookControllerTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.controller.PatientControllerTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.controller.PatientMedicalStudyControllerTest",
+      "tests": "7",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.controller.PingControllerTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.controller.PlanLimitsControllerTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.controller.SpecialtyControllerTest",
+      "tests": "8",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.controller.VaccinationControllerTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.dto.wizard.WizardRequestsTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.entity.ClinicalEncounterEntityTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.entity.DoctorWorkspaceWizardDefinitionTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.entity.PatientEntityTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.entity.PatientMedicalStudyEntityTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.entity.SpecialtyEntityTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.entity.WizardDefaultEntityTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.exception.GlobalExceptionHandlerTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.integration.CalculatorCatalogIntegrationTest",
+      "tests": "12",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.integration.CalculatorHistoryRepositoryIntegrationTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.integration.ClinicalDocumentPrintIntegrationTest",
+      "tests": "23",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.integration.PatientPrescriptionIntegrationTest",
+      "tests": "53",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.integration.Phase2SpecialtyBootstrapIntegrationTest",
+      "tests": "14",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.integration.Phase3SpecialtyWizardIntegrationTest",
+      "tests": "19",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.integration.Phase6ClinicalRecordsIntegrationTest",
+      "tests": "51",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.integration.StudyFileStorageIntegrationTest",
+      "tests": "12",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.service.calculator.ClinicalCalculationEngineTest",
+      "tests": "41",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.service.ClinicalAvailabilityTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.service.DoctorchartPlanValidatorServiceTest",
+      "tests": "12",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.service.impl.ClinicalCalculatorAccessTest",
+      "tests": "49",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.service.impl.ClinicalCalculatorServiceImplTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.service.impl.ClinicalEncounterServiceImplTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.service.impl.ClinicalPdfGeneratorServiceImplTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.service.impl.DoctorProfileServiceImplTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.service.impl.DoctorWorkspaceServiceImplTest",
+      "tests": "11",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.service.impl.PatientGrowthServiceImplTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.service.impl.PatientMedicalStudyAccessTest",
+      "tests": "45",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.service.impl.PatientMedicalStudyServiceImplTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.service.impl.PatientServiceImplTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.service.impl.SpecialtyServiceImplTest",
+      "tests": "13",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.service.impl.WhoGrowthCalculatorServiceImplTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.service.MedicationCatalogServiceTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.service.WizardDefinitionValidatorTest",
+      "tests": "20",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.service.WizardFormEngineTest",
+      "tests": "23",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.service.WizardFormulaEvaluatorTest",
+      "tests": "13",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.storage.LocalStudyFileStorageTest",
+      "tests": "24",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.storage.S3StudyFileStorageTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.storage.StudyImageOptimizerTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart.util.PediatricAgeCalculatorTest",
+      "tests": "8",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.syntah.doctorchart._enum.SubscriptionPlanTest",
+      "tests": "12",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    }
+  ]
+}

@@ -1,0 +1,3 @@
+ok  	api-gateway	9.463s
+ok  	api-gateway/internal/ai	6.022s
+ok  	api-gateway/internal/identity	(cached)

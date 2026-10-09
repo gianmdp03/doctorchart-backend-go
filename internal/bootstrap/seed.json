@@ -1,0 +1,2323 @@
+{
+  "specialties": [
+    {
+      "id": 1,
+      "code": "pediatrics",
+      "active": true,
+      "version": 1,
+      "navigation": [
+        "DASHBOARD",
+        "PATIENTS",
+        "CALCULATORS",
+        "VACCINATION",
+        "WIZARD"
+      ],
+      "description": "Configuración inicial para la atención pediátrica.",
+      "display_name": "Pediatría",
+      "patient_record_tabs": [
+        "SUMMARY",
+        "ENCOUNTERS",
+        "VACCINATION",
+        "GROWTH",
+        "PRESCRIPTIONS",
+        "STUDIES"
+      ],
+      "patient_record_actions": [
+        "EDIT_PATIENT",
+        "NEW_ENCOUNTER",
+        "VIEW_GROWTH",
+        "PRINT_DOCUMENT"
+      ]
+    }
+  ],
+  "wizard_defaults": [
+    {
+      "id": 1,
+      "version": 0,
+      "specialty_id": 1,
+      "draft_definition": {
+        "patientForm": {
+          "categories": [
+            {
+              "key": "sys_patient_profile",
+              "title": "Datos Personales",
+              "fields": [
+                {
+                  "key": "sys_firstName",
+                  "type": "TEXT",
+                  "label": "Nombre",
+                  "system": true,
+                  "required": true
+                },
+                {
+                  "key": "sys_lastName",
+                  "type": "TEXT",
+                  "label": "Apellido",
+                  "system": true,
+                  "required": true
+                },
+                {
+                  "key": "sys_dni",
+                  "type": "TEXT",
+                  "label": "DNI",
+                  "system": true,
+                  "required": true
+                },
+                {
+                  "key": "sys_dob",
+                  "type": "DATE",
+                  "label": "Fecha de nacimiento",
+                  "system": true,
+                  "required": true
+                },
+                {
+                  "key": "sys_sex",
+                  "type": "SELECT",
+                  "label": "Sexo",
+                  "system": true,
+                  "options": [
+                    {
+                      "label": "Masculino",
+                      "value": "MALE"
+                    },
+                    {
+                      "label": "Femenino",
+                      "value": "FEMALE"
+                    },
+                    {
+                      "label": "Otro",
+                      "value": "OTHER"
+                    },
+                    {
+                      "label": "Sin información",
+                      "value": "UNKNOWN"
+                    }
+                  ],
+                  "required": true
+                },
+                {
+                  "key": "sys_phone",
+                  "type": "TEXT",
+                  "label": "Teléfono",
+                  "system": true,
+                  "required": false
+                },
+                {
+                  "key": "sys_email",
+                  "type": "TEXT",
+                  "label": "Email",
+                  "system": true,
+                  "required": false
+                },
+                {
+                  "key": "sys_insurance",
+                  "type": "TEXT",
+                  "label": "Obra social / Cobertura",
+                  "system": true,
+                  "required": false
+                },
+                {
+                  "key": "address",
+                  "type": "TEXT",
+                  "label": "Dirección",
+                  "required": false
+                },
+                {
+                  "key": "nationality",
+                  "type": "TEXT",
+                  "label": "Nacionalidad",
+                  "required": false
+                }
+              ],
+              "system": true,
+              "enabled": true
+            },
+            {
+              "key": "family_history",
+              "title": "ANTECEDENTES FAMILIARES",
+              "fields": [
+                {
+                  "key": "paternalDiseases",
+                  "type": "TEXTAREA",
+                  "label": "Enfermedades del padre",
+                  "required": false
+                },
+                {
+                  "key": "maternalDiseases",
+                  "type": "TEXTAREA",
+                  "label": "Enfermedades de la madre",
+                  "required": false
+                },
+                {
+                  "key": "siblingDiseases",
+                  "type": "TEXTAREA",
+                  "label": "Enfermedades de hermanos",
+                  "required": false
+                }
+              ],
+              "enabled": true
+            },
+            {
+              "key": "guardians",
+              "title": "DATOS FAMILIARES Y TUTORES",
+              "fields": [
+                {
+                  "key": "primaryGuardian",
+                  "type": "SELECT",
+                  "label": "Tutor o responsable principal",
+                  "options": [
+                    {
+                      "label": "Madre",
+                      "value": "Madre"
+                    },
+                    {
+                      "label": "Padre",
+                      "value": "Padre"
+                    },
+                    {
+                      "label": "Ambos",
+                      "value": "Ambos"
+                    },
+                    {
+                      "label": "Abuelo/a",
+                      "value": "Abuelo/a"
+                    },
+                    {
+                      "label": "Tutor legal / Otro",
+                      "value": "Tutor legal / Otro"
+                    }
+                  ],
+                  "required": false
+                },
+                {
+                  "key": "motherFullName",
+                  "type": "TEXT",
+                  "label": "Nombre de la madre",
+                  "required": false
+                },
+                {
+                  "key": "fatherFullName",
+                  "type": "TEXT",
+                  "label": "Nombre del padre",
+                  "required": false
+                },
+                {
+                  "key": "primaryContactPhone",
+                  "type": "TEXT",
+                  "label": "Teléfono de contacto principal",
+                  "required": false
+                },
+                {
+                  "key": "hasSiblings",
+                  "type": "BOOLEAN",
+                  "label": "¿Tiene hermanos?",
+                  "required": false
+                },
+                {
+                  "key": "siblingsCount",
+                  "type": "NUMBER",
+                  "label": "Cantidad de hermanos",
+                  "minimum": 0,
+                  "required": false,
+                  "visibleWhen": {
+                    "equals": true,
+                    "fieldKey": "hasSiblings"
+                  }
+                },
+                {
+                  "key": "siblingOrder",
+                  "type": "NUMBER",
+                  "label": "Lugar que ocupa entre hermanos",
+                  "minimum": 1,
+                  "required": false,
+                  "visibleWhen": {
+                    "equals": true,
+                    "fieldKey": "hasSiblings"
+                  }
+                },
+                {
+                  "key": "livingArrangement",
+                  "type": "SELECT",
+                  "label": "Convivencia",
+                  "options": [
+                    {
+                      "label": "Ambos padres",
+                      "value": "Ambos padres"
+                    },
+                    {
+                      "label": "Solo con la madre",
+                      "value": "Solo con la madre"
+                    },
+                    {
+                      "label": "Solo con el padre",
+                      "value": "Solo con el padre"
+                    },
+                    {
+                      "label": "Cuidado compartido",
+                      "value": "Cuidado compartido"
+                    },
+                    {
+                      "label": "Otros familiares",
+                      "value": "Otros familiares"
+                    }
+                  ],
+                  "required": false
+                }
+              ],
+              "enabled": true
+            }
+          ]
+        },
+        "encounterForm": {
+          "categories": [
+            {
+              "key": "reason",
+              "title": "Motivo de consulta",
+              "fields": [
+                {
+                  "key": "chiefComplaint",
+                  "type": "TEXTAREA",
+                  "label": "Motivo de consulta",
+                  "required": true
+                },
+                {
+                  "key": "presentIllness",
+                  "type": "TEXTAREA",
+                  "label": "Evolución",
+                  "required": false
+                }
+              ],
+              "enabled": true
+            },
+            {
+              "key": "measurements",
+              "title": "Antropometría",
+              "fields": [
+                {
+                  "key": "weightKg",
+                  "type": "NUMBER",
+                  "unit": "kg",
+                  "label": "Peso",
+                  "minimum": 0,
+                  "required": true
+                },
+                {
+                  "key": "heightCm",
+                  "type": "NUMBER",
+                  "unit": "cm",
+                  "label": "Longitud / talla",
+                  "minimum": 0,
+                  "required": true
+                },
+                {
+                  "key": "headCircumferenceCm",
+                  "type": "NUMBER",
+                  "unit": "cm",
+                  "label": "Perímetro cefálico",
+                  "minimum": 0,
+                  "required": false
+                },
+                {
+                  "key": "bloodPressure",
+                  "type": "TEXT",
+                  "label": "Tensión arterial",
+                  "required": false
+                }
+              ],
+              "enabled": true
+            },
+            {
+              "key": "physical_exam",
+              "title": "Examen físico",
+              "fields": [
+                {
+                  "key": "physicalExam",
+                  "type": "TEXTAREA",
+                  "label": "Examen físico",
+                  "required": false
+                }
+              ],
+              "enabled": true
+            },
+            {
+              "key": "development",
+              "title": "Desarrollo",
+              "fields": [
+                {
+                  "key": "meetsMilestones",
+                  "type": "BOOLEAN",
+                  "label": "Cumple pautas de desarrollo",
+                  "required": false
+                },
+                {
+                  "key": "milestoneNotes",
+                  "type": "TEXTAREA",
+                  "label": "Detalle de las pautas pendientes",
+                  "required": false,
+                  "visibleWhen": {
+                    "equals": false,
+                    "fieldKey": "meetsMilestones"
+                  }
+                }
+              ],
+              "enabled": true
+            },
+            {
+              "key": "assessment",
+              "title": "Evaluación",
+              "fields": [
+                {
+                  "key": "diagnosis",
+                  "type": "TEXTAREA",
+                  "label": "Evaluación / diagnóstico",
+                  "required": false
+                }
+              ],
+              "enabled": true
+            },
+            {
+              "key": "plan",
+              "title": "Plan e indicaciones",
+              "fields": [
+                {
+                  "key": "treatment",
+                  "type": "TEXTAREA",
+                  "label": "Plan terapéutico",
+                  "required": false
+                },
+                {
+                  "key": "followUpDate",
+                  "type": "DATE",
+                  "label": "Próximo control",
+                  "required": false
+                }
+              ],
+              "enabled": true
+            }
+          ]
+        },
+        "modulesConfig": {
+          "AI_ASSISTANT": true,
+          "GROWTH_CHARTS": true,
+          "MEDICATION_CATALOG": true
+        },
+        "schemaVersion": 1
+      },
+      "published_version": 1,
+      "published_definition": {
+        "patientForm": {
+          "categories": [
+            {
+              "key": "sys_patient_profile",
+              "title": "Datos Personales",
+              "fields": [
+                {
+                  "key": "sys_firstName",
+                  "type": "TEXT",
+                  "label": "Nombre",
+                  "system": true,
+                  "required": true
+                },
+                {
+                  "key": "sys_lastName",
+                  "type": "TEXT",
+                  "label": "Apellido",
+                  "system": true,
+                  "required": true
+                },
+                {
+                  "key": "sys_dni",
+                  "type": "TEXT",
+                  "label": "DNI",
+                  "system": true,
+                  "required": true
+                },
+                {
+                  "key": "sys_dob",
+                  "type": "DATE",
+                  "label": "Fecha de nacimiento",
+                  "system": true,
+                  "required": true
+                },
+                {
+                  "key": "sys_sex",
+                  "type": "SELECT",
+                  "label": "Sexo",
+                  "system": true,
+                  "options": [
+                    {
+                      "label": "Masculino",
+                      "value": "MALE"
+                    },
+                    {
+                      "label": "Femenino",
+                      "value": "FEMALE"
+                    },
+                    {
+                      "label": "Otro",
+                      "value": "OTHER"
+                    },
+                    {
+                      "label": "Sin información",
+                      "value": "UNKNOWN"
+                    }
+                  ],
+                  "required": true
+                },
+                {
+                  "key": "sys_phone",
+                  "type": "TEXT",
+                  "label": "Teléfono",
+                  "system": true,
+                  "required": false
+                },
+                {
+                  "key": "sys_email",
+                  "type": "TEXT",
+                  "label": "Email",
+                  "system": true,
+                  "required": false
+                },
+                {
+                  "key": "sys_insurance",
+                  "type": "TEXT",
+                  "label": "Obra social / Cobertura",
+                  "system": true,
+                  "required": false
+                },
+                {
+                  "key": "address",
+                  "type": "TEXT",
+                  "label": "Dirección",
+                  "required": false
+                },
+                {
+                  "key": "nationality",
+                  "type": "TEXT",
+                  "label": "Nacionalidad",
+                  "required": false
+                }
+              ],
+              "system": true,
+              "enabled": true
+            },
+            {
+              "key": "family_history",
+              "title": "ANTECEDENTES FAMILIARES",
+              "fields": [
+                {
+                  "key": "paternalDiseases",
+                  "type": "TEXTAREA",
+                  "label": "Enfermedades del padre",
+                  "required": false
+                },
+                {
+                  "key": "maternalDiseases",
+                  "type": "TEXTAREA",
+                  "label": "Enfermedades de la madre",
+                  "required": false
+                },
+                {
+                  "key": "siblingDiseases",
+                  "type": "TEXTAREA",
+                  "label": "Enfermedades de hermanos",
+                  "required": false
+                }
+              ],
+              "enabled": true
+            },
+            {
+              "key": "guardians",
+              "title": "DATOS FAMILIARES Y TUTORES",
+              "fields": [
+                {
+                  "key": "primaryGuardian",
+                  "type": "SELECT",
+                  "label": "Tutor o responsable principal",
+                  "options": [
+                    {
+                      "label": "Madre",
+                      "value": "Madre"
+                    },
+                    {
+                      "label": "Padre",
+                      "value": "Padre"
+                    },
+                    {
+                      "label": "Ambos",
+                      "value": "Ambos"
+                    },
+                    {
+                      "label": "Abuelo/a",
+                      "value": "Abuelo/a"
+                    },
+                    {
+                      "label": "Tutor legal / Otro",
+                      "value": "Tutor legal / Otro"
+                    }
+                  ],
+                  "required": false
+                },
+                {
+                  "key": "motherFullName",
+                  "type": "TEXT",
+                  "label": "Nombre de la madre",
+                  "required": false
+                },
+                {
+                  "key": "fatherFullName",
+                  "type": "TEXT",
+                  "label": "Nombre del padre",
+                  "required": false
+                },
+                {
+                  "key": "primaryContactPhone",
+                  "type": "TEXT",
+                  "label": "Teléfono de contacto principal",
+                  "required": false
+                },
+                {
+                  "key": "hasSiblings",
+                  "type": "BOOLEAN",
+                  "label": "¿Tiene hermanos?",
+                  "required": false
+                },
+                {
+                  "key": "siblingsCount",
+                  "type": "NUMBER",
+                  "label": "Cantidad de hermanos",
+                  "minimum": 0,
+                  "required": false,
+                  "visibleWhen": {
+                    "equals": true,
+                    "fieldKey": "hasSiblings"
+                  }
+                },
+                {
+                  "key": "siblingOrder",
+                  "type": "NUMBER",
+                  "label": "Lugar que ocupa entre hermanos",
+                  "minimum": 1,
+                  "required": false,
+                  "visibleWhen": {
+                    "equals": true,
+                    "fieldKey": "hasSiblings"
+                  }
+                },
+                {
+                  "key": "livingArrangement",
+                  "type": "SELECT",
+                  "label": "Convivencia",
+                  "options": [
+                    {
+                      "label": "Ambos padres",
+                      "value": "Ambos padres"
+                    },
+                    {
+                      "label": "Solo con la madre",
+                      "value": "Solo con la madre"
+                    },
+                    {
+                      "label": "Solo con el padre",
+                      "value": "Solo con el padre"
+                    },
+                    {
+                      "label": "Cuidado compartido",
+                      "value": "Cuidado compartido"
+                    },
+                    {
+                      "label": "Otros familiares",
+                      "value": "Otros familiares"
+                    }
+                  ],
+                  "required": false
+                }
+              ],
+              "enabled": true
+            }
+          ]
+        },
+        "encounterForm": {
+          "categories": [
+            {
+              "key": "reason",
+              "title": "Motivo de consulta",
+              "fields": [
+                {
+                  "key": "chiefComplaint",
+                  "type": "TEXTAREA",
+                  "label": "Motivo de consulta",
+                  "required": true
+                },
+                {
+                  "key": "presentIllness",
+                  "type": "TEXTAREA",
+                  "label": "Evolución",
+                  "required": false
+                }
+              ],
+              "enabled": true
+            },
+            {
+              "key": "measurements",
+              "title": "Antropometría",
+              "fields": [
+                {
+                  "key": "weightKg",
+                  "type": "NUMBER",
+                  "unit": "kg",
+                  "label": "Peso",
+                  "minimum": 0,
+                  "required": true
+                },
+                {
+                  "key": "heightCm",
+                  "type": "NUMBER",
+                  "unit": "cm",
+                  "label": "Longitud / talla",
+                  "minimum": 0,
+                  "required": true
+                },
+                {
+                  "key": "headCircumferenceCm",
+                  "type": "NUMBER",
+                  "unit": "cm",
+                  "label": "Perímetro cefálico",
+                  "minimum": 0,
+                  "required": false
+                },
+                {
+                  "key": "bloodPressure",
+                  "type": "TEXT",
+                  "label": "Tensión arterial",
+                  "required": false
+                }
+              ],
+              "enabled": true
+            },
+            {
+              "key": "physical_exam",
+              "title": "Examen físico",
+              "fields": [
+                {
+                  "key": "physicalExam",
+                  "type": "TEXTAREA",
+                  "label": "Examen físico",
+                  "required": false
+                }
+              ],
+              "enabled": true
+            },
+            {
+              "key": "development",
+              "title": "Desarrollo",
+              "fields": [
+                {
+                  "key": "meetsMilestones",
+                  "type": "BOOLEAN",
+                  "label": "Cumple pautas de desarrollo",
+                  "required": false
+                },
+                {
+                  "key": "milestoneNotes",
+                  "type": "TEXTAREA",
+                  "label": "Detalle de las pautas pendientes",
+                  "required": false,
+                  "visibleWhen": {
+                    "equals": false,
+                    "fieldKey": "meetsMilestones"
+                  }
+                }
+              ],
+              "enabled": true
+            },
+            {
+              "key": "assessment",
+              "title": "Evaluación",
+              "fields": [
+                {
+                  "key": "diagnosis",
+                  "type": "TEXTAREA",
+                  "label": "Evaluación / diagnóstico",
+                  "required": false
+                }
+              ],
+              "enabled": true
+            },
+            {
+              "key": "plan",
+              "title": "Plan e indicaciones",
+              "fields": [
+                {
+                  "key": "treatment",
+                  "type": "TEXTAREA",
+                  "label": "Plan terapéutico",
+                  "required": false
+                },
+                {
+                  "key": "followUpDate",
+                  "type": "DATE",
+                  "label": "Próximo control",
+                  "required": false
+                }
+              ],
+              "enabled": true
+            }
+          ]
+        },
+        "modulesConfig": {
+          "AI_ASSISTANT": true,
+          "GROWTH_CHARTS": true,
+          "MEDICATION_CATALOG": true
+        },
+        "schemaVersion": 1
+      }
+    }
+  ],
+  "chart_definitions": [
+    {
+      "id": 1,
+      "title": "Evolución Somatométrica de Peso",
+      "is_system": true,
+      "chart_code": "WEIGHT_EVOLUTION",
+      "chart_type": "LINE",
+      "description": "Curva temporal de variación de peso corporal del paciente",
+      "required_slots": [
+        {
+          "slot": "x",
+          "type": "DATE",
+          "label": "Fecha de Medición",
+          "suggestions": [
+            "fecha",
+            "encounterdate",
+            "control"
+          ]
+        },
+        {
+          "slot": "y",
+          "type": "NUMBER",
+          "label": "Peso Corporal (kg)",
+          "suggestions": [
+            "peso",
+            "weight",
+            "kg",
+            "peso_corporal"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Registro y Tendencia de Presión Arterial",
+      "is_system": true,
+      "chart_code": "BLOOD_PRESSURE_EVOLUTION",
+      "chart_type": "LINE",
+      "description": "Monitoreo hemodinámico de tensión arterial sistólica y diastólica",
+      "required_slots": [
+        {
+          "slot": "x",
+          "type": "DATE",
+          "label": "Fecha de Registro",
+          "suggestions": [
+            "fecha",
+            "encounterdate"
+          ]
+        },
+        {
+          "slot": "systolic",
+          "type": "NUMBER",
+          "label": "Tensión Sistólica (mmHg)",
+          "suggestions": [
+            "pa",
+            "sistolica",
+            "pas",
+            "tension_sistolica",
+            "ta_sistolica"
+          ]
+        },
+        {
+          "slot": "diastolic",
+          "type": "NUMBER",
+          "label": "Tensión Diastólica (mmHg)",
+          "suggestions": [
+            "diastolica",
+            "pad",
+            "tension_diastolica",
+            "ta_diastolica"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Evolución del Índice de Masa Corporal (IMC)",
+      "is_system": true,
+      "chart_code": "BMI_TRACKING",
+      "chart_type": "LINE",
+      "description": "Seguimiento nutricional y estado somatométrico longitudinal",
+      "required_slots": [
+        {
+          "slot": "x",
+          "type": "DATE",
+          "label": "Fecha",
+          "suggestions": [
+            "fecha",
+            "encounterdate"
+          ]
+        },
+        {
+          "slot": "y",
+          "type": "NUMBER",
+          "label": "IMC (kg/m²)",
+          "suggestions": [
+            "imc",
+            "bmi",
+            "indice_masa_corporal"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Control Glucémico y HbA1c",
+      "is_system": true,
+      "chart_code": "GLYCEMIA_HBA1C",
+      "chart_type": "BAR",
+      "description": "Monitoreo metabólico de glucemia basal y hemoglobina glicosilada",
+      "required_slots": [
+        {
+          "slot": "x",
+          "type": "DATE",
+          "label": "Fecha de Determinación",
+          "suggestions": [
+            "fecha",
+            "encounterdate"
+          ]
+        },
+        {
+          "slot": "y",
+          "type": "NUMBER",
+          "label": "Glucemia (mg/dL)",
+          "suggestions": [
+            "glucemia",
+            "glucose",
+            "glicemia",
+            "hba1c"
+          ]
+        }
+      ]
+    }
+  ],
+  "clinical_calculation_definitions": [
+    {
+      "id": 1,
+      "code": "imc",
+      "name": "Índice de Masa Corporal (IMC) y BSA",
+      "category": "antropometria",
+      "is_system": true,
+      "short_name": "IMC & BSA",
+      "description": "Evalúa el estado nutricional del adulto según la OMS y estima la superficie corporal (BSA) mediante Mosteller.",
+      "result_unit": "kg/m²",
+      "display_order": 0,
+      "category_label": "Antropometría",
+      "summary_formula": "IMC = Peso (kg) / [Talla (m)]² | BSA = √[Peso(kg) × Talla(cm) / 3600]",
+      "evidence_reference": "OMS / Mosteller RD. N Engl J Med 1987.",
+      "required_parameters": [
+        "weightKg",
+        "heightCm"
+      ]
+    },
+    {
+      "id": 2,
+      "code": "tfge",
+      "name": "Filtrado Glomerular Estimado (CKD-EPI 2021)",
+      "category": "nefrologia",
+      "is_system": true,
+      "short_name": "TFGe (CKD-EPI)",
+      "description": "Ecuación estándar de referencia internacional para estimar el filtrado glomerular sin ajuste de raza.",
+      "result_unit": "mL/min/1.73 m²",
+      "display_order": 1,
+      "category_label": "Nefrología",
+      "summary_formula": "CKD-EPI 2021 con Creatinina Sérica, Edad y Sexo Biológico",
+      "evidence_reference": "Inker LA et al. N Engl J Med 2021; KDIGO 2024 Guidelines.",
+      "required_parameters": [
+        "creatinineMgDl",
+        "ageYears",
+        "gender"
+      ]
+    },
+    {
+      "id": 3,
+      "code": "cockcroft",
+      "name": "Aclaramiento de Creatinina (Cockcroft-Gault)",
+      "category": "nefrologia",
+      "is_system": true,
+      "short_name": "ClCr Cockcroft",
+      "description": "Cálculo mandatorio para la dosificación y ajuste posológico de fármacos de excreción renal.",
+      "result_unit": "mL/min",
+      "display_order": 2,
+      "category_label": "Farmacología / Nefro",
+      "summary_formula": "ClCr = [(140 - edad) × peso] / [72 × Cr] (× 0.85 si mujer)",
+      "evidence_reference": "Cockcroft DW, Gault MH. Nephron 1976; FDA Renal Impairment Guidance.",
+      "required_parameters": [
+        "weightKg",
+        "ageYears",
+        "creatinineMgDl",
+        "gender"
+      ]
+    },
+    {
+      "id": 4,
+      "code": "chads_vasc",
+      "name": "Score CHA₂DS₂-VASc",
+      "category": "cardiologia",
+      "is_system": true,
+      "short_name": "CHA₂DS₂-VASc",
+      "description": "Estratificación de riesgo tromboembólico en Fibrilación Auricular no valvular e indicación de anticoagulación.",
+      "result_unit": "puntos",
+      "display_order": 3,
+      "category_label": "Cardiología",
+      "summary_formula": "Suma de factores clínicos: C(1), H(1), A₂(2), D(1), S₂(2), V(1), A(1), Sc(1)",
+      "evidence_reference": "Lip GY et al. Chest 2010; Guías ESC / AHA Fibrilación Auricular.",
+      "required_parameters": [
+        "ageYears",
+        "isFemale",
+        "congestiveHeartFailure",
+        "hypertension",
+        "diabetes",
+        "strokeOrTia",
+        "vascularDisease"
+      ]
+    },
+    {
+      "id": 5,
+      "code": "calcio_corregido",
+      "name": "Calcio Sérico Corregido por Albúmina",
+      "category": "metabolismo",
+      "is_system": true,
+      "short_name": "Calcio Corregido",
+      "description": "Ajusta la calcemia total en presencia de hipoalbuminemia o alteraciones de proteínas séricas.",
+      "result_unit": "mg/dL",
+      "display_order": 4,
+      "category_label": "Metabolismo / Lab",
+      "summary_formula": "Ca Corregido = Ca Total + 0.8 × (4.0 - Albúmina)",
+      "evidence_reference": "Payne RB et al. Br Med J 1973.",
+      "required_parameters": [
+        "serumCalciumMgDl",
+        "serumAlbuminGDl"
+      ]
+    },
+    {
+      "id": 6,
+      "code": "holliday_segar",
+      "name": "Requerimiento Hídrico Basal Pediátrico (Holliday-Segar)",
+      "category": "pediatria",
+      "is_system": true,
+      "short_name": "Holliday-Segar",
+      "description": "Cálculo de necesidades de mantenimiento de líquidos y electrolitos según peso en pacientes pediátricos.",
+      "result_unit": "mL/día",
+      "display_order": 5,
+      "category_label": "Pediatría",
+      "summary_formula": "1-10kg: 100mL/kg | 11-20kg: 1000 + 50*(kg-10) | >20kg: 1500 + 20*(kg-20)",
+      "evidence_reference": "Holliday MA, Segar WE. Pediatrics 1957; 19(5):823-832.",
+      "required_parameters": [
+        "weightKg"
+      ]
+    },
+    {
+      "id": 7,
+      "code": "bsa_mosteller",
+      "name": "Superficie Corporal Pediátrica y Adulto (Mosteller)",
+      "category": "pediatria",
+      "is_system": true,
+      "short_name": "Superficie Corporal (BSA)",
+      "description": "Estimación de área de superficie corporal (BSA) mediante Mosteller para dosificación en quimioterapia y fluidos.",
+      "result_unit": "m²",
+      "display_order": 6,
+      "category_label": "Pediatría / Onco",
+      "summary_formula": "BSA (m²) = √[(Peso (kg) × Talla (cm)) / 3600]",
+      "evidence_reference": "Mosteller RD. N Engl J Med 1987; 317:1098.",
+      "required_parameters": [
+        "weightKg",
+        "heightCm"
+      ]
+    },
+    {
+      "id": 8,
+      "code": "pediatric_dosage",
+      "name": "Dosificación Pediátrica por Peso (mg/kg)",
+      "category": "pediatria",
+      "is_system": true,
+      "short_name": "Dosis Pediátrica",
+      "description": "Calcula la dosis terapéutica en mg y volumen en mL por toma a partir del peso del niño, dosis objetivo y presentación.",
+      "result_unit": "mL/dosis",
+      "display_order": 7,
+      "category_label": "Pediatría / Farma",
+      "summary_formula": "Dosis = Peso × Dosis objetivo | Volumen (mL) = Dosis / Concentración",
+      "evidence_reference": "AAP / Nelson Textbook of Pediatrics 21a Ed.",
+      "required_parameters": [
+        "weightKg",
+        "targetDoseMgKg",
+        "doseUnit",
+        "drugConcentrationMg",
+        "drugConcentrationMl",
+        "dosesPerDay"
+      ]
+    }
+  ],
+  "specialty_calculator_defaults": [
+    {
+      "id": 1,
+      "position": 0,
+      "specialty_id": 1,
+      "calculator_id": 1
+    },
+    {
+      "id": 2,
+      "position": 1,
+      "specialty_id": 1,
+      "calculator_id": 8
+    },
+    {
+      "id": 3,
+      "position": 2,
+      "specialty_id": 1,
+      "calculator_id": 6
+    },
+    {
+      "id": 4,
+      "position": 3,
+      "specialty_id": 1,
+      "calculator_id": 7
+    }
+  ],
+  "vaccination_calendars": [
+    {
+      "id": "argentina-2026-v1",
+      "definition": {
+        "vacunas": [
+          {
+            "id": "bcg",
+            "nombre": "BCG",
+            "categoria": "calendario_regular",
+            "aplicaciones": [
+              {
+                "id": "dose-99fe267e-d300-45c5-9ca0-0ef4a26c8d82",
+                "tipo": "dosis_unica",
+                "dosis": "Única dosis",
+                "notas": [
+                  {
+                    "letra": "A",
+                    "condicion": "Antes de egresar de la maternidad."
+                  }
+                ],
+                "ageRule": {
+                  "toMonths": 0,
+                  "fromMonths": 0,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "recien_nacido"
+                ]
+              }
+            ],
+            "referencia_patologia": {
+              "numero": 1,
+              "descripcion": "Previene formas graves de tuberculosis."
+            }
+          },
+          {
+            "id": "hepatitis_b",
+            "nombre": "Hepatitis B",
+            "categoria": "calendario_regular",
+            "aplicaciones": [
+              {
+                "id": "dose-82854cff-4ff6-43d1-865d-5c7d5cd7868c",
+                "tipo": "dosis_primaria",
+                "dosis": "Dosis neonatal",
+                "notas": [
+                  {
+                    "letra": "B",
+                    "condicion": "En las primeras 12 horas de vida."
+                  }
+                ],
+                "ageRule": {
+                  "toMonths": 0,
+                  "fromMonths": 0,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "recien_nacido"
+                ]
+              },
+              {
+                "id": "dose-dbdaeb43-151b-496f-a31e-d880da0e0d5a",
+                "tipo": "esquema",
+                "dosis": "Iniciar o completar esquema",
+                "notas": [
+                  {
+                    "letra": "C",
+                    "condicion": "Vacunación Universal. Si no hubiera recibido el esquema completo, deberá completarlo. En caso de tener que iniciar, aplicar 1ª dosis, 2ª dosis al mes de la primera y 3ª dosis a los seis meses de la primera."
+                  }
+                ],
+                "ageRule": {
+                  "toMonths": 216,
+                  "fromMonths": 216,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "adultos"
+                ]
+              }
+            ],
+            "referencia_patologia": null
+          },
+          {
+            "id": "neumococo_conjugada",
+            "nombre": "Neumococo Conjugada",
+            "categoria": "calendario_regular",
+            "aplicaciones": [
+              {
+                "id": "dose-4e5852a3-05ba-45bd-8ba9-20650e28b80f",
+                "tipo": "dosis_primaria",
+                "dosis": "1ª dosis",
+                "notas": [],
+                "ageRule": {
+                  "toMonths": 2,
+                  "fromMonths": 2,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "2_meses"
+                ]
+              },
+              {
+                "id": "dose-607929d6-153a-479a-915c-2a5fe1f4f9c0",
+                "tipo": "dosis_primaria",
+                "dosis": "2ª dosis",
+                "notas": [],
+                "ageRule": {
+                  "toMonths": 4,
+                  "fromMonths": 4,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "4_meses"
+                ]
+              },
+              {
+                "id": "dose-f74caf60-4693-4426-8f51-3e6dd946db2d",
+                "tipo": "refuerzo",
+                "dosis": "Refuerzo",
+                "notas": [],
+                "ageRule": {
+                  "toMonths": 12,
+                  "fromMonths": 12,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "12_meses"
+                ]
+              },
+              {
+                "id": "dose-a28c45ac-f7ef-44cd-a108-8027e8b9ba89",
+                "tipo": "dosis_unica",
+                "dosis": "Única dosis",
+                "notas": [
+                  {
+                    "letra": "G",
+                    "condicion": "Recomendada en adultos de 65 años o más."
+                  }
+                ],
+                "ageRule": {
+                  "toMonths": 216,
+                  "fromMonths": 216,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "adultos"
+                ]
+              }
+            ],
+            "referencia_patologia": {
+              "numero": 2,
+              "descripcion": "Previene meningitis, neumonía y sepsis por neumococo."
+            }
+          },
+          {
+            "id": "quintuple_pentavalente",
+            "nombre": "Quíntuple o Pentavalente",
+            "categoria": "calendario_regular",
+            "aplicaciones": [
+              {
+                "id": "dose-44356de2-ee16-46ac-afde-191444a135e2",
+                "tipo": "dosis_primaria",
+                "dosis": "1ª dosis",
+                "notas": [],
+                "ageRule": {
+                  "toMonths": 2,
+                  "fromMonths": 2,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "2_meses"
+                ]
+              },
+              {
+                "id": "dose-006226b6-4030-4f04-8476-1d26a29883b2",
+                "tipo": "dosis_primaria",
+                "dosis": "2ª dosis",
+                "notas": [],
+                "ageRule": {
+                  "toMonths": 4,
+                  "fromMonths": 4,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "4_meses"
+                ]
+              },
+              {
+                "id": "dose-ff2d81cb-e702-4ad2-92d2-54444a40d5a1",
+                "tipo": "dosis_primaria",
+                "dosis": "3ª dosis",
+                "notas": [],
+                "ageRule": {
+                  "toMonths": 6,
+                  "fromMonths": 6,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "6_meses"
+                ]
+              },
+              {
+                "id": "dose-ec80b14e-c2c0-45c0-9a30-09858c610ce4",
+                "tipo": "refuerzo",
+                "dosis": "1º refuerzo (15-18 m)",
+                "notas": [],
+                "ageRule": {
+                  "toMonths": 18,
+                  "fromMonths": 15,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "15_meses",
+                  "18_meses"
+                ]
+              }
+            ],
+            "referencia_patologia": {
+              "numero": 3,
+              "descripcion": "DTP-HB-Hib: previene Difteria, Tétanos, Tos Convulsa, Hepatitis B y Haemophilus Influenzae b."
+            }
+          },
+          {
+            "id": "ipv",
+            "nombre": "IPV",
+            "categoria": "calendario_regular",
+            "aplicaciones": [
+              {
+                "id": "dose-04d8659c-5802-4bda-9efd-1836bf6452a0",
+                "tipo": "dosis_primaria",
+                "dosis": "1ª dosis",
+                "notas": [],
+                "ageRule": {
+                  "toMonths": 2,
+                  "fromMonths": 2,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "2_meses"
+                ]
+              },
+              {
+                "id": "dose-c625ff78-a38e-4f5c-bcea-7be4c724116e",
+                "tipo": "dosis_primaria",
+                "dosis": "2ª dosis",
+                "notas": [],
+                "ageRule": {
+                  "toMonths": 4,
+                  "fromMonths": 4,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "4_meses"
+                ]
+              },
+              {
+                "id": "dose-551c2974-bcca-4b63-86c5-9e92ffc1c39e",
+                "tipo": "dosis_primaria",
+                "dosis": "3ª dosis",
+                "notas": [],
+                "ageRule": {
+                  "toMonths": 6,
+                  "fromMonths": 6,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "6_meses"
+                ]
+              },
+              {
+                "id": "dose-5bf879f8-5537-495e-b864-5f8e0fb8abf4",
+                "tipo": "refuerzo",
+                "dosis": "Refuerzo",
+                "notas": [],
+                "ageRule": {
+                  "toMonths": 60,
+                  "fromMonths": 60,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "nacidos_2021"
+                ]
+              }
+            ],
+            "referencia_patologia": {
+              "numero": 4,
+              "descripcion": "Vacuna antipoliomielítica inactivada tipo Salk."
+            }
+          },
+          {
+            "id": "rotavirus",
+            "nombre": "Rotavirus",
+            "categoria": "calendario_regular",
+            "aplicaciones": [
+              {
+                "id": "dose-cf85c146-aa37-45fe-b941-f961dc05d72e",
+                "tipo": "dosis_primaria",
+                "dosis": "1ª dosis",
+                "notas": [
+                  {
+                    "letra": "D",
+                    "condicion": "La 1ª dosis debe administrarse antes de las catorce semanas y seis días o tres meses y medio de vida."
+                  }
+                ],
+                "ageRule": {
+                  "toMonths": 2,
+                  "fromMonths": 2,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "2_meses"
+                ]
+              },
+              {
+                "id": "dose-f8154270-9423-4bb9-86bb-cc7a002cb81a",
+                "tipo": "dosis_primaria",
+                "dosis": "2ª dosis",
+                "notas": [
+                  {
+                    "letra": "E",
+                    "condicion": "La 2ª dosis debe administrarse antes de las veinticuatro semanas o los seis meses de vida."
+                  }
+                ],
+                "ageRule": {
+                  "toMonths": 4,
+                  "fromMonths": 4,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "4_meses"
+                ]
+              }
+            ],
+            "referencia_patologia": null
+          },
+          {
+            "id": "meningococo_acyw",
+            "nombre": "Meningococo ACYW",
+            "categoria": "calendario_regular",
+            "aplicaciones": [
+              {
+                "id": "dose-ba825ebb-176f-4e5b-b74a-0ff1204f1c90",
+                "tipo": "dosis_primaria",
+                "dosis": "1ª dosis",
+                "notas": [],
+                "ageRule": {
+                  "toMonths": 3,
+                  "fromMonths": 3,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "3_meses"
+                ]
+              },
+              {
+                "id": "dose-0473ae02-2e68-48c7-a402-95c7f732b56b",
+                "tipo": "dosis_primaria",
+                "dosis": "2ª dosis",
+                "notas": [],
+                "ageRule": {
+                  "toMonths": 5,
+                  "fromMonths": 5,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "5_meses"
+                ]
+              },
+              {
+                "id": "dose-e4878ad8-2b8e-455f-839a-adb780d43e36",
+                "tipo": "refuerzo",
+                "dosis": "Refuerzo",
+                "notas": [],
+                "ageRule": {
+                  "toMonths": 15,
+                  "fromMonths": 15,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "15_meses"
+                ]
+              },
+              {
+                "id": "dose-49350f6c-a5cd-4160-ba0c-70a47921f033",
+                "tipo": "dosis_unica",
+                "dosis": "Única dosis",
+                "notas": [],
+                "ageRule": {
+                  "toMonths": 132,
+                  "fromMonths": 132,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "nacidos_2015"
+                ]
+              }
+            ],
+            "referencia_patologia": null
+          },
+          {
+            "id": "antigripal",
+            "nombre": "Antigripal",
+            "categoria": "calendario_regular",
+            "aplicaciones": [
+              {
+                "id": "dose-97b52b74-361c-4f72-8291-19d5a5d6d1d4",
+                "tipo": "dosis_anual",
+                "dosis": "Dosis anual (6 a 24 meses)",
+                "notas": [
+                  {
+                    "letra": "F",
+                    "condicion": "Deberán recibir 2 dosis de la vacuna separadas al menos por cuatro semanas."
+                  }
+                ],
+                "ageRule": {
+                  "toMonths": 24,
+                  "fromMonths": 6,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "6_meses",
+                  "12_meses",
+                  "15_meses",
+                  "18_meses",
+                  "24_meses"
+                ]
+              },
+              {
+                "id": "dose-f258e125-a830-4530-8d2e-6ee57ed3edde",
+                "tipo": "dosis_anual",
+                "dosis": "Dosis anual",
+                "notas": [
+                  {
+                    "letra": "G",
+                    "condicion": "Recomendada en adultos de 65 años o más."
+                  }
+                ],
+                "ageRule": {
+                  "toMonths": 216,
+                  "fromMonths": 216,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "adultos"
+                ]
+              },
+              {
+                "id": "dose-dad96a94-35d6-4546-a920-c6995b9b3610",
+                "tipo": "dosis_anual",
+                "dosis": "Una dosis",
+                "notas": [
+                  {
+                    "letra": "H",
+                    "condicion": "En cada embarazo deberán recibir la vacuna antigripal en cualquier trimestre de la gestación."
+                  }
+                ],
+                "ageRule": null,
+                "columnas": [
+                  "embarazadas"
+                ]
+              },
+              {
+                "id": "dose-fc29b1ec-454e-49c2-9225-3b868eecd088",
+                "tipo": "dosis_anual",
+                "dosis": "Una dosis",
+                "notas": [
+                  {
+                    "letra": "I",
+                    "condicion": "Puérperas deberán recibir vacuna antigripal si no la hubiesen recibido durante el embarazo antes del egreso de la maternidad y hasta un máximo de diez días después del parto."
+                  }
+                ],
+                "ageRule": null,
+                "columnas": [
+                  "puerperas"
+                ]
+              },
+              {
+                "id": "dose-1f995741-5099-46a2-b3f4-3c9ec3c7c411",
+                "tipo": "dosis_anual",
+                "dosis": "Dosis anual",
+                "notas": [],
+                "ageRule": null,
+                "columnas": [
+                  "personal_salud"
+                ]
+              }
+            ],
+            "referencia_patologia": null
+          },
+          {
+            "id": "hepatitis_a",
+            "nombre": "Hepatitis A",
+            "categoria": "calendario_regular",
+            "aplicaciones": [
+              {
+                "id": "dose-1ccf025e-cc87-4d9d-8507-a448334d0605",
+                "tipo": "dosis_unica",
+                "dosis": "Única dosis",
+                "notas": [],
+                "ageRule": {
+                  "toMonths": 12,
+                  "fromMonths": 12,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "12_meses"
+                ]
+              }
+            ],
+            "referencia_patologia": null
+          },
+          {
+            "id": "triple_viral",
+            "nombre": "Triple Viral",
+            "categoria": "calendario_regular",
+            "aplicaciones": [
+              {
+                "id": "dose-6ef7b983-09d7-48cd-ad2f-c9f694de03fc",
+                "tipo": "dosis_primaria",
+                "dosis": "1ª dosis",
+                "notas": [],
+                "ageRule": {
+                  "toMonths": 12,
+                  "fromMonths": 12,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "12_meses"
+                ]
+              },
+              {
+                "id": "dose-6ccfff2d-a6b4-4a07-9e23-3b0f86a2d477",
+                "tipo": "dosis_primaria",
+                "dosis": "2ª dosis Nacidos 2021/22/23/24",
+                "notas": [
+                  {
+                    "letra": "J",
+                    "condicion": "2ª dosis, en el año en que cumplen 5 años, para quienes nacieron en 2021, 2022, 2023 y en los primeros 6 meses de 2024."
+                  }
+                ],
+                "ageRule": {
+                  "toMonths": 60,
+                  "fromMonths": 60,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "nacidos_2021"
+                ]
+              },
+              {
+                "id": "dose-3a61e3b7-2e57-48bc-acf3-6a98c6c2581b",
+                "tipo": "esquema",
+                "dosis": "Iniciar o completar esquema",
+                "notas": [
+                  {
+                    "letra": "K",
+                    "condicion": "Si no hubiera recibido dos dosis de triple viral o una dosis de triple viral + 1 dosis de doble viral después del año de vida para los nacidos después de 1965."
+                  }
+                ],
+                "ageRule": {
+                  "toMonths": 216,
+                  "fromMonths": 216,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "adultos"
+                ]
+              },
+              {
+                "id": "dose-ba8cae69-7843-4542-b9f2-9de77adfbc6b",
+                "tipo": "esquema",
+                "dosis": "Iniciar o completar esquema",
+                "notas": [
+                  {
+                    "letra": "K",
+                    "condicion": "Si no hubiera recibido dos dosis de triple viral o una dosis de triple viral + 1 dosis de doble viral después del año de vida para los nacidos después de 1965."
+                  }
+                ],
+                "ageRule": null,
+                "columnas": [
+                  "personal_salud"
+                ]
+              }
+            ],
+            "referencia_patologia": {
+              "numero": 5,
+              "descripcion": "Previene sarampión, rubéola y paperas."
+            }
+          },
+          {
+            "id": "varicela",
+            "nombre": "Varicela",
+            "categoria": "calendario_regular",
+            "aplicaciones": [
+              {
+                "id": "dose-1fe0eb1c-45c9-4e63-856f-1717daab60c6",
+                "tipo": "dosis_primaria",
+                "dosis": "1ª dosis",
+                "notas": [],
+                "ageRule": {
+                  "toMonths": 15,
+                  "fromMonths": 15,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "15_meses"
+                ]
+              },
+              {
+                "id": "dose-2ace4b22-35a1-4468-92e4-0f9e41ae39c1",
+                "tipo": "dosis_primaria",
+                "dosis": "2ª dosis",
+                "notas": [],
+                "ageRule": {
+                  "toMonths": 60,
+                  "fromMonths": 60,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "nacidos_2021"
+                ]
+              }
+            ],
+            "referencia_patologia": null
+          },
+          {
+            "id": "triple_bacteriana_celular",
+            "nombre": "Triple Bacteriana Celular",
+            "categoria": "calendario_regular",
+            "aplicaciones": [
+              {
+                "id": "dose-1d009f36-7605-4963-a568-2dbc34b16f0d",
+                "tipo": "refuerzo",
+                "dosis": "2º refuerzo",
+                "notas": [],
+                "ageRule": {
+                  "toMonths": 60,
+                  "fromMonths": 60,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "nacidos_2021"
+                ]
+              }
+            ],
+            "referencia_patologia": {
+              "numero": 6,
+              "descripcion": "DTP previene difteria, tétanos y tos convulsa."
+            }
+          },
+          {
+            "id": "triple_bacteriana_acelular",
+            "nombre": "Triple Bacteriana Acelular",
+            "categoria": "calendario_regular",
+            "aplicaciones": [
+              {
+                "id": "dose-a8fb21c9-8958-4722-8268-897f8a954ac2",
+                "tipo": "refuerzo",
+                "dosis": "Refuerzo",
+                "notas": [],
+                "ageRule": {
+                  "toMonths": 132,
+                  "fromMonths": 132,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "nacidos_2015"
+                ]
+              },
+              {
+                "id": "dose-d25e9f34-32a0-4d44-bfa4-006091b78e51",
+                "tipo": "esquema",
+                "dosis": "Una dosis",
+                "notas": [
+                  {
+                    "letra": "L",
+                    "condicion": "Aplicar a partir de la semana 20 de gestación en cada embarazo independientemente del tiempo transcurrido desde la dosis previa."
+                  }
+                ],
+                "ageRule": null,
+                "columnas": [
+                  "embarazadas"
+                ]
+              },
+              {
+                "id": "dose-7ffa62f7-8f27-4e47-8591-73e89167dfe7",
+                "tipo": "esquema",
+                "dosis": "Una dosis",
+                "notas": [
+                  {
+                    "letra": "M",
+                    "condicion": "Personal de salud que asista menores de 12 meses. Revacunar cada 5 años."
+                  }
+                ],
+                "ageRule": null,
+                "columnas": [
+                  "personal_salud"
+                ]
+              }
+            ],
+            "referencia_patologia": {
+              "numero": 7,
+              "descripcion": "dTpa previene difteria, tétanos y tos convulsa."
+            }
+          },
+          {
+            "id": "doble_bacteriana",
+            "nombre": "Doble Bacteriana",
+            "categoria": "calendario_regular",
+            "aplicaciones": [
+              {
+                "id": "dose-68b73946-fade-4258-b3df-1ddab15987f0",
+                "tipo": "refuerzo",
+                "dosis": "Refuerzo cada 10 años",
+                "notas": [],
+                "ageRule": {
+                  "toMonths": 216,
+                  "fromMonths": 180,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "a_partir_15_anos",
+                  "adultos"
+                ]
+              }
+            ],
+            "referencia_patologia": {
+              "numero": 8,
+              "descripcion": "dT previene difteria y tétanos."
+            }
+          },
+          {
+            "id": "vph",
+            "nombre": "Virus Papiloma Humano",
+            "categoria": "calendario_regular",
+            "aplicaciones": [
+              {
+                "id": "dose-f79059d9-7362-419e-89a1-fd6349327626",
+                "tipo": "dosis_unica",
+                "dosis": "Única dosis",
+                "notas": [
+                  {
+                    "letra": "N",
+                    "condicion": "Varones y mujeres."
+                  }
+                ],
+                "ageRule": {
+                  "toMonths": 132,
+                  "fromMonths": 132,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "nacidos_2015"
+                ]
+              }
+            ],
+            "referencia_patologia": null
+          },
+          {
+            "id": "vsr",
+            "nombre": "Virus Sincicial Respiratorio",
+            "categoria": "calendario_regular",
+            "aplicaciones": [
+              {
+                "id": "dose-1ac830ca-832d-41ff-9d74-cb5e68bb0233",
+                "tipo": "dosis_unica",
+                "dosis": "Única dosis",
+                "notas": [
+                  {
+                    "letra": "O",
+                    "condicion": "Se aplica entre las semanas 32 y 36.6 del embarazo durante la temporada de circulación del VSR."
+                  }
+                ],
+                "ageRule": null,
+                "columnas": [
+                  "embarazadas"
+                ]
+              }
+            ],
+            "referencia_patologia": {
+              "numero": 9,
+              "descripcion": "VSR previene bronquiolitis y neumonía hasta los 6 meses de edad."
+            }
+          },
+          {
+            "id": "fiebre_amarilla",
+            "nombre": "Fiebre Amarilla",
+            "categoria": "exclusivo_zonas_de_riesgo",
+            "aplicaciones": [
+              {
+                "id": "dose-5413f9ea-2ce3-430f-91d7-6104ca0186dd",
+                "tipo": "riesgo",
+                "dosis": "1ª dosis",
+                "notas": [
+                  {
+                    "letra": "P",
+                    "condicion": "Residentes en zonas de riesgo."
+                  }
+                ],
+                "ageRule": {
+                  "toMonths": 18,
+                  "fromMonths": 18,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "18_meses"
+                ]
+              },
+              {
+                "id": "dose-7398400c-4dff-49a9-8917-783bf6040553",
+                "tipo": "refuerzo",
+                "dosis": "Refuerzo",
+                "notas": [
+                  {
+                    "letra": "Q",
+                    "condicion": "Residentes en zona de riesgo si la 1ª dosis la recibió antes de los 2 años."
+                  }
+                ],
+                "ageRule": {
+                  "toMonths": 132,
+                  "fromMonths": 132,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "nacidos_2015"
+                ]
+              },
+              {
+                "id": "dose-44d2f0d9-80a4-4d47-a64c-10f002f46639",
+                "tipo": "riesgo",
+                "dosis": "Única dosis",
+                "notas": [
+                  {
+                    "letra": "Q",
+                    "condicion": "Residentes en zona de riesgo si la 1ª dosis la recibió antes de los 2 años."
+                  }
+                ],
+                "ageRule": {
+                  "toMonths": 216,
+                  "fromMonths": 180,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "a_partir_15_anos",
+                  "adultos"
+                ]
+              }
+            ],
+            "referencia_patologia": null
+          },
+          {
+            "id": "fiebre_hemorragica_argentina",
+            "nombre": "Fiebre Hemorrágica Argentina",
+            "categoria": "exclusivo_zonas_de_riesgo",
+            "aplicaciones": [
+              {
+                "id": "dose-2c51eae9-1407-4091-a5f5-5d67ae4149d2",
+                "tipo": "riesgo",
+                "dosis": "Única dosis",
+                "notas": [
+                  {
+                    "letra": "R",
+                    "condicion": "Residentes y/o trabajadores con riesgo ocupacional en zona de riesgo y que no hayan recibido anteriormente la vacuna. Toda persona entre 2 y 59 años residente en zona de riesgo debe recibir 1 dosis (consultar previamente con el equipo de salud las contraindicaciones para esta vacuna)."
+                  }
+                ],
+                "ageRule": {
+                  "toMonths": 216,
+                  "fromMonths": 180,
+                  "graceMonths": 1
+                },
+                "columnas": [
+                  "a_partir_15_anos",
+                  "adultos"
+                ]
+              }
+            ],
+            "referencia_patologia": null
+          }
+        ],
+        "metadata": {
+          "pais": "Argentina",
+          "bajada": "Las vacunas están disponibles en centros de salud y hospitales públicos de todo el país y no requieren una orden médica.",
+          "titulo": "Calendario Nacional de Vacunación 2026",
+          "telefono": "0800 222 1002",
+          "organismo": "Ministerio de Salud | República Argentina",
+          "sitio_web": "argentina.gob.ar/salud/vacunas",
+          "ano_vigencia": 2026
+        },
+        "calendarId": "argentina-2026-v1",
+        "notas_aplicacion": {
+          "A": "Antes de egresar de la maternidad.",
+          "B": "En las primeras 12 horas de vida.",
+          "C": "Vacunación Universal. Si no hubiera recibido el esquema completo, deberá completarlo. En caso de tener que iniciar, aplicar 1ª dosis, 2ª dosis al mes de la primera y 3ª dosis a los seis meses de la primera.",
+          "D": "La 1ª dosis debe administrarse antes de las catorce semanas y seis días o tres meses y medio de vida.",
+          "E": "La 2ª dosis debe administrarse antes de las veinticuatro semanas o los seis meses de vida.",
+          "F": "Deberán recibir 2 dosis de la vacuna separadas al menos por cuatro semanas.",
+          "G": "Recomendada en adultos de 65 años o más.",
+          "H": "En cada embarazo deberán recibir la vacuna antigripal en cualquier trimestre de la gestación.",
+          "I": "Puérperas deberán recibir vacuna antigripal si no la hubiesen recibido durante el embarazo antes del egreso de la maternidad y hasta un máximo de diez días después del parto.",
+          "J": "2ª dosis, en el año en que cumplen 5 años, para quienes nacieron en 2021, 2022, 2023 y en los primeros 6 meses de 2024.",
+          "K": "Si no hubiera recibido dos dosis de triple viral o una dosis de triple viral + 1 dosis de doble viral después del año de vida para los nacidos después de 1965.",
+          "L": "Aplicar a partir de la semana 20 de gestación en cada embarazo independientemente del tiempo transcurrido desde la dosis previa.",
+          "M": "Personal de salud que asista menores de 12 meses. Revacunar cada 5 años.",
+          "N": "Varones y mujeres.",
+          "O": "Se aplica entre las semanas 32 y 36.6 del embarazo durante la temporada de circulación del VSR.",
+          "P": "Residentes en zonas de riesgo.",
+          "Q": "Residentes en zona de riesgo si la 1ª dosis la recibió antes de los 2 años.",
+          "R": "Residentes y/o trabajadores con riesgo ocupacional en zona de riesgo y que no hayan recibido anteriormente la vacuna. Toda persona entre 2 y 59 años residente en zona de riesgo debe recibir 1 dosis (consultar previamente con el equipo de salud las contraindicaciones para esta vacuna)."
+        },
+        "referencias_patologias": {
+          "1": "Previene formas graves de tuberculosis.",
+          "2": "Previene meningitis, neumonía y sepsis por neumococo.",
+          "3": "DTP-HB-Hib: previene Difteria, Tétanos, Tos Convulsa, Hepatitis B y Haemophilus Influenzae b.",
+          "4": "Vacuna antipoliomielítica inactivada tipo Salk.",
+          "5": "Previene sarampión, rubéola y paperas.",
+          "6": "DTP previene difteria, tétanos y tos convulsa.",
+          "7": "dTpa previene difteria, tétanos y tos convulsa.",
+          "8": "dT previene difteria y tétanos.",
+          "9": "VSR previene bronquiolitis y neumonía hasta los 6 meses de edad."
+        },
+        "grupos_etarios_columnas": [
+          {
+            "grupo": "Primeros 2 años de vida",
+            "columnas": [
+              {
+                "id": "recien_nacido",
+                "orden": 1,
+                "nombre": "Recién nacido",
+                "subtitulo": null
+              },
+              {
+                "id": "2_meses",
+                "orden": 2,
+                "nombre": "2 meses",
+                "subtitulo": null
+              },
+              {
+                "id": "3_meses",
+                "orden": 3,
+                "nombre": "3 meses",
+                "subtitulo": null
+              },
+              {
+                "id": "4_meses",
+                "orden": 4,
+                "nombre": "4 meses",
+                "subtitulo": null
+              },
+              {
+                "id": "5_meses",
+                "orden": 5,
+                "nombre": "5 meses",
+                "subtitulo": null
+              },
+              {
+                "id": "6_meses",
+                "orden": 6,
+                "nombre": "6 meses",
+                "subtitulo": null
+              },
+              {
+                "id": "12_meses",
+                "orden": 7,
+                "nombre": "12 meses",
+                "subtitulo": null
+              },
+              {
+                "id": "15_meses",
+                "orden": 8,
+                "nombre": "15 meses",
+                "subtitulo": null
+              },
+              {
+                "id": "18_meses",
+                "orden": 9,
+                "nombre": "18 meses",
+                "subtitulo": null
+              },
+              {
+                "id": "24_meses",
+                "orden": 10,
+                "nombre": "24 meses",
+                "subtitulo": null
+              }
+            ]
+          },
+          {
+            "grupo": "Etapa Escolar",
+            "columnas": [
+              {
+                "id": "nacidos_2021",
+                "orden": 11,
+                "nombre": "Nacidos en 2021",
+                "subtitulo": "5 años"
+              },
+              {
+                "id": "nacidos_2015",
+                "orden": 12,
+                "nombre": "Nacidos en 2015",
+                "subtitulo": "11 años"
+              }
+            ]
+          },
+          {
+            "grupo": "Adolescencia y Adultos",
+            "columnas": [
+              {
+                "id": "a_partir_15_anos",
+                "orden": 13,
+                "nombre": "A partir de los 15 años",
+                "subtitulo": null
+              },
+              {
+                "id": "adultos",
+                "orden": 14,
+                "nombre": "Adultos",
+                "subtitulo": null
+              }
+            ]
+          },
+          {
+            "grupo": "Personas Gestantes y Puérperas",
+            "columnas": [
+              {
+                "id": "embarazadas",
+                "orden": 15,
+                "nombre": "Embarazadas",
+                "subtitulo": null
+              },
+              {
+                "id": "puerperas",
+                "orden": 16,
+                "nombre": "Puérperas",
+                "subtitulo": null
+              }
+            ]
+          },
+          {
+            "grupo": "Personal de Salud",
+            "columnas": [
+              {
+                "id": "personal_salud",
+                "orden": 17,
+                "nombre": "Personal de salud",
+                "subtitulo": null
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "vaccination_doses": [
+    {
+      "id": "dose-006226b6-4030-4f04-8476-1d26a29883b2",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-0473ae02-2e68-48c7-a402-95c7f732b56b",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-04d8659c-5802-4bda-9efd-1836bf6452a0",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-1ac830ca-832d-41ff-9d74-cb5e68bb0233",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-1ccf025e-cc87-4d9d-8507-a448334d0605",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-1d009f36-7605-4963-a568-2dbc34b16f0d",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-1f995741-5099-46a2-b3f4-3c9ec3c7c411",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-1fe0eb1c-45c9-4e63-856f-1717daab60c6",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-2ace4b22-35a1-4468-92e4-0f9e41ae39c1",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-2c51eae9-1407-4091-a5f5-5d67ae4149d2",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-3a61e3b7-2e57-48bc-acf3-6a98c6c2581b",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-44356de2-ee16-46ac-afde-191444a135e2",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-44d2f0d9-80a4-4d47-a64c-10f002f46639",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-49350f6c-a5cd-4160-ba0c-70a47921f033",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-4e5852a3-05ba-45bd-8ba9-20650e28b80f",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-5413f9ea-2ce3-430f-91d7-6104ca0186dd",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-551c2974-bcca-4b63-86c5-9e92ffc1c39e",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-5bf879f8-5537-495e-b864-5f8e0fb8abf4",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-607929d6-153a-479a-915c-2a5fe1f4f9c0",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-68b73946-fade-4258-b3df-1ddab15987f0",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-6ccfff2d-a6b4-4a07-9e23-3b0f86a2d477",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-6ef7b983-09d7-48cd-ad2f-c9f694de03fc",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-7398400c-4dff-49a9-8917-783bf6040553",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-7ffa62f7-8f27-4e47-8591-73e89167dfe7",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-82854cff-4ff6-43d1-865d-5c7d5cd7868c",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-97b52b74-361c-4f72-8291-19d5a5d6d1d4",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-99fe267e-d300-45c5-9ca0-0ef4a26c8d82",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-a28c45ac-f7ef-44cd-a108-8027e8b9ba89",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-a8fb21c9-8958-4722-8268-897f8a954ac2",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-ba825ebb-176f-4e5b-b74a-0ff1204f1c90",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-ba8cae69-7843-4542-b9f2-9de77adfbc6b",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-c625ff78-a38e-4f5c-bcea-7be4c724116e",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-cf85c146-aa37-45fe-b941-f961dc05d72e",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-d25e9f34-32a0-4d44-bfa4-006091b78e51",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-dad96a94-35d6-4546-a920-c6995b9b3610",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-dbdaeb43-151b-496f-a31e-d880da0e0d5a",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-e4878ad8-2b8e-455f-839a-adb780d43e36",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-ec80b14e-c2c0-45c0-9a30-09858c610ce4",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-f258e125-a830-4530-8d2e-6ee57ed3edde",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-f74caf60-4693-4426-8f51-3e6dd946db2d",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-f79059d9-7362-419e-89a1-fd6349327626",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-f8154270-9423-4bb9-86bb-cc7a002cb81a",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-fc29b1ec-454e-49c2-9225-3b868eecd088",
+      "calendar_id": "argentina-2026-v1"
+    },
+    {
+      "id": "dose-ff2d81cb-e702-4ad2-92d2-54444a40d5a1",
+      "calendar_id": "argentina-2026-v1"
+    }
+  ]
+}

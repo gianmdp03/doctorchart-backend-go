@@ -1,0 +1,18 @@
+npm notice run doctorchart-frontend@0.0.0 pretest
+npm notice run node scripts/public-config.mjs test
+Configuración pública validada.
+npm notice run doctorchart-frontend@0.0.0 test
+npm notice run ng test --watch=false --include=src/app/shared/date-picker/date-picker.component.spec.ts
+> Building...
+√ Building...
+Application bundle generation complete. [5.171 seconds] - 2026-10-09T11:04:36.583Z
+
+
+ RUN  v4.1.11 C:/Users/gcast/Documents/GitHub/doctorchart-frontend
+
+
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+   Start at  08:04:36
+   Duration  1.57s (transform 47ms, setup 273ms, import 308ms, tests 223ms, environment 614ms)
+

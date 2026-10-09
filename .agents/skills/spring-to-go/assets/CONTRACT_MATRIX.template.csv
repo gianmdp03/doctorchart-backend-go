@@ -1,0 +1,3 @@
+id,kind,source_reference,external_contract_or_trigger,auth_requirements,data_and_side_effects,source_test_case,go_location,differential_evidence,status,notes
+"GET-products-by-id","http","ProductController#getById","GET /api/products/{id}; statuses 200/404; JSON exact","reader role / tenant check","SELECT products; no mutation","get-product:valid|get-product:missing","","","DISCOVERED","replace example with audit evidence"
+"purchase","business+db","PurchaseService#purchase","POST /api/purchase; 201/409/403","authenticated owner","stock+order atomic transaction; audit event","purchase:valid|purchase:out-of-stock|purchase:rollback","","","DISCOVERED","verify source actual implementation"

@@ -1,0 +1,21 @@
+{
+  "policy": "Only final executed successful cases count as PASS. Failed attempts remain available; historical migration evidence is unchanged.",
+  "harness_corrections": [
+    {"evidence": "local-http-attempt-1.json", "reason": "Workspace version became stale after preferences changed; refresh before writing. The original 409 was legitimate."},
+    {"evidence": "local-http-attempt-2.json", "reason": "Python probe variable shadowed the concurrency helper; rename it."},
+    {"evidence": "local-http-attempt-3.json", "reason": "Probe assumed a flat page response; inspect the actual nested contract."},
+    {"evidence": "local-http-attempt-4.json", "reason": "Empty prescription printing correctly returns 400, rather than the assumed 200."},
+    {"evidence": "browser-attempts.json", "reason": "Retain failed attempts; correct waits for wizard readiness, existing clinical-history labels and post-submit checkbox state."},
+    {"evidence": "browser.json", "reason": "With no-store, Chrome may discard a navigated PDF body from CDP. Capture the actual application-created blob in its original page; separately assert actual HTTP status and cache headers. No interception or substituted PDF."},
+    {"evidence": "current-gateway.json", "reason": "Encounter weight belongs under measurements, not at the response root; correct the probe without changing the contract."}
+  ],
+  "confirmed_application_regressions": [
+    {"evidence": "s3-pagination-before.log", "fix": "Traverse all S3 listing pages."},
+    {"evidence": "unicode-before.json", "fix": "Embed UTF-8 fonts and reject unsupported scripts without changing stored text."},
+    {"evidence": "pdf-cache-before.json", "fix": "Retain private/no-store on PDF responses."},
+    {"evidence": "frontend-tests-before-date-provider.log", "fix": "Browser exposed native date-adapter override. Removing it exposed a missing provider in isolated tests; provide the Argentine adapter and shared formats explicitly."},
+    {"evidence": "browser-before-deep-link.json", "fix": "Preserve protected deep links and reevaluate guards after login. The complete suite then exposed cancellation of active navigation; respect router.currentNavigation()."}
+  ],
+  "final_evidence": ["local-http.json", "current-gateway.json", "browser.json", "pdf-current.json", "frontend-tests.log", "go-quality.log"],
+  "limits": ["Plans fixture intentionally returns 404 after the verified redirect; no payments UI tested.", "Explicit SDK refresh tested; automatic long-lived renewal remains staging work.", "Calculators UI stays disabled by the existing flag; API golden results tested."]
+}

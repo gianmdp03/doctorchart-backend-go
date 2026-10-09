@@ -1,0 +1,178 @@
+{
+  "overall": "IMPLEMENTED / NOT READY FOR EXACT DROP-IN",
+  "phase": "4 VERIFY AND HANDOFF",
+  "discovered_http": 75,
+  "implemented_http": 75,
+  "implemented_lifecycle": 7,
+  "fully_verified_http": 0,
+  "missing_http": 0,
+  "missing_lifecycle": 0,
+  "go_toolchain": "go1.27.2",
+  "go_source_files": 43,
+  "go_quality": {
+    "Go toolchain exact version": "PASS",
+    "Go formatting": "PASS",
+    "Go build": "PASS",
+    "Go vet": "PASS",
+    "Go tests": "PASS",
+    "Go race tests": "PASS",
+    "Go vulnerability scan": "PASS"
+  },
+  "go_test_counts": {
+    "pass": 58,
+    "fail": 0,
+    "skip": 1
+  },
+  "differential_cases": 365,
+  "differential_passed": 365,
+  "rollback_checks": 41,
+  "rollback_passed": 41,
+  "lifecycle_cases": 9,
+  "lifecycle_passed": 9,
+  "document_cases": 14,
+  "document_functional_passed": 14,
+  "schema_unchanged": true,
+  "restore_runtime_passed": true,
+  "source_tests": {
+    "tests": 663,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "source_preserved": {
+    "files_verified": 292,
+    "changed": [],
+    "git_clean": true
+  },
+  "binary_sha256": "9034fcc1dbdd8bcd59852a35ffaeaa865587a243ceafaa20f611cecf5c5aed30",
+  "deviations": [
+    {
+      "case": "large-jpeg",
+      "type": "IMAGE_ENCODER",
+      "reason": "Native Go encoder/resizer produces different compressed bytes/fileSize from Java ImageIO/Thumbnailator.",
+      "image_info": [
+        {
+          "size": [
+            2048,
+            683
+          ],
+          "format": "JPEG",
+          "bytes": 30709,
+          "sha256": "b3aadcb31b522aa938ca707a9926886d90ff1f500e39c32f4a61c45101866f37"
+        },
+        {
+          "size": [
+            2048,
+            683
+          ],
+          "format": "JPEG",
+          "bytes": 30889,
+          "sha256": "da342d07ff028bfa4ce38a13a0bff689a8fdc9e20c5a9234f916338f8024d201"
+        }
+      ],
+      "pixel_comparison": {
+        "mean_absolute_channel_error": [
+          0.04347347410322108,
+          0.06515516334187409,
+          0.0923938220625915
+        ],
+        "channel_rms_error": [
+          0.38010307405627203,
+          0.8117341389940994,
+          0.9514304070715661
+        ],
+        "scope": "Synthetic colored blocks only; no diagnostic quality claim"
+      }
+    },
+    {
+      "case": "exif-portrait",
+      "type": "IMAGE_ENCODER",
+      "reason": "Native Go encoder/resizer produces different compressed bytes/fileSize from Java ImageIO/Thumbnailator.",
+      "image_info": [
+        {
+          "size": [
+            683,
+            2048
+          ],
+          "format": "JPEG",
+          "bytes": 31377,
+          "sha256": "73abeb25a2bb4ba94712c335481f8f415eb2759bb453c80d4f24adb5066f0fa8"
+        },
+        {
+          "size": [
+            683,
+            2048
+          ],
+          "format": "JPEG",
+          "bytes": 31148,
+          "sha256": "0f656694eba3626c3cf1e6173aeecc63646fc04699668bd5a2656a658f4e98ee"
+        }
+      ],
+      "pixel_comparison": {
+        "mean_absolute_channel_error": [
+          0.21147153527635432,
+          0.25652709782210836,
+          0.2026259951500732
+        ],
+        "channel_rms_error": [
+          3.091626677368457,
+          3.793018076030156,
+          2.8753289625757756
+        ],
+        "scope": "Synthetic colored blocks only; no diagnostic quality claim"
+      }
+    },
+    {
+      "case": "high-resolution-48mp",
+      "type": "IMAGE_ENCODER",
+      "reason": "Native Go encoder/resizer produces different compressed bytes/fileSize from Java ImageIO/Thumbnailator.",
+      "image_info": [
+        {
+          "size": [
+            2048,
+            1536
+          ],
+          "format": "JPEG",
+          "bytes": 54489,
+          "sha256": "690c1da2fc30dea1d63b4d6b385fab1e8b643af937a0a74aa54b90aae8d300fc"
+        },
+        {
+          "size": [
+            2048,
+            1536
+          ],
+          "format": "JPEG",
+          "bytes": 58552,
+          "sha256": "c93fcd4edfcc1ee5e10659e720d7facd64fc53f192a42c8b091ff0f58f5bdd42"
+        }
+      ],
+      "pixel_comparison": {
+        "mean_absolute_channel_error": [
+          0.027876853942871094,
+          0.02893352508544922,
+          0.019364674886067707
+        ],
+        "channel_rms_error": [
+          0.5649471035392281,
+          0.5805856387645287,
+          0.48203887356376934
+        ],
+        "scope": "Synthetic colored blocks only; no diagnostic quality claim"
+      }
+    },
+    {
+      "case": "pdf-cache-ownership",
+      "type": "SECURITY",
+      "spring_status": 200,
+      "go_status": 403,
+      "reason": "Spring cache key omits identity and bypasses service ownership checks. Go always enforces medical-record ownership."
+    }
+  ],
+  "limitations": [
+    "JPEG compression bytes/fileSize differ; PDF bytes/layout differ across native engines.",
+    "Go preserves medical-record authorization instead of reproducing the source PDF cache ownership bypass; source cache freshness is not duplicated.",
+    "Go safely bounds optimizer input to 128 MP; larger-original equivalence is not verified. Final stored-image resolution remains 40 MP.",
+    "No real AWS/R2, existing database or productive service tested; release/cutover not authorized.",
+    "Clock windows/precision are tested; audit timestamps excluded from cross-process exact row equality as documented."
+  ]
+}

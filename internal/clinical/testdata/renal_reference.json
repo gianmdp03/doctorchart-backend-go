@@ -1,0 +1,529 @@
+[
+  {
+    "inputs": {
+      "ageYears": 50,
+      "creatinineMgDl": 1.2,
+      "gender": "FEMALE"
+    },
+    "rawValue": 55.14658583492097,
+    "formattedValue": "55",
+    "interpretation": {
+      "code": "renal_g3a",
+      "min": 45.0,
+      "max": 59.99,
+      "label": "Estadio G3a: Descenso ligero a moderado",
+      "severity": "warning",
+      "clinicalAction": "Evaluar complicaciones de ERC (anemia, metabolismo óseo-mineral). Vigilar nefrotoxinas."
+    }
+  },
+  {
+    "inputs": {
+      "ageYears": 18,
+      "creatinineMgDl": 0.1,
+      "gender": "MALE"
+    },
+    "rawValue": 246.51959502029737,
+    "formattedValue": "247",
+    "interpretation": {
+      "code": "renal_g1",
+      "min": 90.0,
+      "max": null,
+      "label": "Estadio G1: Función renal normal o elevada",
+      "severity": "normal",
+      "clinicalAction": "Monitoreo periódico si existen factores de riesgo (diabetes, HTA, proteinuria)."
+    }
+  },
+  {
+    "inputs": {
+      "ageYears": 18,
+      "creatinineMgDl": 0.7,
+      "gender": "MALE"
+    },
+    "rawValue": 136.9720127265977,
+    "formattedValue": "137",
+    "interpretation": {
+      "code": "renal_g1",
+      "min": 90.0,
+      "max": null,
+      "label": "Estadio G1: Función renal normal o elevada",
+      "severity": "normal",
+      "clinicalAction": "Monitoreo periódico si existen factores de riesgo (diabetes, HTA, proteinuria)."
+    }
+  },
+  {
+    "inputs": {
+      "ageYears": 18,
+      "creatinineMgDl": 0.9,
+      "gender": "MALE"
+    },
+    "rawValue": 126.96096296130331,
+    "formattedValue": "127",
+    "interpretation": {
+      "code": "renal_g1",
+      "min": 90.0,
+      "max": null,
+      "label": "Estadio G1: Función renal normal o elevada",
+      "severity": "normal",
+      "clinicalAction": "Monitoreo periódico si existen factores de riesgo (diabetes, HTA, proteinuria)."
+    }
+  },
+  {
+    "inputs": {
+      "ageYears": 18,
+      "creatinineMgDl": 2.0,
+      "gender": "MALE"
+    },
+    "rawValue": 48.69958095782607,
+    "formattedValue": "49",
+    "interpretation": {
+      "code": "renal_g3a",
+      "min": 45.0,
+      "max": 59.99,
+      "label": "Estadio G3a: Descenso ligero a moderado",
+      "severity": "warning",
+      "clinicalAction": "Evaluar complicaciones de ERC (anemia, metabolismo óseo-mineral). Vigilar nefrotoxinas."
+    }
+  },
+  {
+    "inputs": {
+      "ageYears": 18,
+      "creatinineMgDl": 6.0,
+      "gender": "MALE"
+    },
+    "rawValue": 13.031059225051369,
+    "formattedValue": "13",
+    "interpretation": {
+      "code": "renal_g5",
+      "min": 0.0,
+      "max": 14.99,
+      "label": "Estadio G5: Fallo renal terminal (IRCT)",
+      "severity": "critical",
+      "clinicalAction": "Urgencia de reemplazo renal (diálisis peritoneal, hemodiálisis o trasplante)."
+    }
+  },
+  {
+    "inputs": {
+      "ageYears": 18,
+      "creatinineMgDl": 0.1,
+      "gender": "FEMALE"
+    },
+    "rawValue": 205.36165134243532,
+    "formattedValue": "205",
+    "interpretation": {
+      "code": "renal_g1",
+      "min": 90.0,
+      "max": null,
+      "label": "Estadio G1: Función renal normal o elevada",
+      "severity": "normal",
+      "clinicalAction": "Monitoreo periódico si existen factores de riesgo (diabetes, HTA, proteinuria)."
+    }
+  },
+  {
+    "inputs": {
+      "ageYears": 18,
+      "creatinineMgDl": 0.7,
+      "gender": "FEMALE"
+    },
+    "rawValue": 128.48449451683896,
+    "formattedValue": "128",
+    "interpretation": {
+      "code": "renal_g1",
+      "min": 90.0,
+      "max": null,
+      "label": "Estadio G1: Función renal normal o elevada",
+      "severity": "normal",
+      "clinicalAction": "Monitoreo periódico si existen factores de riesgo (diabetes, HTA, proteinuria)."
+    }
+  },
+  {
+    "inputs": {
+      "ageYears": 18,
+      "creatinineMgDl": 0.9,
+      "gender": "FEMALE"
+    },
+    "rawValue": 95.03363845054471,
+    "formattedValue": "95",
+    "interpretation": {
+      "code": "renal_g1",
+      "min": 90.0,
+      "max": null,
+      "label": "Estadio G1: Función renal normal o elevada",
+      "severity": "normal",
+      "clinicalAction": "Monitoreo periódico si existen factores de riesgo (diabetes, HTA, proteinuria)."
+    }
+  },
+  {
+    "inputs": {
+      "ageYears": 18,
+      "creatinineMgDl": 2.0,
+      "gender": "FEMALE"
+    },
+    "rawValue": 36.4529242807467,
+    "formattedValue": "36",
+    "interpretation": {
+      "code": "renal_g3b",
+      "min": 30.0,
+      "max": 44.99,
+      "label": "Estadio G3b: Descenso moderado a severo",
+      "severity": "danger",
+      "clinicalAction": "Ajuste obligatorio de posología farmacológica y derivación a nefrología."
+    }
+  },
+  {
+    "inputs": {
+      "ageYears": 18,
+      "creatinineMgDl": 6.0,
+      "gender": "FEMALE"
+    },
+    "rawValue": 9.754092455951348,
+    "formattedValue": "10",
+    "interpretation": {
+      "code": "renal_g5",
+      "min": 0.0,
+      "max": 14.99,
+      "label": "Estadio G5: Fallo renal terminal (IRCT)",
+      "severity": "critical",
+      "clinicalAction": "Urgencia de reemplazo renal (diálisis peritoneal, hemodiálisis o trasplante)."
+    }
+  },
+  {
+    "inputs": {
+      "ageYears": 65,
+      "creatinineMgDl": 0.1,
+      "gender": "MALE"
+    },
+    "rawValue": 184.03655236771172,
+    "formattedValue": "184",
+    "interpretation": {
+      "code": "renal_g1",
+      "min": 90.0,
+      "max": null,
+      "label": "Estadio G1: Función renal normal o elevada",
+      "severity": "normal",
+      "clinicalAction": "Monitoreo periódico si existen factores de riesgo (diabetes, HTA, proteinuria)."
+    }
+  },
+  {
+    "inputs": {
+      "ageYears": 65,
+      "creatinineMgDl": 0.7,
+      "gender": "MALE"
+    },
+    "rawValue": 102.25498298013133,
+    "formattedValue": "102",
+    "interpretation": {
+      "code": "renal_g1",
+      "min": 90.0,
+      "max": null,
+      "label": "Estadio G1: Función renal normal o elevada",
+      "severity": "normal",
+      "clinicalAction": "Monitoreo periódico si existen factores de riesgo (diabetes, HTA, proteinuria)."
+    }
+  },
+  {
+    "inputs": {
+      "ageYears": 65,
+      "creatinineMgDl": 0.9,
+      "gender": "MALE"
+    },
+    "rawValue": 94.78134144573454,
+    "formattedValue": "95",
+    "interpretation": {
+      "code": "renal_g1",
+      "min": 90.0,
+      "max": null,
+      "label": "Estadio G1: Función renal normal o elevada",
+      "severity": "normal",
+      "clinicalAction": "Monitoreo periódico si existen factores de riesgo (diabetes, HTA, proteinuria)."
+    }
+  },
+  {
+    "inputs": {
+      "ageYears": 65,
+      "creatinineMgDl": 2.0,
+      "gender": "MALE"
+    },
+    "rawValue": 36.35614840472475,
+    "formattedValue": "36",
+    "interpretation": {
+      "code": "renal_g3b",
+      "min": 30.0,
+      "max": 44.99,
+      "label": "Estadio G3b: Descenso moderado a severo",
+      "severity": "danger",
+      "clinicalAction": "Ajuste obligatorio de posología farmacológica y derivación a nefrología."
+    }
+  },
+  {
+    "inputs": {
+      "ageYears": 65,
+      "creatinineMgDl": 6.0,
+      "gender": "MALE"
+    },
+    "rawValue": 9.728197116665157,
+    "formattedValue": "10",
+    "interpretation": {
+      "code": "renal_g5",
+      "min": 0.0,
+      "max": 14.99,
+      "label": "Estadio G5: Fallo renal terminal (IRCT)",
+      "severity": "critical",
+      "clinicalAction": "Urgencia de reemplazo renal (diálisis peritoneal, hemodiálisis o trasplante)."
+    }
+  },
+  {
+    "inputs": {
+      "ageYears": 65,
+      "creatinineMgDl": 0.1,
+      "gender": "FEMALE"
+    },
+    "rawValue": 153.31053216475573,
+    "formattedValue": "153",
+    "interpretation": {
+      "code": "renal_g1",
+      "min": 90.0,
+      "max": null,
+      "label": "Estadio G1: Función renal normal o elevada",
+      "severity": "normal",
+      "clinicalAction": "Monitoreo periódico si existen factores de riesgo (diabetes, HTA, proteinuria)."
+    }
+  },
+  {
+    "inputs": {
+      "ageYears": 65,
+      "creatinineMgDl": 0.7,
+      "gender": "FEMALE"
+    },
+    "rawValue": 95.91871754308336,
+    "formattedValue": "96",
+    "interpretation": {
+      "code": "renal_g1",
+      "min": 90.0,
+      "max": null,
+      "label": "Estadio G1: Función renal normal o elevada",
+      "severity": "normal",
+      "clinicalAction": "Monitoreo periódico si existen factores de riesgo (diabetes, HTA, proteinuria)."
+    }
+  },
+  {
+    "inputs": {
+      "ageYears": 65,
+      "creatinineMgDl": 0.9,
+      "gender": "FEMALE"
+    },
+    "rawValue": 70.9463407075524,
+    "formattedValue": "71",
+    "interpretation": {
+      "code": "renal_g2",
+      "min": 60.0,
+      "max": 89.99,
+      "label": "Estadio G2: Descenso ligero del filtrado",
+      "severity": "low",
+      "clinicalAction": "Control de progresión, ajuste de factores cardiovasculares y albuminuria."
+    }
+  },
+  {
+    "inputs": {
+      "ageYears": 65,
+      "creatinineMgDl": 2.0,
+      "gender": "FEMALE"
+    },
+    "rawValue": 27.21353857407362,
+    "formattedValue": "27",
+    "interpretation": {
+      "code": "renal_g4",
+      "min": 15.0,
+      "max": 29.99,
+      "label": "Estadio G4: Descenso severo",
+      "severity": "critical",
+      "clinicalAction": "Manejo nefrológico activo intensivo, preparación para terapia de reemplazo renal."
+    }
+  },
+  {
+    "inputs": {
+      "ageYears": 65,
+      "creatinineMgDl": 6.0,
+      "gender": "FEMALE"
+    },
+    "rawValue": 7.281812818658047,
+    "formattedValue": "7",
+    "interpretation": {
+      "code": "renal_g5",
+      "min": 0.0,
+      "max": 14.99,
+      "label": "Estadio G5: Fallo renal terminal (IRCT)",
+      "severity": "critical",
+      "clinicalAction": "Urgencia de reemplazo renal (diálisis peritoneal, hemodiálisis o trasplante)."
+    }
+  },
+  {
+    "inputs": {
+      "ageYears": 120,
+      "creatinineMgDl": 0.1,
+      "gender": "MALE"
+    },
+    "rawValue": 130.72199626324988,
+    "formattedValue": "131",
+    "interpretation": {
+      "code": "renal_g1",
+      "min": 90.0,
+      "max": null,
+      "label": "Estadio G1: Función renal normal o elevada",
+      "severity": "normal",
+      "clinicalAction": "Monitoreo periódico si existen factores de riesgo (diabetes, HTA, proteinuria)."
+    }
+  },
+  {
+    "inputs": {
+      "ageYears": 120,
+      "creatinineMgDl": 0.7,
+      "gender": "MALE"
+    },
+    "rawValue": 72.632177309645,
+    "formattedValue": "73",
+    "interpretation": {
+      "code": "renal_g2",
+      "min": 60.0,
+      "max": 89.99,
+      "label": "Estadio G2: Descenso ligero del filtrado",
+      "severity": "low",
+      "clinicalAction": "Control de progresión, ajuste de factores cardiovasculares y albuminuria."
+    }
+  },
+  {
+    "inputs": {
+      "ageYears": 120,
+      "creatinineMgDl": 0.9,
+      "gender": "MALE"
+    },
+    "rawValue": 67.32361589527844,
+    "formattedValue": "67",
+    "interpretation": {
+      "code": "renal_g2",
+      "min": 60.0,
+      "max": 89.99,
+      "label": "Estadio G2: Descenso ligero del filtrado",
+      "severity": "low",
+      "clinicalAction": "Control de progresión, ajuste de factores cardiovasculares y albuminuria."
+    }
+  },
+  {
+    "inputs": {
+      "ageYears": 120,
+      "creatinineMgDl": 2.0,
+      "gender": "MALE"
+    },
+    "rawValue": 25.82393679279984,
+    "formattedValue": "26",
+    "interpretation": {
+      "code": "renal_g4",
+      "min": 15.0,
+      "max": 29.99,
+      "label": "Estadio G4: Descenso severo",
+      "severity": "critical",
+      "clinicalAction": "Manejo nefrológico activo intensivo, preparación para terapia de reemplazo renal."
+    }
+  },
+  {
+    "inputs": {
+      "ageYears": 120,
+      "creatinineMgDl": 6.0,
+      "gender": "MALE"
+    },
+    "rawValue": 6.909982450616545,
+    "formattedValue": "7",
+    "interpretation": {
+      "code": "renal_g5",
+      "min": 0.0,
+      "max": 14.99,
+      "label": "Estadio G5: Fallo renal terminal (IRCT)",
+      "severity": "critical",
+      "clinicalAction": "Urgencia de reemplazo renal (diálisis peritoneal, hemodiálisis o trasplante)."
+    }
+  },
+  {
+    "inputs": {
+      "ageYears": 120,
+      "creatinineMgDl": 0.1,
+      "gender": "FEMALE"
+    },
+    "rawValue": 108.89716501923641,
+    "formattedValue": "109",
+    "interpretation": {
+      "code": "renal_g1",
+      "min": 90.0,
+      "max": null,
+      "label": "Estadio G1: Función renal normal o elevada",
+      "severity": "normal",
+      "clinicalAction": "Monitoreo periódico si existen factores de riesgo (diabetes, HTA, proteinuria)."
+    }
+  },
+  {
+    "inputs": {
+      "ageYears": 120,
+      "creatinineMgDl": 0.7,
+      "gender": "FEMALE"
+    },
+    "rawValue": 68.13149928602178,
+    "formattedValue": "68",
+    "interpretation": {
+      "code": "renal_g2",
+      "min": 60.0,
+      "max": 89.99,
+      "label": "Estadio G2: Descenso ligero del filtrado",
+      "severity": "low",
+      "clinicalAction": "Control de progresión, ajuste de factores cardiovasculares y albuminuria."
+    }
+  },
+  {
+    "inputs": {
+      "ageYears": 120,
+      "creatinineMgDl": 0.9,
+      "gender": "FEMALE"
+    },
+    "rawValue": 50.39350697210212,
+    "formattedValue": "50",
+    "interpretation": {
+      "code": "renal_g3a",
+      "min": 45.0,
+      "max": 59.99,
+      "label": "Estadio G3a: Descenso ligero a moderado",
+      "severity": "warning",
+      "clinicalAction": "Evaluar complicaciones de ERC (anemia, metabolismo óseo-mineral). Vigilar nefrotoxinas."
+    }
+  },
+  {
+    "inputs": {
+      "ageYears": 120,
+      "creatinineMgDl": 2.0,
+      "gender": "FEMALE"
+    },
+    "rawValue": 19.32989964233859,
+    "formattedValue": "19",
+    "interpretation": {
+      "code": "renal_g4",
+      "min": 15.0,
+      "max": 29.99,
+      "label": "Estadio G4: Descenso severo",
+      "severity": "critical",
+      "clinicalAction": "Manejo nefrológico activo intensivo, preparación para terapia de reemplazo renal."
+    }
+  },
+  {
+    "inputs": {
+      "ageYears": 120,
+      "creatinineMgDl": 6.0,
+      "gender": "FEMALE"
+    },
+    "rawValue": 5.172304609186469,
+    "formattedValue": "5",
+    "interpretation": {
+      "code": "renal_g5",
+      "min": 0.0,
+      "max": 14.99,
+      "label": "Estadio G5: Fallo renal terminal (IRCT)",
+      "severity": "critical",
+      "clinicalAction": "Urgencia de reemplazo renal (diálisis peritoneal, hemodiálisis o trasplante)."
+    }
+  }
+]

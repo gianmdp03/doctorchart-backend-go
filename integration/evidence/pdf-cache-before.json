@@ -1,0 +1,14 @@
+[
+  {
+    "case": "pdf-cache-before",
+    "through": "actual-gateway",
+    "method": "GET",
+    "path": "/api/doctorchart/patients/4/prescriptions/4/pdf",
+    "status": 200,
+    "passed": false,
+    "body": {
+      "bytes": 36950,
+      "sha256": "0079fb7340f58c67a69f01dd8f6c8930c255afd69f21749a3ddce330012a4a3b"
+    }
+  }
+]

@@ -1,0 +1,26 @@
+npm notice run doctorchart-frontend@0.0.0 pretest
+npm notice run node scripts/public-config.mjs test
+Configuración pública validada.
+npm notice run doctorchart-frontend@0.0.0 test
+npm notice run ng test --watch=false
+> Building...
+√ Building...
+Application bundle generation complete. [9.656 seconds] - 2026-10-09T11:43:20.356Z
+
+
+ RUN  v4.1.11 C:/Users/gcast/Documents/GitHub/doctorchart-frontend
+
+Not implemented: Window's open() method
+Not implemented: Window's open() method
+Not implemented: Window's open() method
+Not implemented: Window's open() method
+Not implemented: Window's open() method
+Not implemented: Window's open() method
+Not implemented: Window's open() method
+Not implemented: Window's open() method
+
+ Test Files  59 passed (59)
+      Tests  573 passed (573)
+   Start at  08:43:20
+   Duration  11.78s (transform 8.62s, setup 9.35s, import 27.70s, tests 47.13s, environment 105.13s)
+

@@ -1,0 +1,493 @@
+{
+  "scope": "Actual Gateway and current Go process; all identity/data synthetic; fonts embedded; renders require visual inspection",
+  "cases": [
+    {
+      "case": "clinical-unicode-create",
+      "through": "actual-gateway",
+      "method": "POST",
+      "path": "/api/doctorchart/patients/4/prescriptions",
+      "status": 201,
+      "passed": true,
+      "response_headers": {
+        "Cache-Control": "no-cache, no-store, max-age=0, must-revalidate",
+        "Content-Length": "541",
+        "Content-Type": "application/json",
+        "Expires": "0",
+        "Pragma": "no-cache"
+      },
+      "body": {
+        "id": 15,
+        "patientId": 4,
+        "authorUserId": "d34c93dc19d85cab7ad3d1787c0ad558",
+        "createdAt": "2026-10-09T11:48:38.665202700Z",
+        "type": "PRESCRIPTION",
+        "diagnosisDescription": "Синтетический Ø œ; Diagnóstico sintético",
+        "generalInstructions": "Conservar las indicaciones médicas",
+        "prescriptions": [
+          {
+            "medicationName": "Препарат Ω μg; Paracetamol de prueba",
+            "dosage": "5 mg",
+            "administrationRoute": "Oral",
+            "frequency": "Cada 8 horas",
+            "durationDays": 5,
+            "instructions": "Con agua. Información clínica sintética."
+          }
+        ],
+        "diagnosticOrders": []
+      }
+    },
+    {
+      "case": "clinical-unicode-pdf",
+      "through": "actual-gateway",
+      "method": "GET",
+      "path": "/api/doctorchart/patients/4/prescriptions/15/pdf?doctorName=Dra.%20Prueba%20Cl%C3%ADnica&license=MN%2012345&clinicName=Consultorio%20Fixture",
+      "status": 200,
+      "passed": true,
+      "response_headers": {
+        "Cache-Control": "private, no-cache, no-store, max-age=0, must-revalidate",
+        "Content-Length": "39139",
+        "Content-Type": "application/pdf",
+        "Expires": "0",
+        "Pragma": "no-cache"
+      },
+      "body": {
+        "bytes": 39139,
+        "sha256": "65f3013118f55c76d1826aaef6a92c89ae0ad70bbff3c39e481294fd80b40ad6"
+      }
+    },
+    {
+      "case": "clinical-unicode-other-owner-after-hot-access",
+      "through": "actual-gateway",
+      "method": "GET",
+      "path": "/api/doctorchart/patients/4/prescriptions/15/pdf?doctorName=Dra.%20Prueba%20Cl%C3%ADnica&license=MN%2012345&clinicName=Consultorio%20Fixture",
+      "status": 403,
+      "passed": true,
+      "response_headers": {
+        "Cache-Control": "no-cache, no-store, max-age=0, must-revalidate",
+        "Content-Length": "92",
+        "Content-Type": "application/json",
+        "Expires": "0",
+        "Pragma": "no-cache"
+      },
+      "body": {
+        "code": "FORBIDDEN",
+        "message": "No tenés permiso para acceder a este paciente.",
+        "errors": []
+      }
+    },
+    {
+      "case": "clinical-unicode-clinical-content",
+      "pages": 1,
+      "a4": true,
+      "missing": [],
+      "passed": true
+    },
+    {
+      "case": "clinical-unicode-cleanup",
+      "through": "actual-gateway",
+      "method": "DELETE",
+      "path": "/api/doctorchart/patients/4/prescriptions/15",
+      "status": 204,
+      "passed": true,
+      "response_headers": {
+        "Cache-Control": "no-cache, no-store, max-age=0, must-revalidate",
+        "Expires": "0",
+        "Pragma": "no-cache"
+      },
+      "body": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "case": "clinical-orders-current-create",
+      "through": "actual-gateway",
+      "method": "POST",
+      "path": "/api/doctorchart/patients/4/prescriptions",
+      "status": 201,
+      "passed": true,
+      "response_headers": {
+        "Cache-Control": "no-cache, no-store, max-age=0, must-revalidate",
+        "Content-Type": "application/json",
+        "Expires": "0",
+        "Pragma": "no-cache"
+      },
+      "body": {
+        "id": 16,
+        "patientId": 4,
+        "authorUserId": "d34c93dc19d85cab7ad3d1787c0ad558",
+        "createdAt": "2026-10-09T11:48:39.441087700Z",
+        "type": "STUDY_ORDERS",
+        "diagnosisDescription": "Control clínico sintético",
+        "generalInstructions": "Presentar todas las órdenes",
+        "prescriptions": [],
+        "diagnosticOrders": [
+          "Orden de prueba 000 — Estudio clínico completo",
+          "Orden de prueba 001 — Estudio clínico completo",
+          "Orden de prueba 002 — Estudio clínico completo",
+          "Orden de prueba 003 — Estudio clínico completo",
+          "Orden de prueba 004 — Estudio clínico completo",
+          "Orden de prueba 005 — Estudio clínico completo",
+          "Orden de prueba 006 — Estudio clínico completo",
+          "Orden de prueba 007 — Estudio clínico completo",
+          "Orden de prueba 008 — Estudio clínico completo",
+          "Orden de prueba 009 — Estudio clínico completo",
+          "Orden de prueba 010 — Estudio clínico completo",
+          "Orden de prueba 011 — Estudio clínico completo",
+          "Orden de prueba 012 — Estudio clínico completo",
+          "Orden de prueba 013 — Estudio clínico completo",
+          "Orden de prueba 014 — Estudio clínico completo",
+          "Orden de prueba 015 — Estudio clínico completo",
+          "Orden de prueba 016 — Estudio clínico completo",
+          "Orden de prueba 017 — Estudio clínico completo",
+          "Orden de prueba 018 — Estudio clínico completo",
+          "Orden de prueba 019 — Estudio clínico completo",
+          "Orden de prueba 020 — Estudio clínico completo",
+          "Orden de prueba 021 — Estudio clínico completo",
+          "Orden de prueba 022 — Estudio clínico completo",
+          "Orden de prueba 023 — Estudio clínico completo",
+          "Orden de prueba 024 — Estudio clínico completo",
+          "Orden de prueba 025 — Estudio clínico completo",
+          "Orden de prueba 026 — Estudio clínico completo",
+          "Orden de prueba 027 — Estudio clínico completo",
+          "Orden de prueba 028 — Estudio clínico completo",
+          "Orden de prueba 029 — Estudio clínico completo",
+          "Orden de prueba 030 — Estudio clínico completo",
+          "Orden de prueba 031 — Estudio clínico completo",
+          "Orden de prueba 032 — Estudio clínico completo",
+          "Orden de prueba 033 — Estudio clínico completo",
+          "Orden de prueba 034 — Estudio clínico completo",
+          "Orden de prueba 035 — Estudio clínico completo",
+          "Orden de prueba 036 — Estudio clínico completo",
+          "Orden de prueba 037 — Estudio clínico completo",
+          "Orden de prueba 038 — Estudio clínico completo",
+          "Orden de prueba 039 — Estudio clínico completo",
+          "Orden de prueba 040 — Estudio clínico completo",
+          "Orden de prueba 041 — Estudio clínico completo",
+          "Orden de prueba 042 — Estudio clínico completo",
+          "Orden de prueba 043 — Estudio clínico completo",
+          "Orden de prueba 044 — Estudio clínico completo",
+          "Orden de prueba 045 — Estudio clínico completo",
+          "Orden de prueba 046 — Estudio clínico completo",
+          "Orden de prueba 047 — Estudio clínico completo",
+          "Orden de prueba 048 — Estudio clínico completo",
+          "Orden de prueba 049 — Estudio clínico completo",
+          "Orden de prueba 050 — Estudio clínico completo",
+          "Orden de prueba 051 — Estudio clínico completo",
+          "Orden de prueba 052 — Estudio clínico completo",
+          "Orden de prueba 053 — Estudio clínico completo",
+          "Orden de prueba 054 — Estudio clínico completo",
+          "Orden de prueba 055 — Estudio clínico completo",
+          "Orden de prueba 056 — Estudio clínico completo",
+          "Orden de prueba 057 — Estudio clínico completo",
+          "Orden de prueba 058 — Estudio clínico completo",
+          "Orden de prueba 059 — Estudio clínico completo",
+          "Orden de prueba 060 — Estudio clínico completo",
+          "Orden de prueba 061 — Estudio clínico completo",
+          "Orden de prueba 062 — Estudio clínico completo",
+          "Orden de prueba 063 — Estudio clínico completo",
+          "Orden de prueba 064 — Estudio clínico completo",
+          "Orden de prueba 065 — Estudio clínico completo",
+          "Orden de prueba 066 — Estudio clínico completo",
+          "Orden de prueba 067 — Estudio clínico completo",
+          "Orden de prueba 068 — Estudio clínico completo",
+          "Orden de prueba 069 — Estudio clínico completo",
+          "Orden de prueba 070 — Estudio clínico completo",
+          "Orden de prueba 071 — Estudio clínico completo",
+          "Orden de prueba 072 — Estudio clínico completo",
+          "Orden de prueba 073 — Estudio clínico completo",
+          "Orden de prueba 074 — Estudio clínico completo",
+          "Orden de prueba 075 — Estudio clínico completo",
+          "Orden de prueba 076 — Estudio clínico completo",
+          "Orden de prueba 077 — Estudio clínico completo",
+          "Orden de prueba 078 — Estudio clínico completo",
+          "Orden de prueba 079 — Estudio clínico completo",
+          "Orden de prueba 080 — Estudio clínico completo",
+          "Orden de prueba 081 — Estudio clínico completo",
+          "Orden de prueba 082 — Estudio clínico completo",
+          "Orden de prueba 083 — Estudio clínico completo",
+          "Orden de prueba 084 — Estudio clínico completo",
+          "Orden de prueba 085 — Estudio clínico completo",
+          "Orden de prueba 086 — Estudio clínico completo",
+          "Orden de prueba 087 — Estudio clínico completo",
+          "Orden de prueba 088 — Estudio clínico completo",
+          "Orden de prueba 089 — Estudio clínico completo",
+          "Orden de prueba 090 — Estudio clínico completo",
+          "Orden de prueba 091 — Estudio clínico completo",
+          "Orden de prueba 092 — Estudio clínico completo",
+          "Orden de prueba 093 — Estudio clínico completo",
+          "Orden de prueba 094 — Estudio clínico completo",
+          "Orden de prueba 095 — Estudio clínico completo",
+          "Orden de prueba 096 — Estudio clínico completo",
+          "Orden de prueba 097 — Estudio clínico completo",
+          "Orden de prueba 098 — Estudio clínico completo",
+          "Orden de prueba 099 — Estudio clínico completo"
+        ]
+      }
+    },
+    {
+      "case": "clinical-orders-current-pdf",
+      "through": "actual-gateway",
+      "method": "GET",
+      "path": "/api/doctorchart/patients/4/prescriptions/16/pdf?doctorName=Dra.%20Prueba%20Cl%C3%ADnica&license=MN%2012345&clinicName=Consultorio%20Fixture",
+      "status": 200,
+      "passed": true,
+      "response_headers": {
+        "Cache-Control": "private, no-cache, no-store, max-age=0, must-revalidate",
+        "Content-Length": "38837",
+        "Content-Type": "application/pdf",
+        "Expires": "0",
+        "Pragma": "no-cache"
+      },
+      "body": {
+        "bytes": 38837,
+        "sha256": "0e7e989ca4c634d40730661c89afe951d702ced800f911954e11f9d76af250dd"
+      }
+    },
+    {
+      "case": "clinical-orders-current-other-owner-after-hot-access",
+      "through": "actual-gateway",
+      "method": "GET",
+      "path": "/api/doctorchart/patients/4/prescriptions/16/pdf?doctorName=Dra.%20Prueba%20Cl%C3%ADnica&license=MN%2012345&clinicName=Consultorio%20Fixture",
+      "status": 403,
+      "passed": true,
+      "response_headers": {
+        "Cache-Control": "no-cache, no-store, max-age=0, must-revalidate",
+        "Content-Length": "92",
+        "Content-Type": "application/json",
+        "Expires": "0",
+        "Pragma": "no-cache"
+      },
+      "body": {
+        "code": "FORBIDDEN",
+        "message": "No tenés permiso para acceder a este paciente.",
+        "errors": []
+      }
+    },
+    {
+      "case": "clinical-orders-current-clinical-content",
+      "pages": 4,
+      "a4": true,
+      "missing": [],
+      "passed": true
+    },
+    {
+      "case": "clinical-orders-current-cleanup",
+      "through": "actual-gateway",
+      "method": "DELETE",
+      "path": "/api/doctorchart/patients/4/prescriptions/16",
+      "status": 204,
+      "passed": true,
+      "response_headers": {
+        "Cache-Control": "no-cache, no-store, max-age=0, must-revalidate",
+        "Expires": "0",
+        "Pragma": "no-cache"
+      },
+      "body": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "case": "ordered-complete-multipage-pdf",
+      "passed": true
+    },
+    {
+      "case": "unsupported-text-create",
+      "through": "actual-gateway",
+      "method": "POST",
+      "path": "/api/doctorchart/patients/4/prescriptions",
+      "status": 201,
+      "passed": true,
+      "response_headers": {
+        "Cache-Control": "no-cache, no-store, max-age=0, must-revalidate",
+        "Content-Length": "245",
+        "Content-Type": "application/json",
+        "Expires": "0",
+        "Pragma": "no-cache"
+      },
+      "body": {
+        "id": 17,
+        "patientId": 4,
+        "authorUserId": "d34c93dc19d85cab7ad3d1787c0ad558",
+        "createdAt": "2026-10-09T11:48:42.177794600Z",
+        "type": "STUDY_ORDERS",
+        "diagnosisDescription": "",
+        "generalInstructions": "",
+        "prescriptions": [],
+        "diagnosticOrders": [
+          "Control 药"
+        ]
+      }
+    },
+    {
+      "case": "unsupported-text-safe-error",
+      "through": "actual-gateway",
+      "method": "GET",
+      "path": "/api/doctorchart/patients/4/prescriptions/17/pdf",
+      "status": 422,
+      "passed": true,
+      "response_headers": {
+        "Cache-Control": "no-cache, no-store, max-age=0, must-revalidate",
+        "Content-Length": "158",
+        "Content-Type": "application/json",
+        "Expires": "0",
+        "Pragma": "no-cache"
+      },
+      "body": {
+        "code": "PDF_UNSUPPORTED_CHARACTER",
+        "message": "El documento contiene caracteres que no se pueden representar de forma segura en el PDF clínico.",
+        "errors": []
+      }
+    },
+    {
+      "case": "unsupported-text-cleanup",
+      "through": "actual-gateway",
+      "method": "DELETE",
+      "path": "/api/doctorchart/patients/4/prescriptions/17",
+      "status": 204,
+      "passed": true,
+      "response_headers": {
+        "Cache-Control": "no-cache, no-store, max-age=0, must-revalidate",
+        "Expires": "0",
+        "Pragma": "no-cache"
+      },
+      "body": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "case": "unsupported-text-create",
+      "through": "actual-gateway",
+      "method": "POST",
+      "path": "/api/doctorchart/patients/4/prescriptions",
+      "status": 201,
+      "passed": true,
+      "response_headers": {
+        "Cache-Control": "no-cache, no-store, max-age=0, must-revalidate",
+        "Content-Length": "250",
+        "Content-Type": "application/json",
+        "Expires": "0",
+        "Pragma": "no-cache"
+      },
+      "body": {
+        "id": 18,
+        "patientId": 4,
+        "authorUserId": "d34c93dc19d85cab7ad3d1787c0ad558",
+        "createdAt": "2026-10-09T11:48:42.242263200Z",
+        "type": "STUDY_ORDERS",
+        "diagnosisDescription": "",
+        "generalInstructions": "",
+        "prescriptions": [],
+        "diagnosticOrders": [
+          "Control سلام"
+        ]
+      }
+    },
+    {
+      "case": "unsupported-text-safe-error",
+      "through": "actual-gateway",
+      "method": "GET",
+      "path": "/api/doctorchart/patients/4/prescriptions/18/pdf",
+      "status": 422,
+      "passed": true,
+      "response_headers": {
+        "Cache-Control": "no-cache, no-store, max-age=0, must-revalidate",
+        "Content-Length": "158",
+        "Content-Type": "application/json",
+        "Expires": "0",
+        "Pragma": "no-cache"
+      },
+      "body": {
+        "code": "PDF_UNSUPPORTED_CHARACTER",
+        "message": "El documento contiene caracteres que no se pueden representar de forma segura en el PDF clínico.",
+        "errors": []
+      }
+    },
+    {
+      "case": "unsupported-text-cleanup",
+      "through": "actual-gateway",
+      "method": "DELETE",
+      "path": "/api/doctorchart/patients/4/prescriptions/18",
+      "status": 204,
+      "passed": true,
+      "response_headers": {
+        "Cache-Control": "no-cache, no-store, max-age=0, must-revalidate",
+        "Expires": "0",
+        "Pragma": "no-cache"
+      },
+      "body": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "case": "unsupported-text-create",
+      "through": "actual-gateway",
+      "method": "POST",
+      "path": "/api/doctorchart/patients/4/prescriptions",
+      "status": 201,
+      "passed": true,
+      "response_headers": {
+        "Cache-Control": "no-cache, no-store, max-age=0, must-revalidate",
+        "Content-Length": "246",
+        "Content-Type": "application/json",
+        "Expires": "0",
+        "Pragma": "no-cache"
+      },
+      "body": {
+        "id": 19,
+        "patientId": 4,
+        "authorUserId": "d34c93dc19d85cab7ad3d1787c0ad558",
+        "createdAt": "2026-10-09T11:48:42.283267500Z",
+        "type": "STUDY_ORDERS",
+        "diagnosisDescription": "",
+        "generalInstructions": "",
+        "prescriptions": [],
+        "diagnosticOrders": [
+          "Control 🩺"
+        ]
+      }
+    },
+    {
+      "case": "unsupported-text-safe-error",
+      "through": "actual-gateway",
+      "method": "GET",
+      "path": "/api/doctorchart/patients/4/prescriptions/19/pdf",
+      "status": 422,
+      "passed": true,
+      "response_headers": {
+        "Cache-Control": "no-cache, no-store, max-age=0, must-revalidate",
+        "Content-Length": "158",
+        "Content-Type": "application/json",
+        "Expires": "0",
+        "Pragma": "no-cache"
+      },
+      "body": {
+        "code": "PDF_UNSUPPORTED_CHARACTER",
+        "message": "El documento contiene caracteres que no se pueden representar de forma segura en el PDF clínico.",
+        "errors": []
+      }
+    },
+    {
+      "case": "unsupported-text-cleanup",
+      "through": "actual-gateway",
+      "method": "DELETE",
+      "path": "/api/doctorchart/patients/4/prescriptions/19",
+      "status": 204,
+      "passed": true,
+      "response_headers": {
+        "Cache-Control": "no-cache, no-store, max-age=0, must-revalidate",
+        "Expires": "0",
+        "Pragma": "no-cache"
+      },
+      "body": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  ],
+  "passed": 20,
+  "total": 20
+}

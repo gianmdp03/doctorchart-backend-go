@@ -1,0 +1,56 @@
+# DoctorChart migration state
+
+**Current handoff (2026-10-09): READY FOR STAGING within the locally verified Angular + Go scope.** The new acceptance criteria allow harmless PDF differences and prioritize preserved medical originals/ownership. Go is the definitive backend; no local migration functionality remains pending. Current [report](integration/REPORT.md), [resumable state](integration/STATE.md), [evidence](integration/evidence/summary.json).
+
+Current controls: Angular 573 tests, production build/typecheck/configuration/SSR PASS; seven Go Linux quality gates PASS, native Windows 80 PASS / 1 symlink SKIP; real HTTP initial snapshot 137/137, final Gateway regressions 24/24, Chrome 18/18 plus prior setup 3/3, PDF 20/20, Docker restore/nonroot/graceful shutdown PASS. PostgreSQL retains the original 20-table schema. Spring source remains unchanged.
+
+Current changes: strict future entitlement; identity-safe previews and private/no-store PDFs; UTF-8 supported clinical text with explicit 422 for unsupported scripts; original study bytes preserved, new 40 MP / 25 MiB limits; paginated S3 cleanup; Argentine dates and protected login/deep-link navigation. Calculators retain the existing disabled Angular flag; their APIs and clinical results were tested. Gateway/Billing were read-only, with a final tested snapshot recorded by hashes.
+
+Next: freeze Gateway revision and validate real providers in staging (Supabase, automatic renewal, Billing, AWS/R2, Gemini and printers), rebuilding public Angular configuration. No deployment or real-database mutation. Owned integration processes are stopped; synthetic databases retained. Historical matrices and evidence below are not rewritten or elevated to VERIFIED.
+
+## Historical migration handoff
+
+The following results and unresolved exact-equivalence statements describe the earlier Spring differential run, before the new acceptance criteria and integration fixes. The old JPEG optimizer/128 MP limit is superseded by preservation of originals and the 40 MP input limit above.
+
+**Status:** FUNCTIONAL IMPLEMENTATION COMPLETE / NOT READY FOR EXACT DROP-IN
+**Phase:** 4 VERIFY AND HANDOFF — local verification executed; no deployment
+**Source commit:** 828691433ac1057d4e7f132685884b5c9cb58e39
+**Source:** ../doctorchart-backend, read only; Java builds/tests from target-owned copies
+**Source runtime:** Spring Boot 4.1.1 / Java 25
+**Go:** 1.27.2; documented security patch deviation from Skills' 1.27.1
+**Skills:** .agents/skills/spring-to-go/SKILL.md; .agents/skills/go-backend/SKILL.md
+**Fixture:** doctorchart-go-fixture-acd41e09; disposable PostgreSQL 17.11; 20 tables; existing databases untouched
+**Matrix:** migration/CONTRACT_MATRIX.csv — 75 HTTP + 7 lifecycle operations
+**Implemented:** 75/75 HTTP; 7/7 lifecycle; 0 known missing operations; 0 fully VERIFIED contracts
+**Final report:** migration/REPORT.md; machine summary: migration/evidence/summary.json
+
+| Batch | Scope | Status |
+| --- | --- | --- |
+| B01 | Runtime, gateway, health, billing | COMPLETE — executed local evidence |
+| B02 | Specialties, experience, workspace/wizard | COMPLETE — executed local evidence |
+| B03 | Patients, profiles and cascade deletion | COMPLETE — executed local evidence |
+| B04 | Encounters and prescriptions | COMPLETE — executed local evidence |
+| B05 | Growth, vaccination, charts and calculators | COMPLETE — executed local evidence; 31 exact pinned-JVM renal regressions |
+| B06 | Studies, storage, printing/PDF and maintenance | IMPLEMENTED WITH DEVIATIONS — PDF/JPEG/cache differences documented |
+
+| Gate | Result | Evidence in migration/evidence/ |
+| --- | --- | --- |
+| Go format/build/vet/test/race/security | PASS, seven controls | go-quality.log |
+| Go native tests | 58 PASS, 0 FAIL, 1 Windows symlink SKIP; Linux executed | go-tests.jsonl |
+| HTTP/auth/20-table state/sequences | 365/365 PASS | compare.json |
+| Rollback and bidirectional Spring ↔ Go writes | 41/41 PASS; Spring Hibernate validate | compare.json |
+| Startup/configuration | 9/9 PASS | lifecycle.json |
+| Documents/local storage/S3 protocol | 14/14 functional PASS; explicit deviations | documents.json |
+| Existing Spring tests | 663 PASS, 0 failures/errors/skips | spring-tests.json |
+| Schema preservation and full backup/restore | PASS on owned clones | compare.json; restore-runtime.json |
+| Linux nonroot, clinical preview and in-flight graceful shutdown | PASS | restore-runtime.json |
+| Local workload | 1024 requests/runtime, concurrency 8, 0 errors | performance.json |
+| Original source preservation | 292 hashes unchanged; Git clean | source-preserved.json |
+| Exact complete equivalence | FAIL — known differences | ../REPORT.md |
+| Real database/AWS/R2/productive environment/deployment | NOT RUN — not authorized | ../REPORT.md |
+
+**Unresolved equivalence:** native PDF bytes/metadata/minor layout and optimized JPEG bytes/fileSize/pixels differ. Spring's warm PDF cache leaks across owners (200); Go enforces ownership (403) and does not reproduce its stale 30s window. Go bounds optimizer originals to 128 MP; larger originals UNVERIFIED. Audit timestamps excluded only by the explicit tested clock policy. S3 proof is local protocol, not real AWS/R2. See report; no exact drop-in claim.
+
+**Security:** 0 reachable and 0 imported-package vulnerabilities; module-only GO-2026-5932 affects unimported x/crypto/openpgp. No secret values in public evidence.
+
+**Next concrete action:** no known inventory implementation remains. Resolve or explicitly accept documented equivalence exceptions before declaring READY; environment validation and any future deployment require separate authorization. No audit/design restart, source edits, real-database mutation or traffic change. Local fixture retained for review; owned cleanup is `python migration/fixture.py stop`.

@@ -1,0 +1,786 @@
+{
+  "cases": [
+    {
+      "case": "s3-compact-JPEG",
+      "passed": true,
+      "responses": [
+        {
+          "status": 201,
+          "headers": {
+            "location": "/api/doctorchart/patients/1/studies/6",
+            "x-content-type-options": "nosniff",
+            "x-xss-protection": "0",
+            "cache-control": "no-cache, no-store, max-age=0, must-revalidate",
+            "pragma": "no-cache",
+            "expires": "0",
+            "x-frame-options": "DENY",
+            "content-type": "application/json"
+          },
+          "body": {
+            "id": 6,
+            "patientId": 1,
+            "originalFileName": "estudio.jpg",
+            "contentType": "image/jpeg",
+            "fileSize": 905,
+            "description": null,
+            "uploadedAt": "2026-10-09T02:45:03.0397356Z"
+          }
+        },
+        {
+          "status": 201,
+          "headers": {
+            "cache-control": "no-cache, no-store, max-age=0, must-revalidate",
+            "content-type": "application/json",
+            "expires": "0",
+            "location": "/api/doctorchart/patients/1/studies/6",
+            "pragma": "no-cache",
+            "x-content-type-options": "nosniff",
+            "x-frame-options": "DENY",
+            "x-xss-protection": "0"
+          },
+          "body": {
+            "id": 6,
+            "patientId": 1,
+            "originalFileName": "estudio.jpg",
+            "contentType": "image/jpeg",
+            "fileSize": 905,
+            "description": null,
+            "uploadedAt": "2026-10-09T02:45:03.293185Z"
+          }
+        }
+      ],
+      "byte_preserved": true
+    },
+    {
+      "case": "s3-compact-PNG",
+      "passed": true,
+      "responses": [
+        {
+          "status": 201,
+          "headers": {
+            "location": "/api/doctorchart/patients/1/studies/7",
+            "x-content-type-options": "nosniff",
+            "x-xss-protection": "0",
+            "cache-control": "no-cache, no-store, max-age=0, must-revalidate",
+            "pragma": "no-cache",
+            "expires": "0",
+            "x-frame-options": "DENY",
+            "content-type": "application/json"
+          },
+          "body": {
+            "id": 7,
+            "patientId": 1,
+            "originalFileName": "estudio.png",
+            "contentType": "image/png",
+            "fileSize": 110,
+            "description": null,
+            "uploadedAt": "2026-10-09T02:45:03.348164Z"
+          }
+        },
+        {
+          "status": 201,
+          "headers": {
+            "cache-control": "no-cache, no-store, max-age=0, must-revalidate",
+            "content-type": "application/json",
+            "expires": "0",
+            "location": "/api/doctorchart/patients/1/studies/7",
+            "pragma": "no-cache",
+            "x-content-type-options": "nosniff",
+            "x-frame-options": "DENY",
+            "x-xss-protection": "0"
+          },
+          "body": {
+            "id": 7,
+            "patientId": 1,
+            "originalFileName": "estudio.png",
+            "contentType": "image/png",
+            "fileSize": 110,
+            "description": null,
+            "uploadedAt": "2026-10-09T02:45:03.4711976Z"
+          }
+        }
+      ],
+      "byte_preserved": true
+    },
+    {
+      "case": "s3-compact-WEBP",
+      "passed": true,
+      "responses": [
+        {
+          "status": 201,
+          "headers": {
+            "location": "/api/doctorchart/patients/1/studies/8",
+            "x-content-type-options": "nosniff",
+            "x-xss-protection": "0",
+            "cache-control": "no-cache, no-store, max-age=0, must-revalidate",
+            "pragma": "no-cache",
+            "expires": "0",
+            "x-frame-options": "DENY",
+            "content-type": "application/json"
+          },
+          "body": {
+            "id": 8,
+            "patientId": 1,
+            "originalFileName": "estudio.webp",
+            "contentType": "image/webp",
+            "fileSize": 186,
+            "description": null,
+            "uploadedAt": "2026-10-09T02:45:03.5747607Z"
+          }
+        },
+        {
+          "status": 201,
+          "headers": {
+            "cache-control": "no-cache, no-store, max-age=0, must-revalidate",
+            "content-type": "application/json",
+            "expires": "0",
+            "location": "/api/doctorchart/patients/1/studies/8",
+            "pragma": "no-cache",
+            "x-content-type-options": "nosniff",
+            "x-frame-options": "DENY",
+            "x-xss-protection": "0"
+          },
+          "body": {
+            "id": 8,
+            "patientId": 1,
+            "originalFileName": "estudio.webp",
+            "contentType": "image/webp",
+            "fileSize": 186,
+            "description": null,
+            "uploadedAt": "2026-10-09T02:45:03.683724Z"
+          }
+        }
+      ],
+      "byte_preserved": true
+    },
+    {
+      "case": "s3-compact-GIF",
+      "passed": true,
+      "responses": [
+        {
+          "status": 201,
+          "headers": {
+            "location": "/api/doctorchart/patients/1/studies/9",
+            "x-content-type-options": "nosniff",
+            "x-xss-protection": "0",
+            "cache-control": "no-cache, no-store, max-age=0, must-revalidate",
+            "pragma": "no-cache",
+            "expires": "0",
+            "x-frame-options": "DENY",
+            "content-type": "application/json"
+          },
+          "body": {
+            "id": 9,
+            "patientId": 1,
+            "originalFileName": "estudio.gif",
+            "contentType": "image/gif",
+            "fileSize": 116,
+            "description": null,
+            "uploadedAt": "2026-10-09T02:45:03.753735Z"
+          }
+        },
+        {
+          "status": 201,
+          "headers": {
+            "cache-control": "no-cache, no-store, max-age=0, must-revalidate",
+            "content-type": "application/json",
+            "expires": "0",
+            "location": "/api/doctorchart/patients/1/studies/9",
+            "pragma": "no-cache",
+            "x-content-type-options": "nosniff",
+            "x-frame-options": "DENY",
+            "x-xss-protection": "0"
+          },
+          "body": {
+            "id": 9,
+            "patientId": 1,
+            "originalFileName": "estudio.gif",
+            "contentType": "image/gif",
+            "fileSize": 116,
+            "description": null,
+            "uploadedAt": "2026-10-09T02:45:03.8739975Z"
+          }
+        }
+      ],
+      "byte_preserved": true
+    },
+    {
+      "case": "s3-compact-BMP",
+      "passed": true,
+      "responses": [
+        {
+          "status": 201,
+          "headers": {
+            "location": "/api/doctorchart/patients/1/studies/10",
+            "x-content-type-options": "nosniff",
+            "x-xss-protection": "0",
+            "cache-control": "no-cache, no-store, max-age=0, must-revalidate",
+            "pragma": "no-cache",
+            "expires": "0",
+            "x-frame-options": "DENY",
+            "content-type": "application/json"
+          },
+          "body": {
+            "id": 10,
+            "patientId": 1,
+            "originalFileName": "estudio.bmp",
+            "contentType": "image/bmp",
+            "fileSize": 1350,
+            "description": null,
+            "uploadedAt": "2026-10-09T02:45:03.9413142Z"
+          }
+        },
+        {
+          "status": 201,
+          "headers": {
+            "cache-control": "no-cache, no-store, max-age=0, must-revalidate",
+            "content-type": "application/json",
+            "expires": "0",
+            "location": "/api/doctorchart/patients/1/studies/10",
+            "pragma": "no-cache",
+            "x-content-type-options": "nosniff",
+            "x-frame-options": "DENY",
+            "x-xss-protection": "0"
+          },
+          "body": {
+            "id": 10,
+            "patientId": 1,
+            "originalFileName": "estudio.bmp",
+            "contentType": "image/bmp",
+            "fileSize": 1350,
+            "description": null,
+            "uploadedAt": "2026-10-09T02:45:04.053741Z"
+          }
+        }
+      ],
+      "byte_preserved": true
+    },
+    {
+      "case": "s3-compact-TIFF",
+      "passed": true,
+      "responses": [
+        {
+          "status": 201,
+          "headers": {
+            "location": "/api/doctorchart/patients/1/studies/11",
+            "x-content-type-options": "nosniff",
+            "x-xss-protection": "0",
+            "cache-control": "no-cache, no-store, max-age=0, must-revalidate",
+            "pragma": "no-cache",
+            "expires": "0",
+            "x-frame-options": "DENY",
+            "content-type": "application/json"
+          },
+          "body": {
+            "id": 11,
+            "patientId": 1,
+            "originalFileName": "estudio.tiff",
+            "contentType": "image/tiff",
+            "fileSize": 1436,
+            "description": null,
+            "uploadedAt": "2026-10-09T02:45:04.1037641Z"
+          }
+        },
+        {
+          "status": 201,
+          "headers": {
+            "cache-control": "no-cache, no-store, max-age=0, must-revalidate",
+            "content-type": "application/json",
+            "expires": "0",
+            "location": "/api/doctorchart/patients/1/studies/11",
+            "pragma": "no-cache",
+            "x-content-type-options": "nosniff",
+            "x-frame-options": "DENY",
+            "x-xss-protection": "0"
+          },
+          "body": {
+            "id": 11,
+            "patientId": 1,
+            "originalFileName": "estudio.tiff",
+            "contentType": "image/tiff",
+            "fileSize": 1436,
+            "description": null,
+            "uploadedAt": "2026-10-09T02:45:04.1770714Z"
+          }
+        }
+      ],
+      "byte_preserved": true
+    },
+    {
+      "case": "encrypted-pdf-rejected",
+      "passed": true,
+      "responses": [
+        {
+          "status": 415,
+          "headers": {
+            "x-content-type-options": "nosniff",
+            "x-xss-protection": "0",
+            "cache-control": "no-cache, no-store, max-age=0, must-revalidate",
+            "pragma": "no-cache",
+            "expires": "0",
+            "x-frame-options": "DENY",
+            "content-type": "application/json"
+          },
+          "body": {
+            "code": "INVALID_STUDY_FILE",
+            "message": "El archivo debe ser un PDF sin cifrar o una imagen válida (JPG, PNG, WebP, GIF, BMP o TIFF).",
+            "errors": []
+          }
+        },
+        {
+          "status": 415,
+          "headers": {
+            "cache-control": "no-cache, no-store, max-age=0, must-revalidate",
+            "content-type": "application/json",
+            "expires": "0",
+            "pragma": "no-cache",
+            "x-content-type-options": "nosniff",
+            "x-frame-options": "DENY",
+            "x-xss-protection": "0"
+          },
+          "body": {
+            "code": "INVALID_STUDY_FILE",
+            "message": "El archivo debe ser un PDF sin cifrar o una imagen válida (JPG, PNG, WebP, GIF, BMP o TIFF).",
+            "errors": []
+          }
+        }
+      ]
+    },
+    {
+      "case": "optimized-large-jpeg",
+      "passed": true,
+      "exact_bytes": false,
+      "image_info": [
+        {
+          "size": [
+            2048,
+            683
+          ],
+          "format": "JPEG",
+          "bytes": 30709,
+          "sha256": "b3aadcb31b522aa938ca707a9926886d90ff1f500e39c32f4a61c45101866f37"
+        },
+        {
+          "size": [
+            2048,
+            683
+          ],
+          "format": "JPEG",
+          "bytes": 30889,
+          "sha256": "da342d07ff028bfa4ce38a13a0bff689a8fdc9e20c5a9234f916338f8024d201"
+        }
+      ],
+      "responses": [
+        {
+          "status": 201,
+          "headers": {
+            "location": "/api/doctorchart/patients/1/studies/12",
+            "x-content-type-options": "nosniff",
+            "x-xss-protection": "0",
+            "cache-control": "no-cache, no-store, max-age=0, must-revalidate",
+            "pragma": "no-cache",
+            "expires": "0",
+            "x-frame-options": "DENY",
+            "content-type": "application/json"
+          },
+          "body": {
+            "id": 12,
+            "patientId": 1,
+            "originalFileName": "large-jpeg.jpg",
+            "contentType": "image/jpeg",
+            "fileSize": 30709,
+            "description": null,
+            "uploadedAt": "2026-10-09T02:45:04.6476386Z"
+          }
+        },
+        {
+          "status": 201,
+          "headers": {
+            "cache-control": "no-cache, no-store, max-age=0, must-revalidate",
+            "content-type": "application/json",
+            "expires": "0",
+            "location": "/api/doctorchart/patients/1/studies/12",
+            "pragma": "no-cache",
+            "x-content-type-options": "nosniff",
+            "x-frame-options": "DENY",
+            "x-xss-protection": "0"
+          },
+          "body": {
+            "id": 12,
+            "patientId": 1,
+            "originalFileName": "large-jpeg.jpg",
+            "contentType": "image/jpeg",
+            "fileSize": 30889,
+            "description": null,
+            "uploadedAt": "2026-10-09T02:45:04.9247027Z"
+          }
+        }
+      ]
+    },
+    {
+      "case": "optimized-exif-portrait",
+      "passed": true,
+      "exact_bytes": false,
+      "image_info": [
+        {
+          "size": [
+            683,
+            2048
+          ],
+          "format": "JPEG",
+          "bytes": 31377,
+          "sha256": "73abeb25a2bb4ba94712c335481f8f415eb2759bb453c80d4f24adb5066f0fa8"
+        },
+        {
+          "size": [
+            683,
+            2048
+          ],
+          "format": "JPEG",
+          "bytes": 31148,
+          "sha256": "0f656694eba3626c3cf1e6173aeecc63646fc04699668bd5a2656a658f4e98ee"
+        }
+      ],
+      "responses": [
+        {
+          "status": 201,
+          "headers": {
+            "location": "/api/doctorchart/patients/1/studies/13",
+            "x-content-type-options": "nosniff",
+            "x-xss-protection": "0",
+            "cache-control": "no-cache, no-store, max-age=0, must-revalidate",
+            "pragma": "no-cache",
+            "expires": "0",
+            "x-frame-options": "DENY",
+            "content-type": "application/json"
+          },
+          "body": {
+            "id": 13,
+            "patientId": 1,
+            "originalFileName": "exif-portrait.jpg",
+            "contentType": "image/jpeg",
+            "fileSize": 31377,
+            "description": null,
+            "uploadedAt": "2026-10-09T02:45:05.0754301Z"
+          }
+        },
+        {
+          "status": 201,
+          "headers": {
+            "cache-control": "no-cache, no-store, max-age=0, must-revalidate",
+            "content-type": "application/json",
+            "expires": "0",
+            "location": "/api/doctorchart/patients/1/studies/13",
+            "pragma": "no-cache",
+            "x-content-type-options": "nosniff",
+            "x-frame-options": "DENY",
+            "x-xss-protection": "0"
+          },
+          "body": {
+            "id": 13,
+            "patientId": 1,
+            "originalFileName": "exif-portrait.jpg",
+            "contentType": "image/jpeg",
+            "fileSize": 31148,
+            "description": null,
+            "uploadedAt": "2026-10-09T02:45:05.3361582Z"
+          }
+        }
+      ]
+    },
+    {
+      "case": "optimized-large-png",
+      "passed": true,
+      "exact_bytes": true,
+      "image_info": [
+        {
+          "size": [
+            3000,
+            1000
+          ],
+          "format": "PNG",
+          "bytes": 11237,
+          "sha256": "006f6b3d97b8e5820d16581e9db8617ba3421e1ce8fd7855d21eb74df053c74e"
+        },
+        {
+          "size": [
+            3000,
+            1000
+          ],
+          "format": "PNG",
+          "bytes": 11237,
+          "sha256": "006f6b3d97b8e5820d16581e9db8617ba3421e1ce8fd7855d21eb74df053c74e"
+        }
+      ],
+      "responses": [
+        {
+          "status": 201,
+          "headers": {
+            "location": "/api/doctorchart/patients/1/studies/14",
+            "x-content-type-options": "nosniff",
+            "x-xss-protection": "0",
+            "cache-control": "no-cache, no-store, max-age=0, must-revalidate",
+            "pragma": "no-cache",
+            "expires": "0",
+            "x-frame-options": "DENY",
+            "content-type": "application/json"
+          },
+          "body": {
+            "id": 14,
+            "patientId": 1,
+            "originalFileName": "large-png.png",
+            "contentType": "image/png",
+            "fileSize": 11237,
+            "description": null,
+            "uploadedAt": "2026-10-09T02:45:05.529726Z"
+          }
+        },
+        {
+          "status": 201,
+          "headers": {
+            "cache-control": "no-cache, no-store, max-age=0, must-revalidate",
+            "content-type": "application/json",
+            "expires": "0",
+            "location": "/api/doctorchart/patients/1/studies/14",
+            "pragma": "no-cache",
+            "x-content-type-options": "nosniff",
+            "x-frame-options": "DENY",
+            "x-xss-protection": "0"
+          },
+          "body": {
+            "id": 14,
+            "patientId": 1,
+            "originalFileName": "large-png.png",
+            "contentType": "image/png",
+            "fileSize": 11237,
+            "description": null,
+            "uploadedAt": "2026-10-09T02:45:05.7652706Z"
+          }
+        }
+      ]
+    },
+    {
+      "case": "optimized-high-resolution-48mp",
+      "passed": true,
+      "exact_bytes": false,
+      "image_info": [
+        {
+          "size": [
+            2048,
+            1536
+          ],
+          "format": "JPEG",
+          "bytes": 54489,
+          "sha256": "690c1da2fc30dea1d63b4d6b385fab1e8b643af937a0a74aa54b90aae8d300fc"
+        },
+        {
+          "size": [
+            2048,
+            1536
+          ],
+          "format": "JPEG",
+          "bytes": 58552,
+          "sha256": "c93fcd4edfcc1ee5e10659e720d7facd64fc53f192a42c8b091ff0f58f5bdd42"
+        }
+      ],
+      "responses": [
+        {
+          "status": 201,
+          "headers": {
+            "location": "/api/doctorchart/patients/1/studies/15",
+            "x-content-type-options": "nosniff",
+            "x-xss-protection": "0",
+            "cache-control": "no-cache, no-store, max-age=0, must-revalidate",
+            "pragma": "no-cache",
+            "expires": "0",
+            "x-frame-options": "DENY",
+            "content-type": "application/json"
+          },
+          "body": {
+            "id": 15,
+            "patientId": 1,
+            "originalFileName": "high-resolution-48mp.jpg",
+            "contentType": "image/jpeg",
+            "fileSize": 54489,
+            "description": null,
+            "uploadedAt": "2026-10-09T02:45:06.3490596Z"
+          }
+        },
+        {
+          "status": 201,
+          "headers": {
+            "cache-control": "no-cache, no-store, max-age=0, must-revalidate",
+            "content-type": "application/json",
+            "expires": "0",
+            "location": "/api/doctorchart/patients/1/studies/15",
+            "pragma": "no-cache",
+            "x-content-type-options": "nosniff",
+            "x-frame-options": "DENY",
+            "x-xss-protection": "0"
+          },
+          "body": {
+            "id": 15,
+            "patientId": 1,
+            "originalFileName": "high-resolution-48mp.jpg",
+            "contentType": "image/jpeg",
+            "fileSize": 58552,
+            "description": null,
+            "uploadedAt": "2026-10-09T02:45:08.3914444Z"
+          }
+        }
+      ]
+    },
+    {
+      "case": "pdf-other-owner-after-warm-cache",
+      "passed": true,
+      "spring_status": 200,
+      "go_status": 403
+    },
+    {
+      "case": "long-document-all-orders",
+      "passed": true,
+      "page_counts": [
+        4,
+        4
+      ]
+    },
+    {
+      "case": "s3-scheduled-orphan-grace",
+      "passed": true
+    }
+  ],
+  "deviations": [
+    {
+      "case": "large-jpeg",
+      "type": "IMAGE_ENCODER",
+      "reason": "Native Go encoder/resizer produces different compressed bytes/fileSize from Java ImageIO/Thumbnailator.",
+      "image_info": [
+        {
+          "size": [
+            2048,
+            683
+          ],
+          "format": "JPEG",
+          "bytes": 30709,
+          "sha256": "b3aadcb31b522aa938ca707a9926886d90ff1f500e39c32f4a61c45101866f37"
+        },
+        {
+          "size": [
+            2048,
+            683
+          ],
+          "format": "JPEG",
+          "bytes": 30889,
+          "sha256": "da342d07ff028bfa4ce38a13a0bff689a8fdc9e20c5a9234f916338f8024d201"
+        }
+      ],
+      "pixel_comparison": {
+        "mean_absolute_channel_error": [
+          0.04347347410322108,
+          0.06515516334187409,
+          0.0923938220625915
+        ],
+        "channel_rms_error": [
+          0.38010307405627203,
+          0.8117341389940994,
+          0.9514304070715661
+        ],
+        "scope": "Synthetic colored blocks only; no diagnostic quality claim"
+      }
+    },
+    {
+      "case": "exif-portrait",
+      "type": "IMAGE_ENCODER",
+      "reason": "Native Go encoder/resizer produces different compressed bytes/fileSize from Java ImageIO/Thumbnailator.",
+      "image_info": [
+        {
+          "size": [
+            683,
+            2048
+          ],
+          "format": "JPEG",
+          "bytes": 31377,
+          "sha256": "73abeb25a2bb4ba94712c335481f8f415eb2759bb453c80d4f24adb5066f0fa8"
+        },
+        {
+          "size": [
+            683,
+            2048
+          ],
+          "format": "JPEG",
+          "bytes": 31148,
+          "sha256": "0f656694eba3626c3cf1e6173aeecc63646fc04699668bd5a2656a658f4e98ee"
+        }
+      ],
+      "pixel_comparison": {
+        "mean_absolute_channel_error": [
+          0.21147153527635432,
+          0.25652709782210836,
+          0.2026259951500732
+        ],
+        "channel_rms_error": [
+          3.091626677368457,
+          3.793018076030156,
+          2.8753289625757756
+        ],
+        "scope": "Synthetic colored blocks only; no diagnostic quality claim"
+      }
+    },
+    {
+      "case": "high-resolution-48mp",
+      "type": "IMAGE_ENCODER",
+      "reason": "Native Go encoder/resizer produces different compressed bytes/fileSize from Java ImageIO/Thumbnailator.",
+      "image_info": [
+        {
+          "size": [
+            2048,
+            1536
+          ],
+          "format": "JPEG",
+          "bytes": 54489,
+          "sha256": "690c1da2fc30dea1d63b4d6b385fab1e8b643af937a0a74aa54b90aae8d300fc"
+        },
+        {
+          "size": [
+            2048,
+            1536
+          ],
+          "format": "JPEG",
+          "bytes": 58552,
+          "sha256": "c93fcd4edfcc1ee5e10659e720d7facd64fc53f192a42c8b091ff0f58f5bdd42"
+        }
+      ],
+      "pixel_comparison": {
+        "mean_absolute_channel_error": [
+          0.027876853942871094,
+          0.02893352508544922,
+          0.019364674886067707
+        ],
+        "channel_rms_error": [
+          0.5649471035392281,
+          0.5805856387645287,
+          0.48203887356376934
+        ],
+        "scope": "Synthetic colored blocks only; no diagnostic quality claim"
+      }
+    },
+    {
+      "case": "pdf-cache-ownership",
+      "type": "SECURITY",
+      "spring_status": 200,
+      "go_status": 403,
+      "reason": "Spring cache key omits identity and bypasses service ownership checks. Go always enforces medical-record ownership."
+    }
+  ],
+  "s3_methods": [
+    "DELETE",
+    "GET",
+    "HEAD",
+    "PUT"
+  ],
+  "databases": [
+    "documents_a54de0_spring",
+    "documents_a54de0_go"
+  ],
+  "scope": "Owned local signed S3 protocol fixture; no AWS/R2 service contacted"
+}

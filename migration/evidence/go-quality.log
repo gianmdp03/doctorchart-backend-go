@@ -1,0 +1,43 @@
+go version go1.27.2 linux/amd64
+> gofmt -l on 43 source files
+> /usr/local/go/bin/go build ./...
+> /usr/local/go/bin/go vet ./...
+> /usr/local/go/bin/go test ./...
+?   	github.com/syntah/doctorchart-backend-go/cmd/api	[no test files]
+ok  	github.com/syntah/doctorchart-backend-go/internal/api	(cached)
+ok  	github.com/syntah/doctorchart-backend-go/internal/billing	(cached)
+?   	github.com/syntah/doctorchart-backend-go/internal/bootstrap	[no test files]
+ok  	github.com/syntah/doctorchart-backend-go/internal/clinical	(cached)
+ok  	github.com/syntah/doctorchart-backend-go/internal/config	(cached)
+ok  	github.com/syntah/doctorchart-backend-go/internal/storage	0.064s
+ok  	github.com/syntah/doctorchart-backend-go/internal/wizard	(cached)
+?   	github.com/syntah/doctorchart-backend-go/internal/workspace	[no test files]
+> /usr/local/go/bin/go test -race ./...
+?   	github.com/syntah/doctorchart-backend-go/cmd/api	[no test files]
+ok  	github.com/syntah/doctorchart-backend-go/internal/api	(cached)
+ok  	github.com/syntah/doctorchart-backend-go/internal/billing	(cached)
+?   	github.com/syntah/doctorchart-backend-go/internal/bootstrap	[no test files]
+ok  	github.com/syntah/doctorchart-backend-go/internal/clinical	(cached)
+ok  	github.com/syntah/doctorchart-backend-go/internal/config	(cached)
+ok  	github.com/syntah/doctorchart-backend-go/internal/storage	1.047s
+ok  	github.com/syntah/doctorchart-backend-go/internal/wizard	(cached)
+?   	github.com/syntah/doctorchart-backend-go/internal/workspace	[no test files]
+> /app/.migration/linux-tools/govulncheck ./...
+=== Symbol Results ===
+
+No vulnerabilities found.
+
+Your code is affected by 0 vulnerabilities.
+This scan also found 0 vulnerabilities in packages you import and 1
+vulnerability in modules you require, but your code doesn't appear to call these
+vulnerabilities.
+Use '-show verbose' for more details.
+
+=== QUALITY CHECK RESULTS ===
+PASS     Go toolchain exact version
+PASS     Go formatting
+PASS     Go build
+PASS     Go vet
+PASS     Go tests
+PASS     Go race tests
+PASS     Go vulnerability scan

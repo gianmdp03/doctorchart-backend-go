@@ -1,0 +1,50 @@
+npm notice run doctorchart-frontend@0.0.0 pretest
+npm notice run node scripts/public-config.mjs test
+Configuración pública validada.
+npm notice run doctorchart-frontend@0.0.0 test
+npm notice run ng test --watch=false --include=src/app/features/auth/login-dialog.component.spec.ts
+> Building...
+√ Building...
+Application bundle generation complete. [7.305 seconds] - 2026-10-09T11:20:41.992Z
+
+
+ RUN  v4.1.11 C:/Users/gcast/Documents/GitHub/doctorchart-frontend
+
+ ❯ |doctorchart-frontend| src/app/features/auth/login-dialog.component.spec.ts (23 tests | 1 failed) 230ms
+     × rechecks protected route guards after login on the same URL 17ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |doctorchart-frontend| src/app/features/auth/login-dialog.component.spec.ts > LoginDialogComponent > rechecks protected route guards after login on the same URL
+AssertionError: expected "navigateByUrl" to be called with arguments: [ '/dashboard', …(1) ]
+
+Received:
+
+  1st navigateByUrl call:
+
+  [
+    "/dashboard",
+-   {
+-     "onSameUrlNavigation": "reload",
+-   },
+  ]
+
+
+Number of calls: 1
+
+ ❯ src/app/features/auth/login-dialog.component.spec.ts:70:24
+     68|     component.loginForm.patchValue({ email: 'fixture@example.test', pa…
+     69|     await component.onLoginSubmit();
+     70|     expect(navigation).toHaveBeenCalledWith('/dashboard', { onSameUrlN…
+       |                        ^
+     71|   });
+     72|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 22 passed (23)
+   Start at  08:20:42
+   Duration  1.54s (transform 120ms, setup 289ms, import 186ms, tests 230ms, environment 679ms)
+

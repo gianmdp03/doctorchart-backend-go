@@ -1,0 +1,53 @@
+TABS [
+  '1. Datos del paciente',
+  '2. Historia Clínica1',
+  '3. Vacunas',
+  '4. Evolución y Curvas3',
+  '5. Recetas y Órdenes',
+  '6. Estudios realizados'
+]
+BUTTONS [
+  '',
+  'A+Normal',
+  'DP',
+  'Directorio',
+  'Editar datos',
+  'Nueva historia clínica',
+  '1. Datos del paciente',
+  '2. Historia Clínica1',
+  '3. Vacunas',
+  '4. Evolución y Curvas3',
+  '5. Recetas y Órdenes',
+  '6. Estudios realizados',
+  'Editar datos',
+  ''
+]
+PASS Growth chart renders persisted anthropometry 
+PASS Authenticated clinical PDF forbids HTTP cache storage 
+PASS Authenticated PDF opens in an isolated preview 
+PASS Angular uploads the entire original medical image 
+PASS Browser study download is byte-for-byte original 
+PASS Chrome applies original EXIF orientation [1000,3000]
+PASS Study preview has no opener 
+PASS Angular study deletion completes 
+PASS Angular patient edit preserves date and persisted records 
+PASS History survives patient update 
+PASS Actual Supabase SDK refresh rotates bearer and retains owner 
+AUTH RESPONSE 400
+PASS Real browser invalid login stays unauthenticated 
+AUTH RESPONSE 200
+PASS Browser session opens its persisted medical record 
+PASS Protected patient deep link survives browser reload 
+PASS Signout removes medical record from rendered UI 
+AUTH RESPONSE 200
+PASS Account change cannot reuse previous patient directory 
+PASS Foreign medical record is never displayed 
+AUTH RESPONSE 200
+EXPIRED URL http://localhost:18999/fixture-plans BODY Error response
+
+Error code: 404
+
+Message: Not Found.
+
+Error code explanation: 404 - Nothing matches the given URI.
+PASS Expired entitlement redirects to configured plans URL Plans UI is simulated; external Billing UI not exercised

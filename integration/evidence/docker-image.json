@@ -1,0 +1,7 @@
+{
+  "image": "doctorchart-go:staging-local",
+  "id": "sha256:d368c5a986ca938b05e3e7a23909b5ca74af0bc7e28022b0349522410946ee09",
+  "user": "65532:65532",
+  "created": "2026-10-09T11:47:53.064861861Z",
+  "local_only": true
+}

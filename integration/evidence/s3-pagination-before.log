@@ -1,0 +1,5 @@
+--- FAIL: TestS3CandidatesIncludeEveryPage (0.00s)
+    s3_test.go:154: Missing orphan candidates on later S3 pages: [12345678-1234-4123-8123-123456789012], <nil>
+FAIL
+FAIL	github.com/syntah/doctorchart-backend-go/internal/storage	3.163s
+FAIL

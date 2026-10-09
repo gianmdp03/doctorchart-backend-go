@@ -1,0 +1,13 @@
+npm notice run doctorchart-frontend@0.0.0 test:config
+npm notice run node --test scripts/public-config.test.mjs
+✔ every public setting is required; no embedded project or localhost fallback (1.0831ms)
+✔ private values and malformed URLs never reach public configuration or diagnostics (0.3017ms)
+✔ build mode selects only its file and process variables take priority (5.1672ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 81.4402

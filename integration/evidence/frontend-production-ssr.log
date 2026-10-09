@@ -1,0 +1,14 @@
+npm notice run doctorchart-frontend@0.0.0 test:ssr
+npm notice run node --test scripts/ssr-smoke.test.mjs
+▶ production server accepts its configured host and rejects foreign hosts
+  ✔ configured host serves the public shell including protected routes (9.5633ms)
+  ✔ a fabricated Host does not reach application rendering (1.9867ms)
+✔ production server accepts its configured host and rejects foreign hosts (262.8811ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 348.0452

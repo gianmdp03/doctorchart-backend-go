@@ -1,0 +1,20 @@
+{
+  "scope": "Earlier real Chrome setup run, synthetic persisted records; retained separately from final repeated smoke",
+  "cases": [
+    {
+      "name": "Angular onboarding persists through real Gateway and Go",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Patient creation with Argentine leap-day date",
+      "status": "PASS",
+      "detail": "29/02/2020"
+    },
+    {
+      "name": "Clinical encounter created from Angular",
+      "status": "PASS",
+      "detail": ""
+    }
+  ]
+}

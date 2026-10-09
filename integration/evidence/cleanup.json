@@ -1,0 +1,9 @@
+{
+  "owned_backend_stopped": true,
+  "owned_gateway_removed": true,
+  "owned_listening_ports_remaining": [],
+  "synthetic_postgres_retained": true,
+  "integration_runner_exit_code": 0,
+  "production_actions": [],
+  "checked_at": "2026-10-09T12:00:24.2633031Z"
+}

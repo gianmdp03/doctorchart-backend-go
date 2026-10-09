@@ -1,0 +1,95 @@
+{
+  "scope": "Installed Chrome, isolated profile, certificate pinned to owned TLS fixture, actual Angular/Gateway/Go; synthetic data only",
+  "cases": [
+    {
+      "name": "Growth chart renders persisted anthropometry",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Authenticated clinical PDF forbids HTTP cache storage",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Authenticated PDF opens in an isolated preview",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Angular uploads the entire original medical image",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Browser study download is byte-for-byte original",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Chrome applies original EXIF orientation",
+      "status": "PASS",
+      "detail": "[1000,3000]"
+    },
+    {
+      "name": "Study preview has no opener",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Angular study deletion completes",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Angular patient edit preserves date and persisted records",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "History survives patient update",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Actual Supabase SDK refresh rotates bearer and retains owner",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Real browser invalid login stays unauthenticated",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Browser session opens its persisted medical record",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Protected patient deep link survives browser reload",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Signout removes medical record from rendered UI",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Account change cannot reuse previous patient directory",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Foreign medical record is never displayed",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Expired entitlement redirects to configured plans URL",
+      "status": "PASS",
+      "detail": "Plans UI is simulated; external Billing UI not exercised"
+    }
+  ]
+}
