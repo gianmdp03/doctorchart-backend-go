@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -19,6 +20,38 @@ type Evaluation struct {
 type formField struct {
 	data    map[string]any
 	enabled bool
+}
+
+var emailInput = regexp.MustCompile(`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
+var dniInput = regexp.MustCompile(`^[0-9]{6,8}$`)
+var phoneInput = regexp.MustCompile(`^[+0-9\s().-]+$`)
+
+func personalTextError(key, value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	switch key {
+	case "sys_email", "email", "patient.email":
+		if !emailInput.MatchString(value) {
+			return "INVALID_EMAIL"
+		}
+	case "sys_dni", "nationalId", "patient.nationalId", "patient.guardianInfo.firstGuardianNationalId", "patient.guardianInfo.secondGuardianNationalId":
+		if !dniInput.MatchString(value) {
+			return "INVALID_DNI"
+		}
+	case "sys_phone", "phone", "patient.phone", "primaryContactPhone", "patient.guardianInfo.primaryContactPhone":
+		digits := 0
+		for _, char := range value {
+			if char >= '0' && char <= '9' {
+				digits++
+			}
+		}
+		if !phoneInput.MatchString(value) || digits < 6 || digits > 15 {
+			return "INVALID_PHONE"
+		}
+	}
+	return ""
 }
 
 func valuePath(key string) string {
@@ -147,6 +180,11 @@ func (v *Validator) Evaluate(form, values, context map[string]any) (Evaluation, 
 		if shown && flag(field["required"]) {
 			if value, ok := value.(string); ok && strings.TrimSpace(value) == "" {
 				issue(key, "REQUIRED")
+			}
+		}
+		if value, ok := value.(string); ok && (kind == "TEXT" || kind == "TEXTAREA") {
+			if code := personalTextError(key, value); code != "" {
+				issue(key, code)
 			}
 		}
 		if n, ok := number(value); ok {

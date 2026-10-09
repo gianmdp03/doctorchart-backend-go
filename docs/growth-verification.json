@@ -1,0 +1,394 @@
+{
+  "verifiedAt": "2026-10-09T23:44:03.430462+00:00",
+  "toolchain": "go1.27.2 windows/amd64",
+  "pdfSha256": "1be49d4953656433c05ebe444b27adefec4c31283743451cdff80d6dbd7dc114",
+  "originalWorkbooks": 36,
+  "datasets": 18,
+  "independentOfficialCentileRows": 96,
+  "independentCentileComparisons": 480,
+  "toleranceAbsoluteUnits": 0.0011,
+  "backendQualityGates": {
+    "Go toolchain exact version": "PASS",
+    "Go formatting": "PASS",
+    "Go build": "PASS",
+    "Go vet": "PASS",
+    "Go tests": "PASS",
+    "Go race tests": "PASS",
+    "Go vulnerability scan": "PASS"
+  },
+  "postgresHTTPIntegration": "PASS - local disposable PostgreSQL 17.11, TestGrowthHTTPPostgres, fresh run",
+  "frontend": {
+    "files": 58,
+    "tests": 558,
+    "status": "PASS",
+    "excluded": "Only preserved disabled medical-calculators module",
+    "productionBuild": "PASS with initial bundle budget warning",
+    "publicConfigurationTests": 3,
+    "productionHostTests": 3
+  },
+  "visual": {
+    "generated": "2026-10-09T23:36:50.180Z",
+    "desktop": 20,
+    "mobile": 3,
+    "checks": [
+      {
+        "chart": "wfa06_girls",
+        "paths": 5,
+        "invalid": false,
+        "horizontalOverflow": false,
+        "colors": [
+          "#dc2626",
+          "#ea580c",
+          "#16a34a",
+          "#ea580c",
+          "#dc2626"
+        ],
+        "clipping": true,
+        "clippedLabels": false
+      },
+      {
+        "chart": "wfa06_boys",
+        "paths": 5,
+        "invalid": false,
+        "horizontalOverflow": false,
+        "colors": [
+          "#dc2626",
+          "#ea580c",
+          "#16a34a",
+          "#ea580c",
+          "#dc2626"
+        ],
+        "clipping": true,
+        "clippedLabels": false
+      },
+      {
+        "chart": "lfa06_girls",
+        "paths": 5,
+        "invalid": false,
+        "horizontalOverflow": false,
+        "colors": [
+          "#dc2626",
+          "#ea580c",
+          "#16a34a",
+          "#ea580c",
+          "#dc2626"
+        ],
+        "clipping": true,
+        "clippedLabels": false
+      },
+      {
+        "chart": "lfa06_boys",
+        "paths": 5,
+        "invalid": false,
+        "horizontalOverflow": false,
+        "colors": [
+          "#dc2626",
+          "#ea580c",
+          "#16a34a",
+          "#ea580c",
+          "#dc2626"
+        ],
+        "clipping": true,
+        "clippedLabels": false
+      },
+      {
+        "chart": "hfa06_girls",
+        "paths": 5,
+        "invalid": false,
+        "horizontalOverflow": false,
+        "colors": [
+          "#dc2626",
+          "#ea580c",
+          "#16a34a",
+          "#ea580c",
+          "#dc2626"
+        ],
+        "clipping": true,
+        "clippedLabels": false
+      },
+      {
+        "chart": "hfa06_boys",
+        "paths": 5,
+        "invalid": false,
+        "horizontalOverflow": false,
+        "colors": [
+          "#dc2626",
+          "#ea580c",
+          "#16a34a",
+          "#ea580c",
+          "#dc2626"
+        ],
+        "clipping": true,
+        "clippedLabels": false
+      },
+      {
+        "chart": "hcfa06_boys",
+        "paths": 5,
+        "invalid": false,
+        "horizontalOverflow": false,
+        "colors": [
+          "#dc2626",
+          "#ea580c",
+          "#16a34a",
+          "#ea580c",
+          "#dc2626"
+        ],
+        "clipping": true,
+        "clippedLabels": false
+      },
+      {
+        "chart": "hcfa06_girls",
+        "paths": 5,
+        "invalid": false,
+        "horizontalOverflow": false,
+        "colors": [
+          "#dc2626",
+          "#ea580c",
+          "#16a34a",
+          "#ea580c",
+          "#dc2626"
+        ],
+        "clipping": true,
+        "clippedLabels": false
+      },
+      {
+        "chart": "wfa07_girls",
+        "paths": 5,
+        "invalid": false,
+        "horizontalOverflow": false,
+        "colors": [
+          "#dc2626",
+          "#ea580c",
+          "#16a34a",
+          "#ea580c",
+          "#dc2626"
+        ],
+        "clipping": true,
+        "clippedLabels": false
+      },
+      {
+        "chart": "wfa07_boys",
+        "paths": 5,
+        "invalid": false,
+        "horizontalOverflow": false,
+        "colors": [
+          "#dc2626",
+          "#ea580c",
+          "#16a34a",
+          "#ea580c",
+          "#dc2626"
+        ],
+        "clipping": true,
+        "clippedLabels": false
+      },
+      {
+        "chart": "hfa07_girls",
+        "paths": 5,
+        "invalid": false,
+        "horizontalOverflow": false,
+        "colors": [
+          "#dc2626",
+          "#ea580c",
+          "#16a34a",
+          "#ea580c",
+          "#dc2626"
+        ],
+        "clipping": true,
+        "clippedLabels": false
+      },
+      {
+        "chart": "hfa07_boys",
+        "paths": 5,
+        "invalid": false,
+        "horizontalOverflow": false,
+        "colors": [
+          "#dc2626",
+          "#ea580c",
+          "#16a34a",
+          "#ea580c",
+          "#dc2626"
+        ],
+        "clipping": true,
+        "clippedLabels": false
+      },
+      {
+        "chart": "wfl06_girls",
+        "paths": 5,
+        "invalid": false,
+        "horizontalOverflow": false,
+        "colors": [
+          "#dc2626",
+          "#ea580c",
+          "#16a34a",
+          "#ea580c",
+          "#dc2626"
+        ],
+        "clipping": true,
+        "clippedLabels": false
+      },
+      {
+        "chart": "wfl06_boys",
+        "paths": 5,
+        "invalid": false,
+        "horizontalOverflow": false,
+        "colors": [
+          "#dc2626",
+          "#ea580c",
+          "#16a34a",
+          "#ea580c",
+          "#dc2626"
+        ],
+        "clipping": true,
+        "clippedLabels": false
+      },
+      {
+        "chart": "wfh06_girls",
+        "paths": 5,
+        "invalid": false,
+        "horizontalOverflow": false,
+        "colors": [
+          "#dc2626",
+          "#ea580c",
+          "#16a34a",
+          "#ea580c",
+          "#dc2626"
+        ],
+        "clipping": true,
+        "clippedLabels": false
+      },
+      {
+        "chart": "wfh06_boys",
+        "paths": 5,
+        "invalid": false,
+        "horizontalOverflow": false,
+        "colors": [
+          "#dc2626",
+          "#ea580c",
+          "#16a34a",
+          "#ea580c",
+          "#dc2626"
+        ],
+        "clipping": true,
+        "clippedLabels": false
+      },
+      {
+        "chart": "bfa06_girls",
+        "paths": 5,
+        "invalid": false,
+        "horizontalOverflow": false,
+        "colors": [
+          "#dc2626",
+          "#ea580c",
+          "#16a34a",
+          "#ea580c",
+          "#dc2626"
+        ],
+        "clipping": true,
+        "clippedLabels": false
+      },
+      {
+        "chart": "bfa06_boys",
+        "paths": 5,
+        "invalid": false,
+        "horizontalOverflow": false,
+        "colors": [
+          "#dc2626",
+          "#ea580c",
+          "#16a34a",
+          "#ea580c",
+          "#dc2626"
+        ],
+        "clipping": true,
+        "clippedLabels": false
+      },
+      {
+        "chart": "bfa07_girls",
+        "paths": 5,
+        "invalid": false,
+        "horizontalOverflow": false,
+        "colors": [
+          "#dc2626",
+          "#ea580c",
+          "#16a34a",
+          "#ea580c",
+          "#dc2626"
+        ],
+        "clipping": true,
+        "clippedLabels": false
+      },
+      {
+        "chart": "bfa07_boys",
+        "paths": 5,
+        "invalid": false,
+        "horizontalOverflow": false,
+        "colors": [
+          "#dc2626",
+          "#ea580c",
+          "#16a34a",
+          "#ea580c",
+          "#dc2626"
+        ],
+        "clipping": true,
+        "clippedLabels": false
+      },
+      {
+        "chart": "wfa06_girls",
+        "mobile": {
+          "viewport": 390,
+          "document": 390,
+          "plotScrollable": true
+        }
+      },
+      {
+        "chart": "hfa07_boys",
+        "mobile": {
+          "viewport": 390,
+          "document": 390,
+          "plotScrollable": true
+        }
+      },
+      {
+        "chart": "wfl06_boys",
+        "mobile": {
+          "viewport": 390,
+          "document": 390,
+          "plotScrollable": true
+        }
+      }
+    ]
+  },
+  "manuallyReviewedPDFCharts": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20
+  ],
+  "limitations": [
+    "Clinical review pending before care use",
+    "No corrected-age policy",
+    "Historical position must be confirmed when undocumented",
+    "PDF omits female BMI 2-5 years; catalogue remains exactly 20",
+    "21 npm dependency advisories reported; no general dependency upgrade performed",
+    "govulncheck indirect unimported openpgp module advisory GO-2026-5932",
+    "External JWT gateway deployment not exercised"
+  ],
+  "clinicalDataModified": false,
+  "deploymentPerformed": false,
+  "testPostgresStopped": true
+}

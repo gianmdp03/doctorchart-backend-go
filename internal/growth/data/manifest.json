@@ -1,0 +1,416 @@
+{
+  "wfa06_girls": {
+    "lms": {
+      "url": "https://cdn.who.int/media/docs/default-source/child-growth/child-growth-standards/indicators/weight-for-age/expanded-tables/wfa-girls-zscore-expanded-tables.xlsx",
+      "sha256": "ee3ae12cb96c6c5541cdf43665c03ce6c984f877859a183a5f6104eb06a49a6e",
+      "file": "originals/wfa06_girls_lms.xlsx",
+      "sheet": "WFA_girls_z_exp",
+      "coordinate": "Day",
+      "rows": 1857,
+      "version": "WHO 2006",
+      "retrieved": "2026-10-09"
+    },
+    "percentiles": {
+      "url": "https://cdn.who.int/media/docs/default-source/child-growth/child-growth-standards/indicators/weight-for-age/expanded-tables/wfa-girls-percentiles-expanded-tables.xlsx",
+      "sha256": "5bdfd79de222d0f660c1662adc02995e879374f5b3260571a357a2ec771da629",
+      "file": "originals/wfa06_girls_percentiles.xlsx",
+      "sheet": "wfa_girls_p_exp",
+      "coordinate": "Age",
+      "rows": 1857,
+      "version": "WHO 2006",
+      "retrieved": "2026-10-09"
+    },
+    "normalizedSha256": "7a510800a93b80c467ddaf5b581157e35b4b68df3b86b386c07602cf80c7c3a1"
+  },
+  "wfa06_boys": {
+    "lms": {
+      "url": "https://cdn.who.int/media/docs/default-source/child-growth/child-growth-standards/indicators/weight-for-age/expanded-tables/wfa-boys-zscore-expanded-tables.xlsx",
+      "sha256": "b5b4748c6bfa5230e2eddafa1767629c349178b08d457f400b59422b8bfef86c",
+      "file": "originals/wfa06_boys_lms.xlsx",
+      "sheet": "WFA_boys_z_exp",
+      "coordinate": "Day",
+      "rows": 1857,
+      "version": "WHO 2006",
+      "retrieved": "2026-10-09"
+    },
+    "percentiles": {
+      "url": "https://cdn.who.int/media/docs/default-source/child-growth/child-growth-standards/indicators/weight-for-age/expanded-tables/wfa-boys-percentiles-expanded-tables.xlsx",
+      "sha256": "c4e251201c6cd352fbdd7797a7a298aff8c78b7525bd242fedec4494f3ccb095",
+      "file": "originals/wfa06_boys_percentiles.xlsx",
+      "sheet": "wfa_boys_p_exp",
+      "coordinate": "Age",
+      "rows": 1857,
+      "version": "WHO 2006",
+      "retrieved": "2026-10-09"
+    },
+    "normalizedSha256": "455726f9b2b61f2906f107ae15f4a95e13fd5fa24fa2f9ec601e0b0d9af904f0"
+  },
+  "lhfa06_girls": {
+    "lms": {
+      "url": "https://cdn.who.int/media/docs/default-source/child-growth/child-growth-standards/indicators/length-height-for-age/expandable-tables/lhfa-girls-zscore-expanded-tables.xlsx",
+      "sha256": "6aa2876319449a6b1f4d825848128902114ff53c67b92b86a0c5140846013059",
+      "file": "originals/lhfa06_girls_lms.xlsx",
+      "sheet": "LFA_girls_z_exp",
+      "coordinate": "Day",
+      "rows": 1857,
+      "version": "WHO 2006",
+      "retrieved": "2026-10-09"
+    },
+    "percentiles": {
+      "url": "https://cdn.who.int/media/docs/default-source/child-growth/child-growth-standards/indicators/length-height-for-age/expandable-tables/lhfa-girls-percentiles-expanded-tables.xlsx",
+      "sha256": "92b5b0306d87f32eeb1d0c68f32aceda55121ff9a2600af517ba2a5b8dc84851",
+      "file": "originals/lhfa06_girls_percentiles.xlsx",
+      "sheet": "lhfa_girls_p_exp",
+      "coordinate": "Day",
+      "rows": 1857,
+      "version": "WHO 2006",
+      "retrieved": "2026-10-09"
+    },
+    "normalizedSha256": "23c5ca692308ade32834b5944aae600cd7089e6e310bb254395ab813da01a29a"
+  },
+  "lhfa06_boys": {
+    "lms": {
+      "url": "https://cdn.who.int/media/docs/default-source/child-growth/child-growth-standards/indicators/length-height-for-age/expandable-tables/lhfa-boys-zscore-expanded-tables.xlsx",
+      "sha256": "c4b1c9029ab9751a5f0888e32f35c7c0287a16d361885cf911ecf23b3f7f6b4f",
+      "file": "originals/lhfa06_boys_lms.xlsx",
+      "sheet": "LFA_boys_z_exp",
+      "coordinate": "Day",
+      "rows": 1857,
+      "version": "WHO 2006",
+      "retrieved": "2026-10-09"
+    },
+    "percentiles": {
+      "url": "https://cdn.who.int/media/docs/default-source/child-growth/child-growth-standards/indicators/length-height-for-age/expandable-tables/lhfa-boys-percentiles-expanded-tables.xlsx",
+      "sha256": "8e163405223fcdf749f6689a8b8233d15182117c8a8b87f46c957fcfc498c7f2",
+      "file": "originals/lhfa06_boys_percentiles.xlsx",
+      "sheet": "lhfa_boys_p_exp",
+      "coordinate": "Day",
+      "rows": 1857,
+      "version": "WHO 2006",
+      "retrieved": "2026-10-09"
+    },
+    "normalizedSha256": "7ee37f39b209a9809c7826c851fc071015fe0c07be5e299f95e83d97190eeaef"
+  },
+  "hcfa06_girls": {
+    "lms": {
+      "url": "https://cdn.who.int/media/docs/default-source/child-growth/child-growth-standards/indicators/head-circumference-for-age/expanded-tables/hcfa-girls-zscore-expanded-tables.xlsx",
+      "sha256": "8eec3770d1027ce1b3b96a7b89fd1e77070558a7791b17b4462cda8a813324a3",
+      "file": "originals/hcfa06_girls_lms.xlsx",
+      "sheet": "HCFA_girls_z_exp",
+      "coordinate": "Day",
+      "rows": 1857,
+      "version": "WHO 2006",
+      "retrieved": "2026-10-09"
+    },
+    "percentiles": {
+      "url": "https://cdn.who.int/media/docs/default-source/child-growth/child-growth-standards/indicators/head-circumference-for-age/expanded-tables/hcfa-girls-percentiles-expanded-tables.xlsx",
+      "sha256": "3e097ab1c73c9b376faea2bde2f10de761efbde486c9d6092a8ef63d21f2a5ff",
+      "file": "originals/hcfa06_girls_percentiles.xlsx",
+      "sheet": "hcfa_girls_p_exp",
+      "coordinate": "Age",
+      "rows": 1857,
+      "version": "WHO 2006",
+      "retrieved": "2026-10-09"
+    },
+    "normalizedSha256": "0f2c653776816e14309e6d32a092353fc174eb31f0270037948b8978e895c997"
+  },
+  "hcfa06_boys": {
+    "lms": {
+      "url": "https://cdn.who.int/media/docs/default-source/child-growth/child-growth-standards/indicators/head-circumference-for-age/expanded-tables/hcfa-boys-zscore-expanded-tables.xlsx",
+      "sha256": "89a657bc466e85f6c8f2e5e7f4635e969bdcf982bb71e519273e43896a1c3314",
+      "file": "originals/hcfa06_boys_lms.xlsx",
+      "sheet": "HCFA_boys_z_exp",
+      "coordinate": "Day",
+      "rows": 1857,
+      "version": "WHO 2006",
+      "retrieved": "2026-10-09"
+    },
+    "percentiles": {
+      "url": "https://cdn.who.int/media/docs/default-source/child-growth/child-growth-standards/indicators/head-circumference-for-age/expanded-tables/hcfa-boys-percentiles-expanded-tables.xlsx",
+      "sha256": "3e4d401a557841a93d56d552889d2778e4ad4e42585c8d768f5514aaf65979ff",
+      "file": "originals/hcfa06_boys_percentiles.xlsx",
+      "sheet": "hcfa_boys_p_exp",
+      "coordinate": "Age",
+      "rows": 1857,
+      "version": "WHO 2006",
+      "retrieved": "2026-10-09"
+    },
+    "normalizedSha256": "5f4f85905d0ef7922e48fdcfc75c88dc137440639986f06275afef45cd6935e1"
+  },
+  "bfa06_girls": {
+    "lms": {
+      "url": "https://cdn.who.int/media/docs/default-source/child-growth/child-growth-standards/indicators/body-mass-index-for-age/expanded-tables/bfa-girls-zscore-expanded-tables.xlsx",
+      "sha256": "d3817262a383cdd02553b004f1c6110527d30b729c70501d032e71caadc17529",
+      "file": "originals/bfa06_girls_lms.xlsx",
+      "sheet": "BFA_girls_z_exp",
+      "coordinate": "Day",
+      "rows": 1857,
+      "version": "WHO 2006",
+      "retrieved": "2026-10-09"
+    },
+    "percentiles": {
+      "url": "https://cdn.who.int/media/docs/default-source/child-growth/child-growth-standards/indicators/body-mass-index-for-age/expanded-tables/bfa-girls-percentiles-expanded-tables.xlsx",
+      "sha256": "b89cfc51dd733f48e63d56d9f66016ccfed7156774b23c745f0f25e909c75e47",
+      "file": "originals/bfa06_girls_percentiles.xlsx",
+      "sheet": "bfa_girls_p_exp",
+      "coordinate": "Age",
+      "rows": 1857,
+      "version": "WHO 2006",
+      "retrieved": "2026-10-09"
+    },
+    "normalizedSha256": "3dfe50ad42a4613506756aa122df857eaa94c596377c235a1078f97fe12a689a"
+  },
+  "bfa06_boys": {
+    "lms": {
+      "url": "https://cdn.who.int/media/docs/default-source/child-growth/child-growth-standards/indicators/body-mass-index-for-age/expanded-tables/bfa-boys-zscore-expanded-tables.xlsx",
+      "sha256": "58dcb2abea0e04b1c4f8ad3511d05ec1bea03741f230ac127b93f929e4cc6fc8",
+      "file": "originals/bfa06_boys_lms.xlsx",
+      "sheet": "BFA_boys_z_exp",
+      "coordinate": "Day",
+      "rows": 1857,
+      "version": "WHO 2006",
+      "retrieved": "2026-10-09"
+    },
+    "percentiles": {
+      "url": "https://cdn.who.int/media/docs/default-source/child-growth/child-growth-standards/indicators/body-mass-index-for-age/expanded-tables/bfa-boys-percentiles-expanded-tables.xlsx",
+      "sha256": "b4b0fdf7d8613e6035a91910e5f554a28276d415ab066c8d49da1521a5cb38a3",
+      "file": "originals/bfa06_boys_percentiles.xlsx",
+      "sheet": "bfa_boys_p_exp",
+      "coordinate": "Age",
+      "rows": 1857,
+      "version": "WHO 2006",
+      "retrieved": "2026-10-09"
+    },
+    "normalizedSha256": "94bc39b82da4a797b65f3053a2179bca956b7c352f6863b8ae3d450aba4de779"
+  },
+  "wfl06_girls": {
+    "lms": {
+      "url": "https://cdn.who.int/media/docs/default-source/child-growth/child-growth-standards/indicators/weight-for-length-height/expanded-tables/wfl-girls-zscore-expanded-table.xlsx",
+      "sha256": "ec116b8e618ad311d34a87231346badf16c75f5c4f82222ec846e05c582bf16a",
+      "file": "originals/wfl06_girls_lms.xlsx",
+      "sheet": "WFL_girls_z_exp",
+      "coordinate": "Length",
+      "rows": 651,
+      "version": "WHO 2006",
+      "retrieved": "2026-10-09"
+    },
+    "percentiles": {
+      "url": "https://cdn.who.int/media/docs/default-source/child-growth/child-growth-standards/indicators/weight-for-length-height/expanded-tables/wfl-girls-percentiles-expanded-tables.xlsx",
+      "sha256": "2fb6f867050854db19c06a1b0131e07ac02b904d1367ec0a444b1360f6335035",
+      "file": "originals/wfl06_girls_percentiles.xlsx",
+      "sheet": "wfl_girls_p_exp",
+      "coordinate": "Length",
+      "rows": 651,
+      "version": "WHO 2006",
+      "retrieved": "2026-10-09"
+    },
+    "normalizedSha256": "d0adf5a6e0f423b2907e6a89c11489068d589d14767fd9d894ce369bd609450f"
+  },
+  "wfl06_boys": {
+    "lms": {
+      "url": "https://cdn.who.int/media/docs/default-source/child-growth/child-growth-standards/indicators/weight-for-length-height/expanded-tables/wfl-boys-zscore-expanded-table.xlsx",
+      "sha256": "1a6e9a002d2692d038161bc6572a10f8b9fa0657163808141d2981a2132c59cc",
+      "file": "originals/wfl06_boys_lms.xlsx",
+      "sheet": "WFL_boys_z_exp",
+      "coordinate": "Length",
+      "rows": 651,
+      "version": "WHO 2006",
+      "retrieved": "2026-10-09"
+    },
+    "percentiles": {
+      "url": "https://cdn.who.int/media/docs/default-source/child-growth/child-growth-standards/indicators/weight-for-length-height/expanded-tables/wfl-boys-percentiles-expanded-tables.xlsx",
+      "sha256": "388fe58e33ab9a27459ac3cac2b892bc9b2b61fe8d53e9c9b4d9191f9422aa8c",
+      "file": "originals/wfl06_boys_percentiles.xlsx",
+      "sheet": "wfl_boys_p_exp",
+      "coordinate": "Length",
+      "rows": 651,
+      "version": "WHO 2006",
+      "retrieved": "2026-10-09"
+    },
+    "normalizedSha256": "2ed5b5d19e9d567dc64be20f9253d36cc1e4743f5238d81334f77c90b82ce37b"
+  },
+  "wfh06_girls": {
+    "lms": {
+      "url": "https://cdn.who.int/media/docs/default-source/child-growth/child-growth-standards/indicators/weight-for-length-height/expanded-tables/wfh-girls-zscore-expanded-tables.xlsx",
+      "sha256": "fca340d5f04aa1556ac410b176b65b290e1b9ff467fc854a97f9b54ad94c9b8a",
+      "file": "originals/wfh06_girls_lms.xlsx",
+      "sheet": "WFH_girls_z_exp",
+      "coordinate": "Height",
+      "rows": 551,
+      "version": "WHO 2006",
+      "retrieved": "2026-10-09"
+    },
+    "percentiles": {
+      "url": "https://cdn.who.int/media/docs/default-source/child-growth/child-growth-standards/indicators/weight-for-length-height/expanded-tables/wfh-girls-percentiles-expanded-tables.xlsx",
+      "sha256": "27803da855d1fcb560708958b7aabb3fd5eb72ce0a5e3b47aab43e28e7f4a5b4",
+      "file": "originals/wfh06_girls_percentiles.xlsx",
+      "sheet": "wfh_girls_p_exp",
+      "coordinate": "Height",
+      "rows": 551,
+      "version": "WHO 2006",
+      "retrieved": "2026-10-09"
+    },
+    "normalizedSha256": "a6c41d1f61fd6e65b7d86f0fb4945825d915f90d3946091ce303a8cb78936d4e"
+  },
+  "wfh06_boys": {
+    "lms": {
+      "url": "https://cdn.who.int/media/docs/default-source/child-growth/child-growth-standards/indicators/weight-for-length-height/expanded-tables/wfh-boys-zscore-expanded-tables.xlsx",
+      "sha256": "ed3b590f9c65937a138408b13618f33684bb6406a0c56d6a2ce3fd9053a3f59f",
+      "file": "originals/wfh06_boys_lms.xlsx",
+      "sheet": "WFH_boys_z_exp",
+      "coordinate": "Height",
+      "rows": 551,
+      "version": "WHO 2006",
+      "retrieved": "2026-10-09"
+    },
+    "percentiles": {
+      "url": "https://cdn.who.int/media/docs/default-source/child-growth/child-growth-standards/indicators/weight-for-length-height/expanded-tables/wfh-boys-percentiles-expanded-tables.xlsx",
+      "sha256": "ac6d18ef3790e242aff64b42e66337942219188998c9dc5207588ff035a39e8a",
+      "file": "originals/wfh06_boys_percentiles.xlsx",
+      "sheet": "wfh_boys_p_exp",
+      "coordinate": "Height",
+      "rows": 551,
+      "version": "WHO 2006",
+      "retrieved": "2026-10-09"
+    },
+    "normalizedSha256": "18bf90ecee0e368ea4bfe887473ff62e586dbc42428c94975eee17cd69b7f110"
+  },
+  "hfa07_girls": {
+    "lms": {
+      "url": "https://cdn.who.int/media/docs/default-source/child-growth/growth-reference-5-19-years/height-for-age-%285-19-years%29/hfa-girls-z-who-2007-exp.xlsx",
+      "sha256": "df07ee16d3d2916569f1d869b7c874d7b880a41321d871215ed0254cb16679b3",
+      "file": "originals/hfa07_girls_lms.xlsx",
+      "sheet": "hfa_girls_z_WHO 2007_exp",
+      "coordinate": "Month",
+      "rows": 168,
+      "version": "WHO 2007",
+      "retrieved": "2026-10-09"
+    },
+    "percentiles": {
+      "url": "https://cdn.who.int/media/docs/default-source/child-growth/growth-reference-5-19-years/height-for-age-%285-19-years%29/hfa-girls-perc-who2007-exp.xlsx",
+      "sha256": "0f04c643731981f92f0069475bbcc39451fc5ce937b5de2c8da6fa20bf5dff3c",
+      "file": "originals/hfa07_girls_percentiles.xlsx",
+      "sheet": "hfa_girls_perc_WHO2007_exp",
+      "coordinate": "Month",
+      "rows": 168,
+      "version": "WHO 2007",
+      "retrieved": "2026-10-09"
+    },
+    "normalizedSha256": "ca4a70cb3a64fb8782c2078f2488204aba7eb4c91ee14bb5b5920693f805ad87"
+  },
+  "hfa07_boys": {
+    "lms": {
+      "url": "https://cdn.who.int/media/docs/default-source/child-growth/growth-reference-5-19-years/height-for-age-%285-19-years%29/hfa-boys-z-who-2007-exp.xlsx",
+      "sha256": "d78fa8cafcab77dcb5f03d71506d92bdcb28f89c642816b6bb0eef466b007466",
+      "file": "originals/hfa07_boys_lms.xlsx",
+      "sheet": "hfa_boys_z_WHO 2007_exp",
+      "coordinate": "Month",
+      "rows": 168,
+      "version": "WHO 2007",
+      "retrieved": "2026-10-09"
+    },
+    "percentiles": {
+      "url": "https://cdn.who.int/media/docs/default-source/child-growth/growth-reference-5-19-years/height-for-age-%285-19-years%29/hfa-boys-perc-who2007-exp.xlsx",
+      "sha256": "9aaf9f08039f84c64d1a1c95b94286cbe0e87e43409fcd009e5fe0cc67ac66ea",
+      "file": "originals/hfa07_boys_percentiles.xlsx",
+      "sheet": "hfa_boys_perc_WHO2007_exp",
+      "coordinate": "Month",
+      "rows": 168,
+      "version": "WHO 2007",
+      "retrieved": "2026-10-09"
+    },
+    "normalizedSha256": "a9091e26a2f49e5787ee6e4b04de9c145185aaf9218887ad7e4e9cedb3f02880"
+  },
+  "bfa07_girls": {
+    "lms": {
+      "url": "https://cdn.who.int/media/docs/default-source/child-growth/growth-reference-5-19-years/bmi-for-age-%285-19-years%29/bmi-girls-z-who-2007-exp.xlsx",
+      "sha256": "66f5c6284b44579ad6135fc639f22c09e36fe5a695b04390377113f6a00deb72",
+      "file": "originals/bfa07_girls_lms.xlsx",
+      "sheet": "bmi_girls_z_WHO 2007_exp",
+      "coordinate": "Month",
+      "rows": 168,
+      "version": "WHO 2007",
+      "retrieved": "2026-10-09"
+    },
+    "percentiles": {
+      "url": "https://cdn.who.int/media/docs/default-source/child-growth/growth-reference-5-19-years/bmi-for-age-%285-19-years%29/bmi-girls-perc-who2007-exp.xlsx",
+      "sha256": "b45ad98d39f2a2723152ad3d80bf7c4735264513574dea6340209b07172e0b27",
+      "file": "originals/bfa07_girls_percentiles.xlsx",
+      "sheet": "bmi_girls_perc_WHO2007_exp",
+      "coordinate": "Month",
+      "rows": 168,
+      "version": "WHO 2007",
+      "retrieved": "2026-10-09"
+    },
+    "normalizedSha256": "c76158424224a2fabb004725d8f21948e2c79a31502819212f4c992bdb1cf40c"
+  },
+  "bfa07_boys": {
+    "lms": {
+      "url": "https://cdn.who.int/media/docs/default-source/child-growth/growth-reference-5-19-years/bmi-for-age-%285-19-years%29/bmi-boys-z-who-2007-exp.xlsx",
+      "sha256": "0a60849673f34a06b8e2fe4defe5d00348de687b6c9fce0278f1525fff89eb6d",
+      "file": "originals/bfa07_boys_lms.xlsx",
+      "sheet": "bmi_boys_z_WHO 2007_exp",
+      "coordinate": "Month",
+      "rows": 168,
+      "version": "WHO 2007",
+      "retrieved": "2026-10-09"
+    },
+    "percentiles": {
+      "url": "https://cdn.who.int/media/docs/default-source/child-growth/growth-reference-5-19-years/bmi-for-age-%285-19-years%29/bmi-boys-perc-who2007-exp.xlsx",
+      "sha256": "e5dc43f1e6b245f83dfa5e19d1a2023e15bee757004269e9d0bc17fbc512d533",
+      "file": "originals/bfa07_boys_percentiles.xlsx",
+      "sheet": "bmi_boys_perc_WHO2007_exp",
+      "coordinate": "Month",
+      "rows": 168,
+      "version": "WHO 2007",
+      "retrieved": "2026-10-09"
+    },
+    "normalizedSha256": "064b0d4aa98e6c4df6c5897d40997306da9d4a3b576870e1f524f610ef969575"
+  },
+  "wfa07_girls": {
+    "lms": {
+      "url": "https://cdn.who.int/media/docs/default-source/child-growth/growth-reference-5-19-years/weight-for-age-%285-10-years%29/hfa-girls-z-who-2007-exp_7ea58763-36a2-436d-bef0-7fcfbadd2820.xlsx",
+      "sha256": "d747e068fcef4238cbaf1c201dd7788f266d9903685f4495360614eed0153562",
+      "file": "originals/wfa07_girls_lms.xlsx",
+      "sheet": "wfa_girls_z_WHO 2007_exp",
+      "coordinate": "Month",
+      "rows": 60,
+      "version": "WHO 2007",
+      "retrieved": "2026-10-09"
+    },
+    "percentiles": {
+      "url": "https://cdn.who.int/media/docs/default-source/child-growth/growth-reference-5-19-years/weight-for-age-%285-10-years%29/hfa-girls-perc-who2007-exp_6040a43e-81da-48fa-a2d4-5c856fe4fe71.xlsx",
+      "sha256": "3a2c217d6220f53d55c366f7661ab07f6f241e0653849f04165ba45f342bea0b",
+      "file": "originals/wfa07_girls_percentiles.xlsx",
+      "sheet": "wfa_girls_perc_WHO2007_exp",
+      "coordinate": "Month",
+      "rows": 60,
+      "version": "WHO 2007",
+      "retrieved": "2026-10-09"
+    },
+    "normalizedSha256": "0849050553043fc3e76a086e3dd91fc3c89539452524e6774f1006e3945ac165"
+  },
+  "wfa07_boys": {
+    "lms": {
+      "url": "https://cdn.who.int/media/docs/default-source/child-growth/growth-reference-5-19-years/weight-for-age-%285-10-years%29/hfa-boys-z-who-2007-exp_0ff9c43c-8cc0-4c23-9fc6-81290675e08b.xlsx",
+      "sha256": "a6ed0d9f3cfa209747afe49f7503b7cc24a1be6b6a8e7222e85a36b7850cb99f",
+      "file": "originals/wfa07_boys_lms.xlsx",
+      "sheet": "wfa_boys_z_WHO 2007_exp",
+      "coordinate": "Month",
+      "rows": 60,
+      "version": "WHO 2007",
+      "retrieved": "2026-10-09"
+    },
+    "percentiles": {
+      "url": "https://cdn.who.int/media/docs/default-source/child-growth/growth-reference-5-19-years/weight-for-age-%285-10-years%29/hfa-boys-perc-who2007-exp_07eb5053-9a09-4910-aa6b-c7fb28012ce6.xlsx",
+      "sha256": "33ebb6e89e64599d093fc78091941047881793a0baed79ce3528749588ad397b",
+      "file": "originals/wfa07_boys_percentiles.xlsx",
+      "sheet": "wfa_boys_perc_WHO2007_exp",
+      "coordinate": "Month",
+      "rows": 60,
+      "version": "WHO 2007",
+      "retrieved": "2026-10-09"
+    },
+    "normalizedSha256": "03e6162bcf8fbe2d88787fe962391287c9995869cd9a1543acf52eb1adc1fa84"
+  }
+}

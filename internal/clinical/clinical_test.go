@@ -3,6 +3,7 @@ package clinical
 import (
 	"encoding/json"
 	"github.com/syntah/doctorchart-backend-go/internal/api"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
@@ -103,35 +104,39 @@ func TestInstantJSONPrecision(t *testing.T) {
 		}
 	}
 }
-func TestWHODayIndexAndRounding(t *testing.T) {
-	tables, err := loadWHO()
-	if err != nil {
-		t.Fatal(err)
+func TestGrowthReferenceRequiresCanonicalSexOrConfirmation(t *testing.T) {
+	male := "MALE"
+	p := Patient{Gender: &male}
+	sex, source, err := growthReferenceSex(p, "")
+	if err != nil || sex != "" || source != "" {
+		t.Fatal("legacy gender was treated as anthropometric sex")
 	}
-	for _, metric := range []string{"wfa", "lhfa", "hcfa"} {
-		for _, sex := range []string{"MALE", "FEMALE", "UNKNOWN"} {
-			key := metric + "_male"
-			if sex == "FEMALE" {
-				key = metric + "_female"
-			}
-			table := tables[key]
-			value := table[0].m
-			evaluation := tables.evaluate(metric, sex, -10, &value)
-			if evaluation.Z != 0 || evaluation.Percentile != 50 {
-				t.Fatalf("median: %+v", evaluation)
-			}
-			value = table[len(table)-1].m
-			evaluation = tables.evaluate(metric, sex, 100000, &value)
-			if evaluation.Z != 0 || evaluation.Percentile != 50 {
-				t.Fatalf("clamped median: %+v", evaluation)
-			}
+	p.Values = json.RawMessage(`{"sys_sex":"MALE"}`)
+	sex, source, err = growthReferenceSex(p, "")
+	if err != nil || sex != "MALE" || source != "SYSTEM_SEX" {
+		t.Fatal(sex, source, err)
+	}
+	p.Values = json.RawMessage(`{"sys_sex":"UNKNOWN"}`)
+	sex, _, err = growthReferenceSex(p, "")
+	if err != nil || sex != "" {
+		t.Fatal("unknown sex assumed")
+	}
+	sex, source, err = growthReferenceSex(p, "FEMALE")
+	if err != nil || sex != "FEMALE" || source != "VIEW_CONFIRMATION" {
+		t.Fatal(sex, source, err)
+	}
+}
+func TestGrowthQueryRejectsInvalidReferencesAndModes(t *testing.T) {
+	for _, query := range []string{"referenceSex=OTHER", "referenceSex=female", "measurementModes=%7B%22BIRTH%22:%22UNKNOWN%22%7D", "measurementModes=%7B%22-1%22:%22STANDING%22%7D", "measurementModes=broken"} {
+		r := httptest.NewRequest("GET", "/patients/1/growth?"+query, nil)
+		if _, err := parseGrowthOptions(r); err == nil {
+			t.Fatal("accepted", query)
 		}
 	}
-	if tables.evaluations("FEMALE", 0, Measurements{}) != nil {
-		t.Fatal("empty measurements evaluated")
-	}
-	if javaRound(-1.5) != -1 || javaRound(1.5) != 2 {
-		t.Fatal("Java rounding semantics differ")
+	r := httptest.NewRequest("GET", "/patients/1/growth?referenceSex=FEMALE&measurementModes=%7B%22BIRTH%22:%22RECUMBENT%22,%227%22:%22STANDING%22%7D", nil)
+	options, err := parseGrowthOptions(r)
+	if err != nil || options.sex != "FEMALE" || options.modes["7"] != "STANDING" {
+		t.Fatal(options, err)
 	}
 }
 func TestExistingPatientHistoryMaterialization(t *testing.T) {

@@ -1,5 +1,7 @@
 # DoctorChart backend en Go
 
+El módulo de curvas pediátricas incorpora las 20 láminas del PDF con datos OMS, LMS y SVG en Angular. Su [documentación y verificación](docs/growth-charts.md) detalla catálogo, fuentes, endpoint, límites clínicos y pruebas reproducibles.
+
 Backend definitivo de DoctorChart: **75/75 endpoints y 7/7 procesos implementados; READY FOR STAGING dentro del alcance local verificado**. Angular, Gateway desde copia, Go y PostgreSQL se probaron juntos. Consultá el [informe actual](integration/REPORT.md), el [estado de integración](integration/STATE.md) y la [evidencia](integration/evidence/summary.json). La [migración Spring](migration/REPORT.md) y su [matriz](migration/CONTRACT_MATRIX.csv) son evidencia histórica; no se afirma igualdad binaria universal.
 
 El servidor usa `net/http`, dependencias explícitas, PostgreSQL mediante `pgx`, SQL parametrizado, transacciones y versiones optimistas. Conserva las rutas y la configuración original, inicializa catálogos vacíos y preserva los existentes. No ejecuta DDL automático ni requiere Java para funcionar.

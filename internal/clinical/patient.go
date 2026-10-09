@@ -17,6 +17,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/syntah/doctorchart-backend-go/internal/api"
 	"github.com/syntah/doctorchart-backend-go/internal/billing"
+	"github.com/syntah/doctorchart-backend-go/internal/growth"
 	"github.com/syntah/doctorchart-backend-go/internal/storage"
 	"github.com/syntah/doctorchart-backend-go/internal/wizard"
 	"github.com/syntah/doctorchart-backend-go/internal/workspace"
@@ -28,7 +29,7 @@ type Service struct {
 	forms       *wizard.Validator
 	rules       *billing.Rules
 	zone        *time.Location
-	growth      whoTables
+	growth      *growth.References
 	calculators map[string]calculatorMetadata
 	files       *storage.Store
 }
@@ -38,7 +39,7 @@ func New(pool *pgxpool.Pool, workspaces *workspace.Store, forms *wizard.Validato
 	if err != nil {
 		return nil, err
 	}
-	growth, err := loadWHO()
+	growth, err := growth.Load()
 	if err != nil {
 		return nil, err
 	}

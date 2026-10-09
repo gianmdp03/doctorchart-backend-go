@@ -1,0 +1,2 @@
+# gofmt requires LF; keep Windows checkouts compatible with the Go quality gate.
+*.go text eol=lf
