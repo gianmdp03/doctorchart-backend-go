@@ -1,12 +1,14 @@
 package growth
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"embed"
 	"encoding/csv"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"math"
 	"sort"
 	"strconv"
@@ -40,8 +42,12 @@ type ReferenceChart struct {
 }
 
 func Load() (*References, error) {
+	return loadReferences(files)
+}
+
+func loadReferences(source fs.FS) (*References, error) {
 	r := &References{tables: map[string][]LMS{}, provenance: map[string]json.RawMessage{}}
-	manifest, err := files.ReadFile("data/manifest.json")
+	manifest, err := fs.ReadFile(source, "data/manifest.json")
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +55,7 @@ func Load() (*References, error) {
 		return nil, err
 	}
 	for key := range r.provenance {
-		payload, err := files.ReadFile("data/" + key + ".csv")
+		payload, err := fs.ReadFile(source, "data/"+key+".csv")
 		if err != nil {
 			return nil, err
 		}
@@ -59,6 +65,9 @@ func Load() (*References, error) {
 		if err := json.Unmarshal(r.provenance[key], &meta); err != nil {
 			return nil, err
 		}
+		// Git may check out CSVs with CRLF on Windows. The importer hashes LF;
+		// normalize only line endings so changes to any data still fail integrity.
+		payload = bytes.ReplaceAll(payload, []byte("\r\n"), []byte("\n"))
 		sum := sha256.Sum256(payload)
 		if meta.NormalizedSHA256 != hex.EncodeToString(sum[:]) {
 			return nil, fmt.Errorf("WHO %s: normalized checksum mismatch", key)

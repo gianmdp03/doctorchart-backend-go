@@ -1,2 +1,4 @@
 # gofmt requires LF; keep Windows checkouts compatible with the Go quality gate.
 *.go text eol=lf
+# WHO normalized checksums use LF, including on Windows checkouts.
+internal/growth/data/*.csv text eol=lf
