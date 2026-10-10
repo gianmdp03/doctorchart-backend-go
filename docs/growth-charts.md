@@ -38,7 +38,9 @@ Se retiraron las antiguas constantes OMS del frontend y los seis CSV duplicados 
 
 ## 3. Inventario completo y ejes de impresión
 
-Los límites de Y incluyen el margen exterior de la cuadrícula del PDF: por ejemplo, algunas láminas empiezan debajo de su primera etiqueta. No son límites fisiológicos ni límites para aceptar una medición. X se expresa en meses para edad, y en centímetros para longitud/estatura. Todas las láminas tienen P3, P15, P50, P85 y P97, con rojo/naranja/verde/naranja/rojo; el paciente se representa en azul.
+Los límites de Y incluyen el margen exterior de la cuadrícula del PDF: por ejemplo, algunas láminas empiezan debajo de su primera etiqueta. No son límites fisiológicos ni límites para aceptar una medición. X se expresa en meses para edad, y en centímetros para longitud/estatura. Todas las láminas tienen P3, P15, P50, P85 y P97, con rojo/naranja/verde/naranja/rojo; las mediciones del paciente usan corazones rosas en la referencia femenina y estrellas azules en la masculina, con un marco de 9 × 9 unidades SVG. Las mediciones sin evaluación conservan el símbolo delineado.
+
+El IMC OMS 2006 que abarca ambas etapas identifica longitud (0–2 años) y estatura (2–5 años), señala la transición con una línea discontinua y atenúa la cuadrícula secundaria. Tanto las curvas de referencia como la trayectoria del paciente se separan en esa transición, sin cambiar los valores científicos. La verificación posterior de presentación pasó 560 pruebas de frontend y comprobó en Chromium las 20 referencias, tres vistas con mediciones de prueba y cuatro diseños móviles, incluyendo el IMC.
 
 | N.º | Página | Identificador | Indicador | Sexo | Edad del PDF | X | Y | Revisión visual |
 |---|---|---|---|---|---|---|---|---|
