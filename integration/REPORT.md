@@ -1,5 +1,7 @@
 # DoctorChart Angular + Go — cierre local y preparación de staging
 
+**Actualización de configuración (2026-10-09):** por solicitud posterior se reemplazó el soporte Java properties por `.env` y variables del proceso, con prioridad del proceso. Se copiaron los valores locales sin publicarlos; no se inició contra esa base. Se agregó `.env.example` y se retiró el parser anterior. La nueva verificación Go está en [evidence/dotenv](evidence/dotenv/); el resumen y los hashes originales de este informe describen la integración previa, no una repetición de Chrome después de este cambio de configuración. El resto del informe conserva el alcance de esa ejecución.
+
 **Estado: READY FOR STAGING para los artefactos locales de DoctorChart y la copia del Gateway identificada por hashes.** No significa que producción esté validada. Antes de usar otra revisión del Gateway hay que repetir las regresiones de su frontera de seguridad. No se desplegó ni se modificaron servicios, credenciales, bases o pacientes reales.
 
 Go queda como backend definitivo. Se continuó sobre la migración existente, sin rehacer auditoría/diseño ni repetir los 365 casos Spring↔Go. La evidencia histórica permanece en `migration/evidence`; la evidencia actual está en [evidence/summary.json](evidence/summary.json) y sus hashes en [evidence/artifact-manifest.json](evidence/artifact-manifest.json).
@@ -107,3 +109,10 @@ Nada de eso figura como PASS local. No se hicieron DNS, Cloudflare, despliegues,
 **READY FOR STAGING dentro del alcance indicado.** No quedan fallos de los controles locales finales ni operaciones pendientes de la migración funcional. La aceptación nueva permite diferencias inocuas de PDF y prioriza originales; el `NOT READY FOR EXACT DROP-IN` histórico no se utiliza como requisito de igualdad binaria actual.
 
 La guía de reproducción está en [README.md](../README.md) y en [la guía Angular](../../doctorchart-frontend/docs/angular-go-staging.md). Las fixtures y bases descartables quedan para revisión; los procesos propios están detenidos, sin puertos de integración abiertos, según [cleanup.json](evidence/cleanup.json). La [imagen local](evidence/docker-image.json) queda identificada para revisión. La evidencia original Spring no se reescribió ni se elevaron contratos a `VERIFIED` sin pruebas.
+# Cambio posterior de almacenamiento, 09/10/2026 (histórico)
+
+Por solicitud del usuario para ahorrar almacenamiento en Cloudflare R2, las cargas nuevas se optimizan antes de guardarse: máximo 2048 px y JPEG calidad 85 para imágenes opacas, PNG para transparencia; solo se reemplazan los bytes si el resultado es menor. Se aplica orientación EXIF de JPEG/WebP/TIFF. PDF, GIF, imágenes compactas y archivos existentes se conservan. Las evidencias anteriores de conservación byte a byte describen la ejecución anterior, no este cambio; no se volvió a ejecutar el harness de navegador ni se probó una cuenta R2 real para este cambio.
+
+## Sustitución por el conversor compartido, 09/10/2026
+
+La implementación local anterior se retiró por solicitud del usuario. DoctorChart ahora envía JPEG/PNG/WebP al conversor compartido con el perfil `doctorchart-study` seleccionado por el backend y una credencial independiente. Las reglas de procesamiento pertenecen al conversor; los archivos especiales tienen una política explícita de conservación. La autorización precede a la llamada y el registro se inserta después del guardado, con limpieza ante rollback. Pasaron las pruebas Go, build, vet, race en Linux y la prueba con API del conversor y PostgreSQL reales; almacenamiento S3/R2 mediante fixture de protocolo. Configuración, resultados y reproducción: [SHARED_IMAGE_CONVERTER.md](SHARED_IMAGE_CONVERTER.md). No se reejecutó el navegador ni se utilizó un bucket real.

@@ -41,6 +41,7 @@ func run() error {
 	poolConfig.MaxConnLifetime = 30 * time.Minute
 	poolConfig.MaxConnIdleTime = 10 * time.Minute
 	poolConfig.ConnConfig.RuntimeParams["timezone"] = "UTC"
+	poolConfig.ConnConfig.RuntimeParams["search_path"] = "public"
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {
 		return errors.New("create PostgreSQL pool failed")
@@ -50,6 +51,9 @@ func run() error {
 	defer cancel()
 	if err := pool.Ping(startup); err != nil {
 		return errors.New("PostgreSQL is unavailable")
+	}
+	if err := bootstrap.EnsureSchema(startup, pool); err != nil {
+		return err
 	}
 	rules := billing.New(c.BillingURL)
 	rules.Load(startup)
@@ -93,7 +97,7 @@ func run() error {
 			return err
 		}
 	case <-ctx.Done():
-		shutdown, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		shutdown, cancel := context.WithTimeout(context.Background(), 180*time.Second)
 		defer cancel()
 		return server.Shutdown(shutdown)
 	}

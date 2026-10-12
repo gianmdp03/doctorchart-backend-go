@@ -1,0 +1,34 @@
+go version go1.27.2 linux/amd64
+> gofmt -l on 42 source files
+> /usr/local/go/bin/go build ./...
+> /usr/local/go/bin/go vet ./...
+> /usr/local/go/bin/go test ./...
+?   	github.com/syntah/doctorchart-backend-go/cmd/api	[no test files]
+ok  	github.com/syntah/doctorchart-backend-go/internal/api	(cached)
+ok  	github.com/syntah/doctorchart-backend-go/internal/billing	(cached)
+?   	github.com/syntah/doctorchart-backend-go/internal/bootstrap	[no test files]
+ok  	github.com/syntah/doctorchart-backend-go/internal/clinical	(cached)
+ok  	github.com/syntah/doctorchart-backend-go/internal/config	0.014s
+ok  	github.com/syntah/doctorchart-backend-go/internal/storage	(cached)
+ok  	github.com/syntah/doctorchart-backend-go/internal/wizard	(cached)
+?   	github.com/syntah/doctorchart-backend-go/internal/workspace	[no test files]
+> /usr/local/go/bin/go test -race ./...
+?   	github.com/syntah/doctorchart-backend-go/cmd/api	[no test files]
+ok  	github.com/syntah/doctorchart-backend-go/internal/api	(cached)
+ok  	github.com/syntah/doctorchart-backend-go/internal/billing	(cached)
+?   	github.com/syntah/doctorchart-backend-go/internal/bootstrap	[no test files]
+ok  	github.com/syntah/doctorchart-backend-go/internal/clinical	(cached)
+ok  	github.com/syntah/doctorchart-backend-go/internal/config	1.028s
+ok  	github.com/syntah/doctorchart-backend-go/internal/storage	(cached)
+ok  	github.com/syntah/doctorchart-backend-go/internal/wizard	(cached)
+?   	github.com/syntah/doctorchart-backend-go/internal/workspace	[no test files]
+govulncheck unavailable (BLOCKED); not a security pass.
+
+=== QUALITY CHECK RESULTS ===
+PASS     Go toolchain exact version
+PASS     Go formatting
+PASS     Go build
+PASS     Go vet
+PASS     Go tests
+PASS     Go race tests
+BLOCKED  Go vulnerability scan

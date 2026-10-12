@@ -10,6 +10,7 @@ import (
 	"image/jpeg"
 	"image/png"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
@@ -21,7 +22,7 @@ func TestPrivateStudyRoundTripAndDeletion(t *testing.T) {
 	if err := os.Chmod(directory, 0700); err != nil {
 		t.Fatal(err)
 	}
-	store, err := New(Config{Directory: directory})
+	store, err := New(Config{Directory: directory, Converter: preservingConverter(t)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,12 +69,19 @@ func TestPrivateStudyRoundTripAndDeletion(t *testing.T) {
 		t.Fatal("path traversal accepted")
 	}
 }
-func TestStudyPreservesOriginalJPEGAndEXIF(t *testing.T) {
+func TestStudyStoresRemotelyProcessedJPEGAndMetadata(t *testing.T) {
 	directory := t.TempDir()
 	if err := os.Chmod(directory, 0700); err != nil {
 		t.Fatal(err)
 	}
-	store, err := New(Config{Directory: directory})
+	var processed bytes.Buffer
+	if err := jpeg.Encode(&processed, image.NewRGBA(image.Rect(0, 0, 682, 2048)), &jpeg.Options{Quality: 85}); err != nil {
+		t.Fatal(err)
+	}
+	converter := fixtureConverter(t, func(w http.ResponseWriter, r *http.Request, data []byte) {
+		writeConverted(w, processed.Bytes(), "image/jpeg", false)
+	})
+	store, err := New(Config{Directory: directory, Converter: converter})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,8 +104,12 @@ func TestStudyPreservesOriginalJPEGAndEXIF(t *testing.T) {
 	}
 	actual, err := io.ReadAll(file)
 	closeErr := file.Close()
-	if err != nil || closeErr != nil || !bytes.Equal(actual, original) || saved.Size != int64(len(original)) {
-		t.Fatal("Original JPEG/EXIF was altered")
+	if err != nil || closeErr != nil || len(actual) >= len(original) || saved.Size != int64(len(actual)) {
+		t.Fatal("JPEG was not compressed or stored size is incorrect")
+	}
+	config, format, err := image.DecodeConfig(bytes.NewReader(actual))
+	if err != nil || format != "jpeg" || config.Width != 682 || config.Height != 2048 || !bytes.Equal(actual, processed.Bytes()) {
+		t.Fatalf("orientation or dimensions incorrect: %+v %s %v", config, format, err)
 	}
 }
 

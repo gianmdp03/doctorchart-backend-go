@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -21,16 +22,22 @@ import (
 	"github.com/syntah/doctorchart-backend-go/internal/api"
 )
 
-const MaxBytes = 25 * 1024 * 1024
+// MaxBytes bounds original uploads: 10 MB in decimal units.
+const MaxBytes = 10_000_000
 
 var storageKey = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
 
-type Config struct{ Type, Directory, Endpoint, Bucket, AccessKey, SecretKey, Region string }
+type Config struct {
+	Type, Directory, Endpoint, Bucket, AccessKey, SecretKey, Region string
+	Converter                                                       ConverterConfig
+}
 type Store struct {
-	root   string
-	client *s3.Client
-	bucket string
-	slots  chan struct{}
+	root      string
+	client    *s3.Client
+	bucket    string
+	slots     chan struct{}
+	uploads   chan struct{}
+	converter *studyConverter
 }
 type File struct {
 	Key, Name, ContentType string
@@ -49,10 +56,15 @@ func readFailure(err error) error {
 	return unavailable()
 }
 func TooLarge() error {
-	return api.Failure(413, "STUDY_FILE_TOO_LARGE", "El archivo supera el tamaño máximo permitido de 25 MB.")
+	return api.Failure(413, "STUDY_FILE_TOO_LARGE", "El archivo supera el tamaño máximo permitido de 10 MB.")
 }
 func New(config Config) (*Store, error) {
-	store := &Store{slots: make(chan struct{}, 2)}
+	store := &Store{slots: make(chan struct{}, 2), uploads: make(chan struct{}, 21)}
+	var err error
+	store.converter, err = newStudyConverter(config.Converter)
+	if err != nil {
+		return nil, err
+	}
 	if config.Type == "s3" {
 		if api.JavaBlank(config.Bucket) {
 			return nil, errors.New("app.storage.s3.bucket must be configured when storage type is s3")
@@ -145,32 +157,52 @@ func newKey() (string, error) {
 	return fmt.Sprintf("%x-%x-%x-%x-%x", value[:4], value[4:6], value[6:8], value[8:10], value[10:]), nil
 }
 func (s *Store) Save(ctx context.Context, name string, input io.Reader) (File, error) {
-	content, err := io.ReadAll(io.LimitReader(input, MaxBytes+1))
+	upload, err := s.BeginUpload(ctx)
 	if err != nil {
+		return File{}, err
+	}
+	defer upload.Close()
+	return upload.Save(ctx, name, input)
+}
+
+// Upload reserves admission before the HTTP handler reads/spools multipart data.
+// Its owner closes it only after Save has finished (or parsing fails).
+type Upload struct {
+	store  *Store
+	closed atomic.Bool
+}
+
+func (s *Store) BeginUpload(ctx context.Context) (*Upload, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	select {
+	case s.uploads <- struct{}{}:
+		return &Upload{store: s}, nil
+	default:
+		return nil, api.Failure(503, "STUDY_VALIDATION_BUSY", "La cola de cargas está completa. Reintentá en unos segundos.")
+	}
+}
+
+func (u *Upload) Close() {
+	if !u.closed.Swap(true) {
+		<-u.store.uploads
+	}
+}
+
+func (u *Upload) Save(ctx context.Context, name string, input io.Reader) (File, error) {
+	if u.closed.Load() {
 		return File{}, unavailable()
 	}
-	if len(content) == 0 {
-		return File{}, api.Failure(400, "EMPTY_STUDY_FILE", "Seleccioná un archivo que no esté vacío.")
-	}
-	if len(content) > MaxBytes {
-		return File{}, TooLarge()
-	}
-	if err := validateName(name); err != nil {
+	return u.store.save(ctx, name, input)
+}
+
+func (s *Store) save(ctx context.Context, name string, input io.Reader) (File, error) {
+	content, contentType, err := s.readOriginal(ctx, name, input)
+	if err != nil {
 		return File{}, err
 	}
-	// Match the original's two decoding slots; cancellation never leaves a detached decoder.
-	select {
-	case s.slots <- struct{}{}:
-		defer func() { <-s.slots }()
-	default:
-		return File{}, api.Failure(503, "STUDY_VALIDATION_BUSY", "Hay otras cargas en proceso. Reintentá en unos segundos.")
-	}
-	if err := ctx.Err(); err != nil {
-		return File{}, err
-	}
-	// Studies may contain diagnostic material. Preserve the original bytes and
-	// EXIF metadata; reject unsafe inputs instead of silently resampling them.
-	contentType, err := inspect(ctx, content, name)
+	content, name, contentType, err = s.convertStudy(ctx, content, name, contentType)
 	if err != nil {
 		return File{}, err
 	}
@@ -200,6 +232,46 @@ func (s *Store) Save(ctx context.Context, name string, input io.Reader) (File, e
 		return File{}, unavailable()
 	}
 	return stored, nil
+}
+
+// Decode at most two originals/responses at a time. Release this resource
+// before waiting on the shared converter so uploads can join its queue.
+func (s *Store) acquireValidation(ctx context.Context) (func(), error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	select {
+	case s.slots <- struct{}{}:
+		return func() { <-s.slots }, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+func (s *Store) readOriginal(ctx context.Context, name string, input io.Reader) ([]byte, string, error) {
+	release, err := s.acquireValidation(ctx)
+	if err != nil {
+		return nil, "", err
+	}
+	defer release()
+	content, err := io.ReadAll(io.LimitReader(input, MaxBytes+1))
+	if err != nil {
+		return nil, "", unavailable()
+	}
+	if len(content) == 0 {
+		return nil, "", api.Failure(400, "EMPTY_STUDY_FILE", "Seleccioná un archivo que no esté vacío.")
+	}
+	if len(content) > MaxBytes {
+		return nil, "", TooLarge()
+	}
+	if err := validateName(name); err != nil {
+		return nil, "", err
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, "", err
+	}
+	contentType, err := inspect(ctx, content, name)
+	return content, contentType, err
 }
 func (s *Store) Open(ctx context.Context, key string) (io.ReadCloser, int64, error) {
 	if err := validateKey(key); err != nil {

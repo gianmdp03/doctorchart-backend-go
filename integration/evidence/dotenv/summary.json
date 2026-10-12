@@ -1,0 +1,37 @@
+{
+  "change": "Go dotenv configuration; no Java properties loader",
+  "process_environment_precedes_dotenv": true,
+  "old_local_properties_removed": true,
+  "private_dotenv_values_checked": true,
+  "external_database_connections": false,
+  "native_tests": {
+    "pass": 81,
+    "fail": 0,
+    "skip": 1
+  },
+  "linux_quality": {
+    "Go toolchain exact version": "PASS",
+    "Go formatting": "PASS",
+    "Go build": "PASS",
+    "Go vet": "PASS",
+    "Go tests": "PASS",
+    "Go race tests": "PASS",
+    "Go vulnerability scan": "BLOCKED"
+  },
+  "native_govulncheck": "PASS; 0 reachable vulnerabilities; see log for module-level warnings",
+  "prior_browser_http_evidence": "Earlier snapshot; not rerun or reissued for this configuration change",
+  "artifacts": {
+    "internal\\config\\config.go": "dc2e8cfd1db6aefc466396e208db04bdb94bcff31a2c94ea64325c6d16dd7182",
+    "internal\\config\\config_test.go": "535d7064a6f5d81a41f63613794e32615a7cd2aa3327ad5c258b0af44ce704f5",
+    "go.mod": "4adf87d3dcee5401354cb4e32ca0673e032524db062f712ce3ad81e72dcfbd9e",
+    "go.sum": "bc180304c2341bafd6f16d66810a0f73e502e9582f7189fbebde3a199dd643cb",
+    "README.md": "5424e488749bf4eff8d6f8f6d97055e5aebef52c283d87634cde20cd35f35c42",
+    ".env.example": "d9791c83d5d7f99e6a65e1325399f04867ce7a4be7fc8859e204320432aba076"
+  },
+  "evidence_hashes": {
+    "go-quality.log": "6cdf492e0f97208f5998fa36eb31014ab77afbb2a8e952d9fc179475870a56f7",
+    "go-tests.jsonl": "1a7e3d971c64537cad36381dc7641f8cbbe72129ca2c8aa160b33b95de83adcd",
+    "govulncheck.log": "30d974061df15c89ac116d65fad1f966a47421057ebf4f62c4171ca6b400be36",
+    "local-config-check.log": "83995672de05f39fdfde6272e60f4d763dabf661e40b5d4699576a007a05e38f"
+  }
+}

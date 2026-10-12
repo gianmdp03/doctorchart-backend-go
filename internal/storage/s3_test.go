@@ -23,7 +23,7 @@ func TestS3MissingAndUnavailableAreDistinct(t *testing.T) {
 		t.Run(fmt.Sprint(status), func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(status) }))
 			defer server.Close()
-			store, err := New(Config{Type: "s3", Endpoint: server.URL, Bucket: "owned-fixture", AccessKey: "owned-access", SecretKey: "owned-secret"})
+			store, err := New(Config{Type: "s3", Endpoint: server.URL, Bucket: "owned-fixture", AccessKey: "owned-access", SecretKey: "owned-secret", Converter: preservingConverter(t)})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -97,7 +97,7 @@ func TestS3PrivateObjectProtocol(t *testing.T) {
 		}
 	}))
 	defer server.Close()
-	store, err := New(Config{Type: "s3", Endpoint: server.URL, Bucket: "fixture-bucket", AccessKey: "fixture-access", SecretKey: "fixture-secret", Region: "auto"})
+	store, err := New(Config{Type: "s3", Endpoint: server.URL, Bucket: "fixture-bucket", AccessKey: "fixture-access", SecretKey: "fixture-secret", Region: "auto", Converter: preservingConverter(t)})
 	if err != nil {
 		t.Fatal(err)
 	}

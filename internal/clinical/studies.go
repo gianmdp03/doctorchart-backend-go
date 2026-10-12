@@ -156,14 +156,28 @@ func (s *Service) StudyRoutes(mux *http.ServeMux) {
 			api.WriteError(w, err)
 			return
 		}
+		ctx, cancel := context.WithTimeout(r.Context(), 175*time.Second)
+		defer cancel()
+		r = r.WithContext(ctx)
 		id, err := pathID(r, "patientId")
 		var result study
+		if deadlineErr := http.NewResponseController(w).SetWriteDeadline(time.Now().Add(180 * time.Second)); deadlineErr != nil && !errors.Is(deadlineErr, http.ErrNotSupported) {
+			api.WriteError(w, api.Failure(503, "IMAGE_CONVERTER_UNAVAILABLE", "No se pudo iniciar la carga. Reintentá más tarde."))
+			return
+		}
 		mediaType, _, parseErr := mime.ParseMediaType(r.Header.Get("Content-Type"))
 		if err == nil && (parseErr != nil || mediaType != "multipart/form-data") {
 			err = api.Failure(500, "INTERNAL_ERROR", "No se pudo completar la solicitud.")
 		}
+		var upload *storage.Upload
 		if err == nil {
-			r.Body = http.MaxBytesReader(w, r.Body, 26<<20)
+			upload, err = s.files.BeginUpload(ctx)
+			if err == nil {
+				defer upload.Close()
+			}
+		}
+		if err == nil {
+			r.Body = http.MaxBytesReader(w, r.Body, storage.MaxBytes+(64<<10))
 			err = r.ParseMultipartForm(1 << 20)
 			if r.MultipartForm != nil {
 				defer r.MultipartForm.RemoveAll()
@@ -192,45 +206,51 @@ func (s *Service) StudyRoutes(mux *http.ServeMux) {
 		}
 		var stored storage.File
 		if err == nil {
-			ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
-			defer cancel()
-			err = s.transaction(ctx, false, func(tx pgx.Tx) error {
-				if err := s.studyOwner(ctx, tx, api.User(ctx).UserID, id); err != nil {
-					return err
+			var description *string
+			if values, ok := r.MultipartForm.Value["description"]; ok && len(values) > 0 {
+				value := values[0]
+				if api.JavaLength(value) > 4000 {
+					err = api.Failure(400, "STUDY_DESCRIPTION_TOO_LONG", "La descripción admite hasta 4000 caracteres.")
 				}
-				var description *string
-				if values, ok := r.MultipartForm.Value["description"]; ok && len(values) > 0 {
-					value := values[0]
-					if api.JavaLength(value) > 4000 {
-						return api.Failure(400, "STUDY_DESCRIPTION_TOO_LONG", "La descripción admite hasta 4000 caracteres.")
-					}
-					if !api.JavaBlank(value) {
-						value = api.JavaTrim(value)
-						description = &value
-					}
+				if !api.JavaBlank(value) {
+					value = api.JavaTrim(value)
+					description = &value
 				}
-				var err error
+			}
+			if err == nil {
+				// Authorize before conversion, then release the database connection
+				// while the request waits in the shared converter's queue.
+				err = s.transaction(ctx, true, func(tx pgx.Tx) error {
+					return s.studyOwner(ctx, tx, api.User(ctx).UserID, id)
+				})
+			}
+			if err == nil {
 				originalName := header.Filename
 				if _, parameters, parseErr := mime.ParseMediaType(header.Header.Get("Content-Disposition")); parseErr == nil {
 					if name, present := parameters["filename"]; present {
 						originalName = name
 					}
 				}
-				stored, err = s.files.Save(ctx, originalName, input)
-				if err != nil {
+				stored, err = upload.Save(ctx, originalName, input)
+			}
+			if err == nil {
+				err = s.transaction(ctx, false, func(tx pgx.Tx) error {
+					// Ownership and feature access may have changed during queueing.
+					if err := s.studyOwner(ctx, tx, api.User(ctx).UserID, id); err != nil {
+						return err
+					}
+					at := time.Now().UTC()
+					err := tx.QueryRow(ctx, "INSERT INTO patient_medical_studies(patient_id,original_file_name,stored_file_name,content_type,file_size,description,uploaded_at) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id", id, stored.Name, stored.Key, stored.ContentType, stored.Size, description, at).Scan(&result.ID)
+					result.PatientID = id
+					result.Name = stored.Name
+					result.ContentType = stored.ContentType
+					result.Size = stored.Size
+					result.Description = description
+					result.Uploaded = at.Format(time.RFC3339Nano)
+					result.key = stored.Key
 					return err
-				}
-				at := time.Now().UTC()
-				err = tx.QueryRow(ctx, "INSERT INTO patient_medical_studies(patient_id,original_file_name,stored_file_name,content_type,file_size,description,uploaded_at) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id", id, stored.Name, stored.Key, stored.ContentType, stored.Size, description, at).Scan(&result.ID)
-				result.PatientID = id
-				result.Name = stored.Name
-				result.ContentType = stored.ContentType
-				result.Size = stored.Size
-				result.Description = description
-				result.Uploaded = at.Format(time.RFC3339Nano)
-				result.key = stored.Key
-				return err
-			})
+				})
+			}
 			if err != nil && stored.Key != "" {
 				cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 				defer cancel()

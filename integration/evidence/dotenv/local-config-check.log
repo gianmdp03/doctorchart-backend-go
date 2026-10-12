@@ -1,0 +1,1 @@
+PASS: Go loads .env; all original configuration values preserved exactly; no connections performed.

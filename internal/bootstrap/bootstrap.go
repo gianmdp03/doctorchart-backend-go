@@ -1,5 +1,5 @@
-// Package bootstrap initializes empty catalogs without repairing or overwriting
-// persisted configuration. It never creates or changes the PostgreSQL schema.
+// Package bootstrap creates the schema in an empty DoctorChart database and
+// initializes empty catalogs without overwriting persisted configuration.
 package bootstrap
 
 import (

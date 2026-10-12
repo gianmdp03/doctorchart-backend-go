@@ -1,12 +1,15 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
+	"github.com/joho/godotenv"
 	"github.com/syntah/doctorchart-backend-go/internal/api"
 	"github.com/syntah/doctorchart-backend-go/internal/storage"
 )
@@ -21,21 +24,32 @@ type Config struct {
 }
 
 func Load() (Config, error) {
-	properties, err := readProperties("secrets.properties")
+	directory, err := localConfigDirectory()
 	if err != nil {
-		return Config{}, fmt.Errorf("read external configuration: %w", err)
+		return Config{}, err
+	}
+	fileValues, err := godotenv.Read(filepath.Join(directory, ".env"))
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		// Parser errors can contain the offending line, including credentials.
+		return Config{}, errors.New("Configuración inválida: no se pudo leer .env (directorio actual o raíz del módulo); revisá sus permisos y sintaxis.")
 	}
 	get := func(key, alias, fallback string) string {
-		for _, name := range []string{key, strings.ToUpper(strings.NewReplacer(".", "_", "-", "_").Replace(key)), strings.ToUpper(strings.NewReplacer(".", "_", "-", "").Replace(key))} {
+		names := []string{key, strings.ToUpper(strings.NewReplacer(".", "_", "-", "_").Replace(key)), strings.ToUpper(strings.NewReplacer(".", "_", "-", "").Replace(key)), alias}
+		if key == "app.security.gateway-secret" {
+			names = []string{"GATEWAY_SHARED_SECRET", "APP_SECURITY_GATEWAY_SECRET", "APP_SECURITY_GATEWAYSECRET", key}
+		}
+		if key == "services.billing.shared-secret" {
+			names = []string{"SERVICES_BILLING_SHARED_SECRET", "SERVICES_POINTLY_SHARED_SECRET", key, "services.pointly.shared-secret", "SERVICES_BILLING_SHAREDSECRET"}
+		}
+		for _, name := range names {
 			if value, ok := os.LookupEnv(name); ok {
 				return value
 			}
 		}
-		if value, ok := properties[key]; ok {
-			return value
-		}
-		if value, ok := os.LookupEnv(alias); ok {
-			return value
+		for _, name := range names {
+			if value, ok := fileValues[name]; ok {
+				return value
+			}
 		}
 		return fallback
 	}
@@ -44,43 +58,34 @@ func Load() (Config, error) {
 		{"server.port", "PORT", "8083"}, {"app.security.gateway-secret", "GATEWAY_SHARED_SECRET", ""}, {"services.billing.shared-secret", "SERVICES_BILLING_SHARED_SECRET", ""}, {"services.billing.url", "SERVICES_BILLING_URL", ""},
 		{"spring.datasource.url", "SPRING_DATASOURCE_URL", ""}, {"spring.datasource.username", "DB_USERNAME", ""}, {"spring.datasource.password", "DB_PASSWORD", ""},
 		{"app.storage.type", "STORAGE_TYPE", "local"}, {"app.storage.studies-dir", "STUDIES_STORAGE_DIR", ""}, {"app.storage.s3.endpoint", "S3_ENDPOINT", ""}, {"app.storage.s3.bucket", "S3_BUCKET", ""}, {"app.storage.s3.access-key", "S3_ACCESS_KEY", ""}, {"app.storage.s3.secret-key", "S3_SECRET_KEY", ""}, {"app.storage.s3.region", "S3_REGION", "auto"},
+		{"services.image-converter.url", "IMAGE_CONVERTER_URL", ""}, {"services.image-converter.api-key", "IMAGE_CONVERTER_API_KEY", ""}, {"app.storage.allow-study-image-transformation", "STUDIES_ALLOW_IMAGE_TRANSFORM", "false"},
 	} {
-		value := get(item[0], item[1], item[2])
-		for attempts := 0; strings.Contains(value, "${"); attempts++ {
-			if attempts >= 32 {
-				return Config{}, fmt.Errorf("Configuración inválida: %s contiene un placeholder sin resolver.", item[0])
-			}
-			start := strings.Index(value, "${")
-			end := strings.Index(value[start+2:], "}")
-			if end < 0 {
-				return Config{}, fmt.Errorf("Configuración inválida: %s contiene un placeholder sin resolver.", item[0])
-			}
-			end += start + 2
-			key, defaultValue, hasDefault := strings.Cut(value[start+2:end], ":")
-			replacement, ok := os.LookupEnv(key)
-			if !ok {
-				replacement, ok = properties[key]
-			}
-			if !ok && !hasDefault {
-				return Config{}, fmt.Errorf("Configuración inválida: %s contiene un placeholder sin resolver.", item[0])
-			}
-			if !ok {
-				replacement = defaultValue
-			}
-			value = value[:start] + replacement + value[end+1:]
-		}
-		values[item[0]] = value
+		values[item[0]] = get(item[0], item[1], item[2])
 	}
 	c := Config{Port: values["server.port"], GatewaySecret: values["app.security.gateway-secret"], BillingSecret: values["services.billing.shared-secret"], BillingURL: values["services.billing.url"]}
 	c.Storage = storage.Config{Type: values["app.storage.type"], Directory: values["app.storage.studies-dir"], Endpoint: values["app.storage.s3.endpoint"], Bucket: values["app.storage.s3.bucket"], AccessKey: values["app.storage.s3.access-key"], SecretKey: values["app.storage.s3.secret-key"], Region: values["app.storage.s3.region"]}
+	transformValue := values["app.storage.allow-study-image-transformation"]
+	if transformValue != "true" && transformValue != "false" {
+		return c, errors.New("Configuración inválida: STUDIES_ALLOW_IMAGE_TRANSFORM debe ser true o false.")
+	}
+	c.Storage.Converter = storage.ConverterConfig{URL: values["services.image-converter.url"], APIKey: values["services.image-converter.api-key"], AllowStudyTransformation: transformValue == "true"}
 	port, err := strconv.Atoi(c.Port)
 	if err != nil || port < 1 || port > 65535 {
 		return c, fmt.Errorf("Configuración inválida: PORT.")
 	}
-	for key, value := range map[string]string{"app.security.gateway-secret": c.GatewaySecret, "services.billing.shared-secret": c.BillingSecret} {
-		if api.JavaLength(value) < 32 || api.JavaTrim(value) != value || strings.Contains(strings.ToLower(value), "replace") {
-			return c, fmt.Errorf("Configuración inválida: %s debe contener al menos 32 caracteres y no ser un ejemplo.", key)
+	for _, item := range []struct{ name, value string }{{"GATEWAY_SHARED_SECRET", c.GatewaySecret}, {"SERVICES_BILLING_SHARED_SECRET", c.BillingSecret}} {
+		if err := validateSharedSecret(item.name, item.value); err != nil {
+			return c, err
 		}
+	}
+	if c.GatewaySecret == c.BillingSecret {
+		return c, fmt.Errorf("Configuración inválida: GATEWAY_SHARED_SECRET y SERVICES_BILLING_SHARED_SECRET deben ser distintos.")
+	}
+	if err := storage.ValidateConverterConfig(c.Storage.Converter); err != nil {
+		return c, err
+	}
+	if c.Storage.Converter.APIKey != "" && (c.Storage.Converter.APIKey == c.GatewaySecret || c.Storage.Converter.APIKey == c.BillingSecret) {
+		return c, errors.New("Configuración inválida: IMAGE_CONVERTER_API_KEY debe ser independiente de Gateway y Billing.")
 	}
 	for _, key := range []string{"spring.datasource.username", "spring.datasource.password", "spring.datasource.url", "services.billing.url"} {
 		if api.JavaBlank(values[key]) {

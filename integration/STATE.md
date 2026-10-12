@@ -1,5 +1,9 @@
 # DoctorChart Angular + Go integration
 
+Shared converter follow-up (2026-10-09): the local optimizer has been removed. Compatible new uploads use the shared converter API with the fixed `doctorchart-study` profile; processing settings belong to the converter. Independent credentials and an explicit transformation policy are configured in the backend. All Go tests, vet, build and Linux race tests passed. Live converter/PostgreSQL tests cover authorization, local/S3 persistence, metadata and failure cleanup; S3 uses a local protocol fixture. See [configuration and reproducible proof](SHARED_IMAGE_CONVERTER.md). Previous browser evidence is historical for this change. No production schema change or bulk recompression.
+
+Configuration follow-up: `.env` replaced Java properties at the user's explicit request. Process environment overrides the file; file absence permits environment-only execution. The copied local values were verified without database connections. Config parser errors are redacted. Current Go controls are under `evidence/dotenv`; the previous aggregate integration evidence remains the earlier snapshot and is not reissued as a new complete browser run.
+
 **Status: READY FOR STAGING — local DoctorChart artifacts and tested Gateway snapshot.** Closed 2026-10-09; no deployment. No pending local functionality implementation. Do not restart migration audit/design.
 
 Scope: DoctorChart frontend and Go backend only. Spring is a historical reference. Gateway and Billing are read-only; Gateway is under active refactor. PostgreSQL and all identities/storage are disposable synthetic fixtures. Migration evidence remains historical; new evidence belongs to integration/evidence.
