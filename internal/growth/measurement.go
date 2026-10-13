@@ -32,8 +32,23 @@ type PatientChart struct {
 
 func positive(v *float64) bool { return v != nil && finite(*v) && *v > 0 }
 
-// Position conversion is only applied to a documented or explicitly confirmed
-// position; no position is inferred from age, height or gender.
+// ResolveMeasurementMode preserves documented positions. Missing positions use
+// DoctorChart's standard measuring workflow: recumbent infants, then standing.
+// This is a calculation default; the original clinical record is never rewritten.
+func ResolveMeasurementMode(mode string, ageDays int) string {
+	if mode == "RECUMBENT" || mode == "STANDING" {
+		return mode
+	}
+	if ageDays < 0 {
+		return "UNKNOWN"
+	}
+	if ageDays <= 730 {
+		return "RECUMBENT"
+	}
+	return "STANDING"
+}
+
+// Convert only when a documented position differs from the reference position.
 func normalizedHeight(o Observation) (float64, float64, bool) {
 	if !positive(o.Height) || (o.Mode != "RECUMBENT" && o.Mode != "STANDING") {
 		return 0, 0, false
@@ -58,6 +73,7 @@ func (r *References) Point(d Definition, o Observation) *Point {
 	if !d.Applicable(d.Sex, o.AgeDays) {
 		return nil
 	}
+	o.Mode = ResolveMeasurementMode(o.Mode, o.AgeDays)
 	x := float64(o.AgeDays) / DaysPerMonth
 	coordinate := float64(o.AgeDays)
 	if d.Reference == "WHO 2007" {

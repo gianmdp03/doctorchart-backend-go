@@ -5,6 +5,7 @@ import (
 	"math"
 	"os"
 	"testing"
+	"time"
 )
 
 func references(t *testing.T) *References {
@@ -205,8 +206,10 @@ func TestSameObservationPositionAndHistoricalAge(t *testing.T) {
 		t.Fatal(p)
 	}
 	o.Mode = "UNKNOWN"
-	if r.Point(d, o) != nil || r.Point(Catalog()[16], o) != nil {
-		t.Fatal("position invented")
+	p = r.Point(d, o)
+	bmi := r.Point(Catalog()[16], o)
+	if p == nil || p.X != h || p.Mode != "RECUMBENT" || p.AdjustmentCm != 0 || bmi == nil || bmi.Value != w/math.Pow(h/100, 2) || bmi.Evaluation == nil {
+		t.Fatal("standard infant measurements were omitted or converted", p, bmi)
 	}
 	o.Mode = "RECUMBENT"
 	o.Weight = nil
@@ -217,6 +220,74 @@ func TestSameObservationPositionAndHistoricalAge(t *testing.T) {
 	for _, c := range charts {
 		if c.Definition.Indicator == "BMI" && len(c.Points) != 0 {
 			t.Fatal("mixed consultations")
+		}
+	}
+}
+
+func TestDefaultMeasurementModeAndBMIAtAgeBoundaries(t *testing.T) {
+	r := references(t)
+	w, h := 12., 85.
+	for _, days := range []int{0, 730, 731, 1856, 1857, 2000} {
+		want := "STANDING"
+		if days <= 730 {
+			want = "RECUMBENT"
+		}
+		for _, mode := range []string{"", "UNKNOWN"} {
+			o := Observation{AgeDays: days, Weight: &w, Height: &h, Mode: mode}
+			found := false
+			for _, d := range Catalog() {
+				if d.Sex != "MALE" || d.Indicator != "BMI" || !d.Applicable("MALE", days) {
+					continue
+				}
+				found = true
+				p := r.Point(d, o)
+				if p == nil || p.Mode != want || p.AdjustmentCm != 0 || p.Value != w/math.Pow(h/100, 2) || p.Evaluation == nil {
+					t.Fatalf("day %d mode %q: %+v", days, mode, p)
+				}
+			}
+			// The official school-age table starts at month 61; do not fill its gap.
+			if days != 1857 && !found {
+				t.Fatalf("missing BMI reference for day %d", days)
+			}
+		}
+	}
+	if ResolveMeasurementMode("STANDING", 100) != "STANDING" || ResolveMeasurementMode("RECUMBENT", 1000) != "RECUMBENT" || ResolveMeasurementMode("", -1) != "UNKNOWN" {
+		t.Fatal("documented positions or invalid ages changed")
+	}
+}
+
+func TestHistoricalBMIWithoutPositionPrompts(t *testing.T) {
+	r := references(t)
+	birth := time.Date(2023, 11, 1, 0, 0, 0, 0, time.UTC)
+	observations := make([]Observation, 36)
+	for month := range observations {
+		day := birth.AddDate(0, month, 0)
+		w, h := 3.5+float64(month)*.3, 50.+float64(month)*1.3
+		observations[month] = Observation{Source: "ENCOUNTER", Date: day.Format("2006-01-02"), AgeDays: int(day.Sub(birth).Hours() / 24), Weight: &w, Height: &h}
+	}
+	for _, sex := range []string{"MALE", "FEMALE"} {
+		want := 36
+		if sex == "FEMALE" {
+			want = 24 // This PDF's female BMI chart ends at two years.
+		}
+		found := false
+		for _, chart := range r.PatientCharts(sex, 1070, observations) {
+			if chart.Definition.Dataset != "bfa06_boys" && chart.Definition.Dataset != "bfa06_girls" {
+				continue
+			}
+			found = true
+			if len(chart.Points) != want || chart.Omitted != 0 {
+				t.Fatalf("%s: %d points, %d omitted", sex, len(chart.Points), chart.Omitted)
+			}
+			for i, point := range chart.Points {
+				o := observations[i]
+				if point.Value != *o.Weight/math.Pow(*o.Height/100, 2) || point.Date != o.Date || point.Evaluation == nil || point.AdjustmentCm != 0 {
+					t.Fatalf("%s observation %d: %+v", sex, i, point)
+				}
+			}
+		}
+		if !found {
+			t.Fatal("missing historical BMI reference", sex)
 		}
 	}
 }

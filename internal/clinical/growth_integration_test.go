@@ -141,13 +141,13 @@ func TestGrowthHTTPPostgres(t *testing.T) {
 			t.Fatal("mixed sex references")
 		}
 		if chart.Definition.Indicator == "BMI" && chart.Definition.Reference == "WHO 2006" {
-			if len(chart.Points) != 1 || *chart.Points[0].EncounterID != 13 || chart.Points[0].Evaluation == nil {
+			if len(chart.Points) != 3 || chart.Points[0].Source != "BIRTH" || *chart.Points[1].EncounterID != 11 || *chart.Points[2].EncounterID != 13 || chart.Points[2].Evaluation == nil {
 				t.Fatal("BMI fabricated or mixed between encounters", chart.Points)
 			}
 		}
 	}
 	confirmed := decode(base + "1/growth?measurementModes=%7B%22BIRTH%22:%22RECUMBENT%22%7D")
-	if confirmed.Observations[0].Mode != "RECUMBENT" || confirmed.Observations[1].Mode != "UNKNOWN" {
+	if confirmed.Observations[0].Mode != "RECUMBENT" || confirmed.Observations[1].Mode != "RECUMBENT" || confirmed.Observations[3].Mode != "STANDING" {
 		t.Fatal("confirmation escaped its observation")
 	}
 	if decode(base+"3/growth").Status != "REFERENCE_SEX_REQUIRED" || decode(base+"3/growth?referenceSex=FEMALE").SexSource != "VIEW_CONFIRMATION" {

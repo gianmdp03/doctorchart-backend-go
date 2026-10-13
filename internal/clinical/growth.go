@@ -137,10 +137,9 @@ func (s *Service) PatientGrowth(ctx context.Context, user string, id int64, opti
 			if confirmed, ok := options.modes[key]; ok {
 				mode = confirmed
 			}
-			if mode != "RECUMBENT" && mode != "STANDING" {
-				mode = "UNKNOWN"
-			}
-			result.Observations = append(result.Observations, growth.Observation{Source: source, EncounterID: encounterID, Date: date, AgeDays: int(day.Sub(birth).Hours() / 24), AgeFormatted: pediatricAge(birth, day), Weight: m.Weight, Height: m.Height, Head: m.Head, Mode: mode})
+			ageDays := int(day.Sub(birth).Hours() / 24)
+			mode = growth.ResolveMeasurementMode(mode, ageDays)
+			result.Observations = append(result.Observations, growth.Observation{Source: source, EncounterID: encounterID, Date: date, AgeDays: ageDays, AgeFormatted: pediatricAge(birth, day), Weight: m.Weight, Height: m.Height, Head: m.Head, Mode: mode})
 			return nil
 		}
 		if len(p.Personal) > 0 && string(p.Personal) != "null" {
