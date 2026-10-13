@@ -10,8 +10,10 @@ Generar una clave independiente, guardarla como `APP_DOCTORCHART_API_KEY` en ese
 
 En DoctorChart:
 
+Estos valores corresponden a procesos nativos en el mismo host. En una red privada de contenedores usar el DNS del servicio y su puerto interno, por ejemplo `http://image-converter:8080`; publicar el conversor en `127.0.0.1:8086` evita colisionar con Pointly nativo en `8080`. Cada despliegue configura sus propias URLs; loopback no comunica contenedores diferentes.
+
 ```ini
-IMAGE_CONVERTER_URL=http://127.0.0.1:8080
+IMAGE_CONVERTER_URL=http://127.0.0.1:8086
 IMAGE_CONVERTER_API_KEY=<la-misma-clave-de-APP_DOCTORCHART_API_KEY>
 STUDIES_ALLOW_IMAGE_TRANSFORM=true
 ```

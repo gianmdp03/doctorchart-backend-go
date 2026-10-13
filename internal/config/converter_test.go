@@ -8,7 +8,7 @@ import (
 
 func TestConverterConfigurationAndPrecedence(t *testing.T) {
 	t.Chdir(t.TempDir())
-	base := "GATEWAY_SHARED_SECRET=" + strings.Repeat("g", 64) + "\nSERVICES_BILLING_SHARED_SECRET=" + strings.Repeat("b", 64) + "\nSPRING_DATASOURCE_URL=jdbc:postgresql://127.0.0.1:5432/fixture\nDB_USERNAME=fixture\nDB_PASSWORD=fixture\nSERVICES_BILLING_URL=http://127.0.0.1:8081\nIMAGE_CONVERTER_URL=http://127.0.0.1:8080\nIMAGE_CONVERTER_API_KEY=" + strings.Repeat("c", 64) + "\nSTUDIES_ALLOW_IMAGE_TRANSFORM=true\n"
+	base := "GATEWAY_SHARED_SECRET=" + strings.Repeat("g", 64) + "\nSERVICES_BILLING_SHARED_SECRET=" + strings.Repeat("b", 64) + "\nDATABASE_URL=postgresql://fixture:fixture@127.0.0.1:5432/fixture\nSERVICES_BILLING_URL=http://127.0.0.1:8081\nIMAGE_CONVERTER_URL=http://127.0.0.1:8080\nIMAGE_CONVERTER_API_KEY=" + strings.Repeat("c", 64) + "\nSTUDIES_ALLOW_IMAGE_TRANSFORM=true\n"
 	if err := os.WriteFile(".env", []byte(base), 0600); err != nil {
 		t.Fatal(err)
 	}

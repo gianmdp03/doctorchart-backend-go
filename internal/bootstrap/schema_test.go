@@ -2,6 +2,8 @@ package bootstrap
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -11,7 +13,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/syntah/doctorchart-backend-go/db"
 	"github.com/syntah/doctorchart-backend-go/internal/wizard"
 )
 
@@ -50,9 +55,6 @@ func initializeFixture(t *testing.T, pool *pgxpool.Pool) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := EnsureSchema(context.Background(), pool); err != nil {
-		t.Fatal(err)
-	}
 	if err := Run(context.Background(), pool, validator); err != nil {
 		t.Fatal(err)
 	}
@@ -73,14 +75,29 @@ func assertFixtureReady(t *testing.T, pool *pgxpool.Pool) {
 	if err := pool.QueryRow(context.Background(), "SELECT count(*) FROM vaccination_calendars").Scan(&calendars); err != nil {
 		t.Fatal(err)
 	}
-	if tables != 20 || constraints != 19 || specialties == 0 || calendars != 1 {
+	if tables != 21 || constraints != 19 || specialties == 0 || calendars != 1 {
 		t.Fatalf("startup produced %d tables, %d foreign keys, %d specialties and %d calendars", tables, constraints, specialties, calendars)
+	}
+	var expected map[string][]json.RawMessage
+	if err := json.Unmarshal(seedJSON, &expected); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"specialties", "wizard_defaults", "chart_definitions", "clinical_calculation_definitions", "specialty_calculator_defaults", "vaccination_calendars", "vaccination_doses"} {
+		var count int
+		if err := pool.QueryRow(context.Background(), "SELECT count(*) FROM "+pgx.Identifier{name}.Sanitize()).Scan(&count); err != nil {
+			t.Fatal(err)
+		}
+		if count != len(expected[name]) {
+			t.Fatalf("catalog %s has %d rows, expected %d", name, count, len(expected[name]))
+		}
 	}
 }
 
 func TestEmptySchemaAndRestartPreserveData(t *testing.T) {
 	pool := schemaFixture(t)
-	initializeFixture(t, pool)
+	for range 3 {
+		initializeFixture(t, pool)
+	}
 	assertFixtureReady(t, pool)
 	ctx := context.Background()
 	var patientID int64
@@ -92,7 +109,24 @@ func TestEmptySchemaAndRestartPreserveData(t *testing.T) {
 	if _, err := pool.Exec(ctx, "UPDATE chart_definitions SET title='Preserved custom title' WHERE id=(SELECT min(id) FROM chart_definitions)"); err != nil {
 		t.Fatal(err)
 	}
-	initializeFixture(t, pool)
+	if _, err := pool.Exec(ctx, "UPDATE specialties SET display_name='Admin specialty' WHERE id=(SELECT min(id) FROM specialties); UPDATE clinical_calculation_definitions SET name='Admin calculator' WHERE id=(SELECT min(id) FROM clinical_calculation_definitions)"); err != nil {
+		t.Fatal(err)
+	}
+	catalogSnapshot := func() string {
+		t.Helper()
+		var result string
+		if err := pool.QueryRow(ctx, `SELECT jsonb_build_object('specialties',(SELECT jsonb_agg(to_jsonb(s) ORDER BY id) FROM specialties s),'wizards',(SELECT jsonb_agg(to_jsonb(w) ORDER BY id) FROM wizard_defaults w),'calculators',(SELECT jsonb_agg(to_jsonb(c) ORDER BY id) FROM clinical_calculation_definitions c),'charts',(SELECT jsonb_agg(to_jsonb(c) ORDER BY id) FROM chart_definitions c),'state',(SELECT to_jsonb(s) FROM app_schema_state s))::text`).Scan(&result); err != nil {
+			t.Fatal(err)
+		}
+		return result
+	}
+	before := catalogSnapshot()
+	for range 3 {
+		initializeFixture(t, pool)
+	}
+	if after := catalogSnapshot(); after != before {
+		t.Fatal("restart replaced administered catalogs or baseline metadata")
+	}
 	assertFixtureReady(t, pool)
 	var name, title string
 	if err := pool.QueryRow(ctx, "SELECT full_name FROM patients WHERE id=$1", patientID).Scan(&name); err != nil || name != "Preserved fixture patient" {
@@ -118,16 +152,21 @@ func TestEmptySchemaAndRestartPreserveData(t *testing.T) {
 func TestConcurrentSchemaAndCatalogInitialization(t *testing.T) {
 	pool := schemaFixture(t)
 	var wg sync.WaitGroup
-	failures := make(chan error, 4)
-	for range 4 {
+	failures := make(chan error, 16)
+	for range 16 {
 		wg.Go(func() {
 			ctx := context.Background()
+			cfg := pool.Config()
+			cfg.MaxConns = 1
+			instance, err := pgxpool.NewWithConfig(ctx, cfg)
+			if err != nil {
+				failures <- err
+				return
+			}
+			defer instance.Close()
 			validator, err := wizard.NewValidator()
 			if err == nil {
-				err = EnsureSchema(ctx, pool)
-			}
-			if err == nil {
-				err = Run(ctx, pool, validator)
+				err = Run(ctx, instance, validator)
 			}
 			failures <- err
 		})
@@ -149,7 +188,7 @@ func TestPartialSchemaIsRejectedWithoutChanges(t *testing.T) {
 		t.Fatal(err)
 	}
 	err := EnsureSchema(ctx, pool)
-	if err == nil || !strings.Contains(err.Error(), "incompleto") {
+	if err == nil || !strings.Contains(err.Error(), "partial schema") {
 		t.Fatal("partial schema accepted", err)
 	}
 	var preserved bool
@@ -209,7 +248,7 @@ func TestSchemaLockHasBoundedWait(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer tx.Rollback(ctx)
-	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(17209,41000)"); err != nil {
+	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1,$2)", db.LockNamespace, db.LockKey); err != nil {
 		t.Fatal(err)
 	}
 	bounded, cancel := context.WithTimeout(ctx, 150*time.Millisecond)
@@ -217,4 +256,107 @@ func TestSchemaLockHasBoundedWait(t *testing.T) {
 	if err := EnsureSchema(bounded, pool); err == nil {
 		t.Fatal("locked initialization did not time out")
 	}
+}
+
+func TestFirstVisitIndexDriftRejectedWithoutChanges(t *testing.T) {
+	cases := []struct{ name, replacement string }{
+		{"missing", ""},
+		{"nonunique", "CREATE INDEX clinical_encounters_one_first_visit ON clinical_encounters(patient_id)"},
+		{"wrong_predicate", "CREATE UNIQUE INDEX clinical_encounters_one_first_visit ON clinical_encounters(patient_id) WHERE consultation_type='FOLLOW_UP'"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			pool := schemaFixture(t)
+			initializeFixture(t, pool)
+			ctx := context.Background()
+			var patientID int64
+			if err := pool.QueryRow(ctx, `INSERT INTO patients(birth_date,form_definition_snapshot,form_values,formula_context,formula_results,full_name,updated_at,user_id,version,workspace_version) VALUES('1990-01-01','{}','{}','{}','{}','Preserved duplicate fixture',now(),'fixture-owner',0,0) RETURNING id`).Scan(&patientID); err != nil {
+				t.Fatal(err)
+			}
+			insertEncounter := `INSERT INTO clinical_encounters(patient_id,specialty_id,encounter_date,consultation_type,version,workspace_version,form_values,formula_results,form_definition_snapshot,formula_context,updated_at) VALUES($1,(SELECT min(id) FROM specialties),now(),'FIRST_VISIT',0,0,'{}','{}','{}','{}',now())`
+			if _, err := pool.Exec(ctx, insertEncounter, patientID); err != nil {
+				t.Fatal(err)
+			}
+			_, err := pool.Exec(ctx, insertEncounter, patientID)
+			var pg *pgconn.PgError
+			if !errors.As(err, &pg) || pg.Code != "23505" {
+				t.Fatalf("baseline allowed duplicate FIRST_VISIT: %v", err)
+			}
+			if _, err := pool.Exec(ctx, "DROP INDEX public.clinical_encounters_one_first_visit"); err != nil {
+				t.Fatal(err)
+			}
+			if tc.replacement != "" {
+				if _, err := pool.Exec(ctx, tc.replacement); err != nil {
+					t.Fatal(err)
+				}
+			}
+			// The altered fixture permits two rows; startup must neither repair
+			// its index nor remove the records or adopt a new catalog hash.
+			if _, err := pool.Exec(ctx, insertEncounter, patientID); err != nil {
+				t.Fatal(err)
+			}
+			snapshot := func() string {
+				t.Helper()
+				var result string
+				if err := pool.QueryRow(ctx, `SELECT jsonb_build_object('state',(SELECT to_jsonb(s) FROM app_schema_state s),'index',(SELECT pg_get_indexdef(c.oid) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname='clinical_encounters_one_first_visit'),'encounters',(SELECT jsonb_agg(to_jsonb(e) ORDER BY id) FROM clinical_encounters e))::text`).Scan(&result); err != nil {
+					t.Fatal(err)
+				}
+				return result
+			}
+			before := snapshot()
+			validator, err := wizard.NewValidator()
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, initialize := range []func() error{
+				func() error { return EnsureSchema(ctx, pool) },
+				func() error { return Run(ctx, pool, validator) },
+			} {
+				if err := initialize(); err == nil || !strings.Contains(err.Error(), "schema drift") {
+					t.Fatal("incompatible FIRST_VISIT index accepted", err)
+				}
+				if after := snapshot(); after != before {
+					t.Fatal("failed startup changed metadata, index or clinical records")
+				}
+			}
+			var count int
+			if err := pool.QueryRow(ctx, "SELECT count(*) FROM clinical_encounters WHERE patient_id=$1", patientID).Scan(&count); err != nil || count != 2 {
+				t.Fatal("startup removed duplicate clinical data", count, err)
+			}
+		})
+	}
+}
+
+func TestCatalogSeedFailureRollsBackSchemaAndData(t *testing.T) {
+	pool := schemaFixture(t)
+	validator, err := wizard.NewValidator()
+	if err != nil {
+		t.Fatal(err)
+	}
+	failure := errors.New("synthetic failure after all catalog seeds")
+	err = db.Ensure(context.Background(), pool, func(ctx context.Context, tx pgx.Tx) error {
+		if err := seed(ctx, tx, validator); err != nil {
+			return err
+		}
+		var specialties, calendars int
+		if err := tx.QueryRow(ctx, "SELECT count(*) FROM specialties").Scan(&specialties); err != nil {
+			return err
+		}
+		if err := tx.QueryRow(ctx, "SELECT count(*) FROM vaccination_calendars").Scan(&calendars); err != nil {
+			return err
+		}
+		if specialties == 0 || calendars != 1 {
+			return errors.New("catalog hook did not insert both groups")
+		}
+		return failure
+	})
+	if !errors.Is(err, failure) {
+		t.Fatal("seed failure was not reported", err)
+	}
+	var objects int
+	if err := pool.QueryRow(context.Background(), "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public'").Scan(&objects); err != nil || objects != 0 {
+		t.Fatal("failed catalog seed left baseline objects", objects, err)
+	}
+	initializeFixture(t, pool)
+	assertFixtureReady(t, pool)
 }

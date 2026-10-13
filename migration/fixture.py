@@ -1,29 +1,53 @@
-"""Target-owned disposable reference. Never reads existing DB connection settings."""
+"""Owned PostgreSQL 17 fixture helpers; no Java or historical schema bootstrap."""
 import argparse
 import json
 import os
 import secrets
 import subprocess
-import tempfile
 import time
 import atexit
 import threading
-import urllib.error
-import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 WORK = ROOT / '.migration'
-JAVA = Path(os.environ.get('MIGRATION_JAVA', 'C:/Users/gcast/.jdks/ms-25.0.4.1/bin/java.exe'))
+FIXTURE_LABEL_KEY = 'doctorchart-go.integration'
+FIXTURE_LABEL_VALUE = 'fixture'
 
 def command(*args, input=None):
     return subprocess.run(args, input=input, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE).stdout
 
+def verify_fixture(config):
+    if not isinstance(config, dict):
+        raise RuntimeError('Invalid fixture descriptor')
+    name = config.get('container', '')
+    identifier = config.get('container_id', '')
+    label = config.get('label')
+    port = config.get('db_port')
+    if not isinstance(name, str) or not isinstance(identifier, str):
+        raise RuntimeError('Invalid fixture identity')
+    suffix = name.removeprefix('doctorchart-go-fixture-')
+    if (not name.startswith('doctorchart-go-fixture-') or len(suffix) != 8 or
+            any(char not in '0123456789abcdef' for char in suffix) or
+            len(identifier) != 64 or any(char not in '0123456789abcdef' for char in identifier) or
+            label != {FIXTURE_LABEL_KEY: FIXTURE_LABEL_VALUE} or
+            not isinstance(port, int) or isinstance(port, bool) or not 1 <= port <= 65535):
+        raise RuntimeError('Fixture requires its exact container ID, label and loopback port; old descriptors are not adopted')
+    metadata = json.loads(command('docker', 'inspect', name))
+    if len(metadata) != 1:
+        raise RuntimeError('Fixture inspection did not identify one owned container')
+    actual = metadata[0]
+    bindings = actual.get('NetworkSettings', {}).get('Ports', {}).get('5432/tcp')
+    if (actual.get('Id') != identifier or
+            actual.get('Config', {}).get('Labels', {}).get(FIXTURE_LABEL_KEY) != FIXTURE_LABEL_VALUE or
+            actual.get('Config', {}).get('Image') != 'postgres:17-alpine' or
+            bindings != [{'HostIp': '127.0.0.1', 'HostPort': str(port)}]):
+        raise RuntimeError('Fixture ownership or PostgreSQL loopback binding does not match its descriptor')
+
 _sessions={}
 _sessions_lock=threading.Lock()
 def sql(config, db, statement):
-    if not config['container'].startswith('doctorchart-go-fixture-'):
-        raise RuntimeError('Refusing an unowned SQL fixture')
+    verify_fixture(config)
     key=(config['container'],db)
     with _sessions_lock:
         if key not in _sessions or _sessions[key][0].poll() is not None:
@@ -49,73 +73,54 @@ def close_sql():
     _sessions.clear()
 atexit.register(close_sql)
 
-def start_spring(config, database='spring', port=18083, cwd=WORK, overrides=None):
-    env = dict(os.environ)
-    env.update(PORT=str(port),SPRING_DATASOURCE_URL=f'jdbc:postgresql://127.0.0.1:{config["db_port"]}/{database}',DB_USERNAME='migration',DB_PASSWORD=config['password'],GATEWAY_SHARED_SECRET=config['gateway'],SERVICES_BILLING_SHARED_SECRET=config['billing'],SERVICES_BILLING_URL='http://127.0.0.1:18999',STUDIES_STORAGE_DIR=str(Path(tempfile.gettempdir()) / config['container'] / ('studies-'+database)))
-    if overrides:env.update(overrides)
-    log = (WORK / ('spring-'+database+'.log')).open('wb')
-    process = subprocess.Popen([str(JAVA),'-jar',str(WORK/'spring/target/doctorchart-0.0.1-SNAPSHOT.jar')],cwd=cwd,env=env,stdout=log,stderr=subprocess.STDOUT)
-    log.close()
-    try:
-        for _ in range(180):
-            if process.poll() is not None:
-                raise RuntimeError(f'Spring exited; inspect .migration/spring-{database}.log')
-            try:
-                with urllib.request.urlopen(f'http://127.0.0.1:{port}/api/doctorchart/health',timeout=1) as response:
-                    # HTTP starts before ApplicationRunner/ApplicationReadyEvent; wait for seed commit.
-                    startup_log = (WORK / ('spring-'+database+'.log')).read_text(errors='replace')
-                    ready = '[RULES REGISTRY] Successfully loaded' in startup_log or '[RULES REGISTRY] Safe fallback rules activated' in startup_log
-                    if response.status == 200 and ready:
-                        return process
-                    time.sleep(0.5)
-            except (OSError,urllib.error.URLError):
-                time.sleep(0.5)
-        raise RuntimeError('Spring did not become healthy')
-    except BaseException:
-        process.terminate()
-        process.wait(timeout=15)
-        raise
-
-def start_go(config,database,port=18084,cwd=WORK,overrides=None):
-    env=dict(os.environ,PORT=str(port),SPRING_DATASOURCE_URL=f'jdbc:postgresql://127.0.0.1:{config["db_port"]}/{database}',DB_USERNAME='migration',DB_PASSWORD=config['password'],GATEWAY_SHARED_SECRET=config['gateway'],SERVICES_BILLING_SHARED_SECRET=config['billing'],SERVICES_BILLING_URL='http://127.0.0.1:18999',STUDIES_STORAGE_DIR=str(Path(tempfile.gettempdir())/config['container']/('studies-'+database)))
-    if overrides:env.update(overrides)
-    log=(WORK/('go-'+database+'.log')).open('wb')
-    process=subprocess.Popen([str(ROOT/'bin/doctorchart.exe')],cwd=cwd,env=env,stdout=log,stderr=subprocess.STDOUT);log.close()
-    return process
-
 def prepare():
     WORK.mkdir(exist_ok=True)
-    cfg = dict(container='doctorchart-go-fixture-'+secrets.token_hex(4),password=secrets.token_hex(24),gateway=secrets.token_hex(24),billing=secrets.token_hex(24))
+    descriptor = WORK / 'fixture.json'
+    if descriptor.exists():
+        raise RuntimeError('Fixture descriptor already exists; do not overwrite an existing fixture')
+    cfg = dict(container='doctorchart-go-fixture-'+secrets.token_hex(4),
+               password=secrets.token_hex(24), gateway=secrets.token_hex(24), billing=secrets.token_hex(24),
+               label={FIXTURE_LABEL_KEY: FIXTURE_LABEL_VALUE})
     env = dict(os.environ, POSTGRES_PASSWORD=cfg['password'])
-    subprocess.run(['docker','run','-d','--name',cfg['container'],'--label','doctorchart-go.migration=fixture','-e','POSTGRES_PASSWORD','-e','POSTGRES_USER=migration','-e','POSTGRES_DB=spring','-p','127.0.0.1::5432','postgres:17-alpine'],env=env,check=True,stdout=subprocess.PIPE)
-    cfg['db_port'] = int(command('docker','port',cfg['container'],'5432').decode().strip().split(':')[-1])
-    (WORK/'fixture.json').write_text(json.dumps(cfg),encoding='utf-8')
+    result = subprocess.run(['docker', 'run', '-d', '--name', cfg['container'],
+                             '--label', FIXTURE_LABEL_KEY+'='+FIXTURE_LABEL_VALUE,
+                             '--tmpfs', '/var/lib/postgresql/data',
+                             '-e', 'POSTGRES_PASSWORD', '-e', 'POSTGRES_USER=migration', '-e', 'POSTGRES_DB=target',
+                             '-p', '127.0.0.1::5432', 'postgres:17-alpine'],
+                            env=env, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    cfg['container_id'] = result.stdout.decode('ascii').strip()
+    cfg['db_port'] = int(command('docker', 'port', cfg['container'], '5432/tcp').decode().strip().rsplit(':', 1)[1])
+    verify_fixture(cfg)
+    try:
+        with descriptor.open('x', encoding='utf-8') as output:
+            output.write(json.dumps(cfg, indent=2)+'\n')
+    except FileExistsError:
+        # A concurrent prepare owns the existing descriptor. Remove only the
+        # container whose exact identity was just verified for this invocation.
+        verify_fixture(cfg)
+        command('docker', 'rm', '-f', cfg['container'])
+        raise RuntimeError('Fixture descriptor appeared concurrently; it was not overwritten')
     for _ in range(30):
-        if subprocess.run(['docker','exec',cfg['container'],'pg_isready','-U','migration','-d','spring'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL).returncode == 0:
-            break
+        verify_fixture(cfg)
+        result = subprocess.run(['docker', 'exec', cfg['container'], 'pg_isready', '-U', 'migration', '-d', 'target'],
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if result.returncode == 0:
+            print(json.dumps({'fixture': cfg['container'], 'container_id': cfg['container_id'],
+                              'label': cfg['label'], 'loopback_port': cfg['db_port'],
+                              'postgres': '17-alpine', 'database': 'target', 'schema': 'empty'}))
+            return
         time.sleep(0.5)
-    source = start_spring(cfg)
-    source.terminate()
-    source.wait(timeout=20)
-    dump = command('docker','exec',cfg['container'],'pg_dump','-U','migration','-d','spring','--no-owner','--no-privileges')
-    (WORK/'fixture.sql').write_bytes(dump)
-    sql(cfg,'postgres','CREATE DATABASE target;')
-    sql(cfg,'target',dump.decode())
-    schema = command('docker','exec',cfg['container'],'pg_dump','-U','migration','-d','spring','--schema-only','--no-owner','--no-privileges').decode()
-    # PG dump restrict keys are random per invocation and have no schema semantics.
-    schema = '\n'.join(line for line in schema.splitlines() if not line.startswith(('\\restrict','\\unrestrict')))+'\n'
-    (ROOT/'migration/schema-reference.sql').write_text(schema,encoding='utf-8')
-    print(json.dumps({'fixture':cfg['container'],'postgres':'17-alpine','tables':sql(cfg,'spring',"SELECT count(*) FROM pg_tables WHERE schemaname='public';").strip(),'source':'fresh build of pinned Spring revision','original_project':'untouched'}))
+    raise RuntimeError('Owned PostgreSQL fixture did not become ready; its descriptor was retained for explicit cleanup')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('action', choices=['prepare','stop'])
+    parser.add_argument('action', choices=['prepare', 'stop'])
     action = parser.parse_args().action
     if action == 'prepare':
         prepare()
     else:
-        config = json.loads((WORK/'fixture.json').read_text())
-        name = config['container']
-        if not name.startswith('doctorchart-go-fixture-'):
-            raise RuntimeError('Refusing to remove unrecognized fixture')
-        command('docker','rm','-f',name)
+        descriptor = WORK / 'fixture.json'
+        config = json.loads(descriptor.read_text())
+        verify_fixture(config)
+        command('docker', 'rm', '-f', config['container'])
+        descriptor.unlink()

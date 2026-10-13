@@ -8,7 +8,7 @@ import (
 )
 
 func TestConfigurationDirectoryAndSecretPrecedence(t *testing.T) {
-	const rootEnv = "GATEWAY_SHARED_SECRET=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\nSERVICES_BILLING_SHARED_SECRET=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\nSPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/fixture\nDB_USERNAME=fixture\nDB_PASSWORD=fixture\nSERVICES_BILLING_URL=http://localhost:8081\n"
+	const rootEnv = "GATEWAY_SHARED_SECRET=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\nSERVICES_BILLING_SHARED_SECRET=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\nDATABASE_URL=postgresql://fixture:fixture@localhost:5432/fixture\nSERVICES_BILLING_URL=http://localhost:8081\n"
 	const canonical = "GATEWAY_SHARED_SECRET"
 	const alias = "APP_SECURITY_GATEWAY_SECRET"
 	const fileSecret = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"

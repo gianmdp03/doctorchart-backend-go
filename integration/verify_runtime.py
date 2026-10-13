@@ -1,5 +1,6 @@
 """Restore this owned integration DB; check the current nonroot Go image and SIGTERM."""
 import concurrent.futures, json, os, secrets, subprocess, sys, time
+import urllib.parse
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'migration'))
 from fixture import ROOT, WORK, command, sql
@@ -17,11 +18,11 @@ sql(cfg,database,backup)
 evidence={'source_database':origin,'database':database,'restore_full_dump_equal':backup==normalized_dump(cfg,database),
     'restore_schema_equal':schema(cfg,origin)==schema(cfg,database),'tables':int(sql(cfg,database,"SELECT count(*) FROM pg_tables WHERE schemaname='public';").strip())}
 name='doctorchart-integration-runtime-'+secrets.token_hex(4)
-env=dict(os.environ,SPRING_DATASOURCE_URL=f'jdbc:postgresql://host.docker.internal:{cfg["db_port"]}/{database}',
-    DB_USERNAME='migration',DB_PASSWORD=cfg['password'],GATEWAY_SHARED_SECRET=cfg['gateway'],
+database_url=f'postgresql://migration:{urllib.parse.quote(cfg["password"],safe="")}@host.docker.internal:{cfg["db_port"]}/{urllib.parse.quote(database,safe="")}?sslmode=disable'
+env=dict(os.environ,DATABASE_URL=database_url,GATEWAY_SHARED_SECRET=cfg['gateway'],
     SERVICES_BILLING_SHARED_SECRET=cfg['billing'],SERVICES_BILLING_URL='http://host.docker.internal:18999')
 args=['docker','run','-d','--name',name,'--label','doctorchart-go.integration=runtime','-p','127.0.0.1::8083']
-for key in ['SPRING_DATASOURCE_URL','DB_USERNAME','DB_PASSWORD','GATEWAY_SHARED_SECRET','SERVICES_BILLING_SHARED_SECRET','SERVICES_BILLING_URL']:args+=['-e',key]
+for key in ['DATABASE_URL','GATEWAY_SHARED_SECRET','SERVICES_BILLING_SHARED_SECRET','SERVICES_BILLING_URL']:args+=['-e',key]
 args+=['doctorchart-go:staging-local']
 subprocess.run(args,env=env,check=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
 holder=None
@@ -54,7 +55,7 @@ try:
         code=int(command('docker','wait',name).decode().strip())
         evidence.update(inflight_request_status=response['status'],graceful_exit_code=code,shutdown_seconds=time.monotonic()-started,worker_joined=code==0)
     holder.stdin.close();holder.wait(timeout=5);holder=None
-    evidence['passed']=all([evidence['restore_full_dump_equal'],evidence['restore_schema_equal'],evidence['tables']==20,evidence['nonroot_user']=='65532:65532',evidence['linux_clinical_preview'],evidence['inflight_request_status']==200,evidence['graceful_exit_code']==0])
+    evidence['passed']=all([evidence['restore_full_dump_equal'],evidence['restore_schema_equal'],evidence['tables']==21,evidence['nonroot_user']=='65532:65532',evidence['linux_clinical_preview'],evidence['inflight_request_status']==200,evidence['graceful_exit_code']==0])
     (ROOT/'integration/evidence/restore-runtime.json').write_text(json.dumps(evidence,indent=2),encoding='utf8')
     print(json.dumps(evidence),flush=True)
     if not evidence['passed']:raise SystemExit(1)

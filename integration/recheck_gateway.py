@@ -6,12 +6,12 @@ context=json.loads((LOCAL/'context.json').read_text()); cfg=context['fixture']
 name=context['gateway_container']
 if not name.startswith('doctorchart-integration-gateway-'):raise RuntimeError('Unowned container')
 copy=LOCAL/'gateway-current-source'; manifest={}
-for project in ['api-gateway','billing-service-go']:
+for project in ['api-ai-gateway-go','billing-service-go']:
     source=ROOT.parent/project
     for file in sorted(list(source.rglob('*.go'))+[source/'go.mod',source/'go.sum']):
         relative=file.relative_to(source)
         manifest[project+'/'+relative.as_posix()]=hashlib.sha256(file.read_bytes()).hexdigest()
-        if project=='api-gateway':
+        if project=='api-ai-gateway-go':
             target=copy/relative;target.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(file,target)
 (EVIDENCE/'reference-manifest-current.json').write_text(json.dumps(manifest,indent=2),encoding='utf8')
 with (EVIDENCE/'gateway-current-build.log').open('wb') as out:

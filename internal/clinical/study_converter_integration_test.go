@@ -72,7 +72,7 @@ func TestLiveStudyHTTPConverterAndPersistence(t *testing.T) {
 		t.Fatal(err)
 	}
 	var specialtyID, patientID int64
-	if err := pool.QueryRow(ctx, `INSERT INTO specialties(active,code,created_at,display_name,navigation,patient_record_actions,patient_record_tabs,updated_at,version) VALUES(true,'CONVERTER_TEST',now(),'Fixture','[]','[]','["STUDIES"]',now(),0) RETURNING id`).Scan(&specialtyID); err != nil {
+	if err := pool.QueryRow(ctx, `INSERT INTO specialties(active,code,created_at,display_name,navigation,patient_record_actions,patient_record_tabs,updated_at,version) VALUES(true,'CONVERTER_TEST',now(),'Fixture','[]','["PRINT_DOCUMENT"]','["SUMMARY","ENCOUNTERS","STUDIES","PRESCRIPTIONS"]',now(),0) RETURNING id`).Scan(&specialtyID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := pool.Exec(ctx, `INSERT INTO doctor_workspaces(created_at,current_step_key,definition,onboarding_completed,updated_at,user_id,version,specialty_id) VALUES(now(),'done','{"modulesConfig":{}}',true,now(),'fixture-owner',0,$1)`, specialtyID); err != nil {
@@ -161,9 +161,11 @@ func TestLiveStudyHTTPConverterAndPersistence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	service := &Service{pool: pool, workspaces: workspace.New(pool, nil), files: files}
+	service := &Service{pool: pool, workspaces: workspace.New(pool, nil), files: files, zone: time.UTC}
 	mux := http.NewServeMux()
 	service.StudyRoutes(mux)
+	service.PrescriptionRoutes(mux)
+	service.PrintRoutes(mux)
 	gatewayKey := strings.Repeat("g", 64)
 	handler := api.Gateway(gatewayKey, api.Dispatch(mux))
 	img := image.NewNRGBA(image.Rect(0, 0, 2400, 1000))
@@ -305,5 +307,63 @@ func TestLiveStudyHTTPConverterAndPersistence(t *testing.T) {
 	mu.Unlock()
 	if countStudies() != 21 || objectCount != 21 {
 		t.Fatalf("burst persistence mismatch: rows=%d objects=%d", countStudies(), objectCount)
+	}
+	// These reads/writes use real baseline tables, including document children
+	// and PDF queries; mocked SQL cannot establish their schema compatibility.
+	documentRequest := func(method, path, user, role, body string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest(method, path, strings.NewReader(body)).WithContext(ctx)
+		r.Header.Set("Content-Type", "application/json")
+		r.Header.Set("X-Gateway-Secret", gatewayKey)
+		r.Header.Set("X-User-Id", user)
+		r.Header.Set("X-User-Role", role)
+		r.Header.Set("X-User-Plan", "PRO")
+		r.Header.Set("X-User-Plan-Expires-At", time.Now().Add(time.Hour).UTC().Format(time.RFC3339))
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, r)
+		return w
+	}
+	documentPath := fmt.Sprintf("/api/doctorchart/patients/%d/prescriptions", patientID)
+	prescriptionBody := `{"type":"PRESCRIPTION","diagnosisDescription":"Synthetic diagnosis","prescriptions":[{"medicationName":"Synthetic medicine","dosage":"5 mg","administrationRoute":"oral","frequency":"daily","durationDays":5}],"diagnosticOrders":[]}`
+	for _, actor := range []struct{ user, role string }{{"other-owner", "DOCTOR"}, {"fixture-owner", "VIEWER"}} {
+		if w := documentRequest("POST", documentPath, actor.user, actor.role, prescriptionBody); w.Code != 403 {
+			t.Fatal("document creation bypassed authorization", w.Code)
+		}
+	}
+	w := documentRequest("POST", documentPath, "fixture-owner", "DOCTOR", prescriptionBody)
+	var prescription Prescription
+	if w.Code != 201 || json.Unmarshal(w.Body.Bytes(), &prescription) != nil || len(prescription.Medications) != 1 {
+		t.Fatal("baseline prescription creation failed", w.Code, w.Body.String())
+	}
+	recordPath := fmt.Sprintf("%s/%d", documentPath, prescription.ID)
+	w = documentRequest("GET", recordPath+"/print", "fixture-owner", "DOCTOR", "")
+	var printed printDocument
+	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &printed) != nil || printed.Patient.Name != "Synthetic Patient" || printed.ID != prescription.ID {
+		t.Fatal("baseline printable document read failed", w.Code, w.Body.String())
+	}
+	w = documentRequest("GET", recordPath+"/pdf", "fixture-owner", "DOCTOR", "")
+	if w.Code != 200 || !bytes.HasPrefix(w.Body.Bytes(), []byte("%PDF")) || w.Header().Get("Content-Type") != "application/pdf" || !strings.Contains(w.Header().Get("Cache-Control"), "no-store") {
+		t.Fatal("baseline private PDF generation failed", w.Code)
+	}
+	if w := documentRequest("GET", recordPath+"/pdf", "other-owner", "DOCTOR", ""); w.Code != 403 {
+		t.Fatal("foreign owner read a PDF", w.Code)
+	}
+	ordersBody := `{"type":"STUDY_ORDERS","prescriptions":[],"diagnosticOrders":["Synthetic laboratory order"]}`
+	w = documentRequest("POST", documentPath, "fixture-owner", "DOCTOR", ordersBody)
+	var order Prescription
+	if w.Code != 201 || json.Unmarshal(w.Body.Bytes(), &order) != nil || len(order.Orders) != 1 {
+		t.Fatal("baseline study order creation failed", w.Code, w.Body.String())
+	}
+	if w := documentRequest("POST", documentPath, "fixture-owner", "DOCTOR", strings.Replace(prescriptionBody, `"durationDays":5`, `"durationDays":0`, 1)); w.Code != 400 {
+		t.Fatal("invalid document accepted", w.Code)
+	}
+	var records, medications, orders int
+	if err := pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM patient_prescription_records),(SELECT count(*) FROM prescription_medications),(SELECT count(*) FROM prescription_diagnostic_orders)`).Scan(&records, &medications, &orders); err != nil || records != 2 || medications != 1 || orders != 1 {
+		t.Fatal("document children or rejected writes mismatch", records, medications, orders, err)
+	}
+	if w := documentRequest("DELETE", recordPath, "fixture-owner", "DOCTOR", ""); w.Code != 204 {
+		t.Fatal("baseline document deletion failed", w.Code)
+	}
+	if err := pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM patient_prescription_records),(SELECT count(*) FROM prescription_medications),(SELECT count(*) FROM prescription_diagnostic_orders)`).Scan(&records, &medications, &orders); err != nil || records != 1 || medications != 0 || orders != 1 {
+		t.Fatal("document deletion left child rows or removed other documents", records, medications, orders, err)
 	}
 }

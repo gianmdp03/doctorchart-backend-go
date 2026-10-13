@@ -52,13 +52,18 @@ func run() error {
 	if err := pool.Ping(startup); err != nil {
 		return errors.New("PostgreSQL is unavailable")
 	}
-	if err := bootstrap.EnsureSchema(startup, pool); err != nil {
-		return err
-	}
 	rules := billing.New(c.BillingURL)
 	rules.Load(startup)
 	mux := http.NewServeMux()
-	api.BaseRoutes(mux, rules, c.BillingSecret)
+	api.BaseRoutes(mux, rules, c.BillingSecret, func(ctx context.Context) error {
+		if err := pool.Ping(ctx); err != nil {
+			return errors.New("PostgreSQL is unavailable")
+		}
+		if !rules.Available() {
+			return errors.New("billing rules are unavailable")
+		}
+		return nil
+	})
 	validator, err := wizard.NewValidator()
 	if err != nil {
 		return err
@@ -83,7 +88,9 @@ func run() error {
 	clinicalService.PrintRoutes(mux)
 	maintenanceDone := make(chan struct{})
 	go func() { defer close(maintenanceDone); clinicalService.Maintain(ctx) }()
-	defer func() { stop(); <-maintenanceDone }()
+	rulesDone := make(chan struct{})
+	go func() { defer close(rulesDone); rules.RunRefresh(ctx) }()
+	defer func() { stop(); <-maintenanceDone; <-rulesDone }()
 	if err := clinicalService.CatalogRoutes(mux); err != nil {
 		return err
 	}

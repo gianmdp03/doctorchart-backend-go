@@ -3,23 +3,20 @@ package clinical
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"regexp"
-	"strings"
 	"testing"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/syntah/doctorchart-backend-go/internal/api"
+	"github.com/syntah/doctorchart-backend-go/internal/bootstrap"
 	"github.com/syntah/doctorchart-backend-go/internal/workspace"
 )
 
 // Opt-in real PostgreSQL + HTTP test. It accepts only a local disposable database
-// named doctorchart_growth_test and creates/drops its own unique schema.
+// named doctorchart_growth_test, which must be empty before the test starts.
 func TestGrowthHTTPPostgres(t *testing.T) {
 	dsn := os.Getenv("DOCTORCHART_GROWTH_TEST_DSN")
 	if dsn == "" {
@@ -34,42 +31,29 @@ func TestGrowthHTTPPostgres(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	admin, err := pgx.ConnectConfig(ctx, config.ConnConfig)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer admin.Close(context.Background())
-	schema := pgx.Identifier{fmt.Sprintf("growth_test_%d", time.Now().UnixNano())}.Sanitize()
-	if _, err = admin.Exec(ctx, "CREATE SCHEMA "+schema); err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		cleanup, stop := context.WithTimeout(context.Background(), 10*time.Second)
-		defer stop()
-		if _, err := admin.Exec(cleanup, "DROP SCHEMA "+schema+" CASCADE"); err != nil {
-			t.Error(err)
-		}
-	}()
-	// Use the repository's exact PostgreSQL column types and CHECK constraints.
-	ddl, err := os.ReadFile("../../migration/schema-reference.sql")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, name := range []string{"patients", "clinical_encounters", "specialties", "doctor_workspaces"} {
-		statement := regexp.MustCompile(`(?s)CREATE TABLE public\.` + name + ` \(\n.*?\n\);`).FindString(strings.ReplaceAll(string(ddl), "\r\n", "\n"))
-		if statement == "" {
-			t.Fatal("missing reference schema", name)
-		}
-		if _, err := admin.Exec(ctx, strings.Replace(statement, "public."+name, schema+"."+name, 1)); err != nil {
-			t.Fatal(err)
-		}
-	}
-	config.ConnConfig.RuntimeParams["search_path"] = strings.Trim(schema, `"`)
+	config.ConnConfig.RuntimeParams["search_path"] = "public"
 	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer pool.Close()
+	var objects int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public'`).Scan(&objects); err != nil {
+		t.Fatal(err)
+	}
+	if objects != 0 {
+		t.Fatal("growth fixture database must be empty; existing objects are preserved")
+	}
+	if err := bootstrap.EnsureSchema(ctx, pool); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		cleanup, stop := context.WithTimeout(context.Background(), 10*time.Second)
+		defer stop()
+		if _, err := pool.Exec(cleanup, "DROP SCHEMA public CASCADE; CREATE SCHEMA public"); err != nil {
+			t.Error(err)
+		}
+	}()
 	seed := []string{
 		`INSERT INTO specialties(id,active,code,created_at,display_name,navigation,patient_record_actions,patient_record_tabs,updated_at,version) VALUES(1,true,'PEDIATRICS',now(),'Pediatría','[]','[]','["GROWTH"]',now(),1)`,
 		`INSERT INTO doctor_workspaces(id,created_at,current_step_key,definition,onboarding_completed,updated_at,user_id,version,specialty_id) VALUES(1,now(),'COMPLETE','{"modulesConfig":{"GROWTH_CHARTS":true}}',true,now(),'owner',1,1),(2,now(),'COMPLETE','{"modulesConfig":{"GROWTH_CHARTS":false}}',true,now(),'disabled',1,1)`,

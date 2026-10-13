@@ -15,6 +15,7 @@ import shutil
 import ssl
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import urllib.error
@@ -22,7 +23,7 @@ import urllib.parse
 import urllib.request
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'migration'))
-from fixture import ROOT, WORK, command, sql, start_go
+from fixture import ROOT, WORK, command, sql
 from compare import Billing
 from verify_documents import S3
 from cryptography import x509
@@ -132,6 +133,21 @@ def stop_process(process):
         try: process.wait(timeout=10)
         except subprocess.TimeoutExpired: process.kill(); process.wait(timeout=10)
 
+def start_go(config, database, port=18084, cwd=WORK, overrides=None):
+    # This current Go fixture starts against a new empty database. PostgreSQL
+    # baseline creation and catalog seeds belong entirely to the Go bootstrap.
+    user = urllib.parse.quote('migration', safe='')
+    password = urllib.parse.quote(config['password'], safe='')
+    database_name = urllib.parse.quote(database, safe='')
+    address = f'postgresql://{user}:{password}@127.0.0.1:{config["db_port"]}/{database_name}?sslmode=disable'
+    env = dict(os.environ, PORT=str(port), DATABASE_URL=address,
+               GATEWAY_SHARED_SECRET=config['gateway'], SERVICES_BILLING_SHARED_SECRET=config['billing'],
+               SERVICES_BILLING_URL='http://127.0.0.1:18999',
+               STUDIES_STORAGE_DIR=str(Path(tempfile.gettempdir())/config['container']/('studies-'+database)))
+    if overrides: env.update(overrides)
+    with (WORK/('go-'+database+'.log')).open('wb') as log:
+        return subprocess.Popen([str(ROOT/'bin/doctorchart.exe')], cwd=cwd, env=env, stdout=log, stderr=log)
+
 def main():
     LOCAL.mkdir(parents=True, exist_ok=True); EVIDENCE.mkdir(parents=True, exist_ok=True)
     stop = LOCAL/'stop'; stop.unlink(missing_ok=True)
@@ -143,19 +159,19 @@ def main():
     # Docker Desktop can reassign an ephemeral published port after a restart.
     cfg['db_port'] = int(command('docker','port',cfg['container'],'5432/tcp').decode().strip().rsplit(':',1)[1])
     (WORK/'fixture.json').write_text(json.dumps(cfg, indent=2)+'\n')
-    gateway_source = ROOT.parent/'api-gateway'; gateway_copy = LOCAL/'gateway-source'
+    gateway_source = ROOT.parent/'api-ai-gateway-go'; gateway_copy = LOCAL/'gateway-source'
     if gateway_copy.exists():
         if gateway_copy.resolve().parent != LOCAL.resolve(): raise RuntimeError('Unowned gateway copy')
         for path in list(gateway_copy.rglob('*.go'))+[gateway_copy/'go.mod', gateway_copy/'go.sum']:
             if path.resolve().is_relative_to(gateway_copy.resolve()): path.unlink(missing_ok=True)
             else: raise RuntimeError('Gateway copy contains an external link')
     manifest = {}
-    for project in ['api-gateway', 'billing-service-go']:
+    for project in ['api-ai-gateway-go', 'billing-service-go']:
         source = ROOT.parent/project
         for path in sorted(list(source.rglob('*.go'))+[source/'go.mod', source/'go.sum']):
             relative = path.relative_to(source)
             manifest[project+'/'+relative.as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
-            if project == 'api-gateway':
+            if project == 'api-ai-gateway-go':
                 dest = gateway_copy/relative; dest.parent.mkdir(parents=True, exist_ok=True); shutil.copyfile(path, dest)
     (EVIDENCE/'reference-manifest.json').write_text(json.dumps(manifest, indent=2)+'\n')
     with (LOCAL/'gateway-build.log').open('wb') as log:
@@ -178,7 +194,6 @@ def main():
     for server in servers: threading.Thread(target=server.serve_forever, daemon=True).start()
     database = 'integration_'+secrets.token_hex(4)
     sql(cfg, 'postgres', 'CREATE DATABASE '+database+';')
-    sql(cfg, database, (ROOT/'migration/schema-reference.sql').read_text())
     processes = []; container = 'doctorchart-integration-gateway-'+secrets.token_hex(4)
     try:
         overrides = {'STORAGE_TYPE': 's3', 'S3_ENDPOINT': 'http://127.0.0.1:19200', 'S3_BUCKET': 'integration-fixture',

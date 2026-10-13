@@ -148,6 +148,23 @@ func ownedPatient(ctx context.Context, tx pgx.Tx, userID string, id int64) (Pati
 	}
 	return p, nil
 }
+
+// All encounter writes take the patient lock before touching encounter rows.
+// Count/check/write then serializes across pools and backend instances.
+func lockPatient(ctx context.Context, tx pgx.Tx, userID string, id int64) error {
+	var owner string
+	err := tx.QueryRow(ctx, "SELECT user_id FROM patients WHERE id=$1 FOR UPDATE", id).Scan(&owner)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return api.Failure(404, "PATIENT_NOT_FOUND", "No se encontró el paciente.")
+	}
+	if err != nil {
+		return err
+	}
+	if owner != userID {
+		return api.Failure(403, "FORBIDDEN", "No tenés permiso para acceder a este paciente.")
+	}
+	return nil
+}
 func (s *Service) transaction(ctx context.Context, readOnly bool, fn func(pgx.Tx) error) error {
 	options := pgx.TxOptions{}
 	if readOnly {
@@ -169,6 +186,9 @@ func (s *Service) transaction(ctx context.Context, readOnly bool, fn func(pgx.Tx
 }
 func clinicalDBError(err error) error {
 	var pg *pgconn.PgError
+	if errors.As(err, &pg) && pg.Code == "23505" && pg.ConstraintName == "clinical_encounters_one_first_visit" {
+		return api.Failure(400, "FIRST_VISIT_ALREADY_EXISTS", "El paciente ya cuenta con una primera consulta registrada.")
+	}
 	if errors.Is(err, pgx.ErrNoRows) || errors.As(err, &pg) && (strings.HasPrefix(pg.Code, "23") || pg.Code == "22001") {
 		return api.Failure(409, "VERSION_CONFLICT", "La configuración cambió. Actualizá los datos antes de guardar.")
 	}
@@ -370,7 +390,19 @@ func (s *Service) CreatePatient(ctx context.Context, identity api.Identity, requ
 	if err != nil {
 		return result, err
 	}
+	if err := s.refreshQuotaRules(ctx, identity); err != nil {
+		return result, err
+	}
 	err = s.transaction(ctx, false, func(tx pgx.Tx) error {
+		// UNIQUE(user_id) makes the workspace a stable owner quota lock. Take
+		// it before Effective's FOR SHARE, avoiding a competing lock upgrade.
+		var workspaceID int64
+		if err := tx.QueryRow(ctx, "SELECT id FROM doctor_workspaces WHERE user_id=$1 FOR UPDATE", identity.UserID).Scan(&workspaceID); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return api.Failure(409, "ONBOARDING_REQUIRED", "Completá la configuración antes de crear registros.")
+			}
+			return err
+		}
 		setup, err := s.workspaces.Effective(ctx, tx, identity.UserID, *expected)
 		if err != nil {
 			return err
@@ -385,6 +417,11 @@ func (s *Service) CreatePatient(ctx context.Context, identity api.Identity, requ
 			plan := billing.Plan(identity.Plan)
 			if plan == "NONE" {
 				return api.Failure(403, "FORBIDDEN", "No se pudo completar la solicitud.")
+			}
+			if plan != "FREE_TRIAL" {
+				if !s.rules.Available() {
+					return api.Failure(503, "BILLING_UNAVAILABLE", "Los límites no están disponibles. Reintentá más tarde.")
+				}
 			}
 			var count int64
 			if err := tx.QueryRow(ctx, "SELECT count(*) FROM patients WHERE user_id=$1", identity.UserID).Scan(&count); err != nil {
@@ -443,6 +480,24 @@ func (s *Service) CreatePatient(ctx context.Context, identity api.Identity, requ
 		return nil
 	})
 	return result, err
+}
+
+// Refresh before acquiring PostgreSQL quota locks or pool connections.
+func (s *Service) refreshQuotaRules(ctx context.Context, identity api.Identity) error {
+	plan := billing.Plan(identity.Plan)
+	admin := false
+	for _, role := range identity.Roles {
+		if strings.EqualFold(role, "ROLE_SUPER_ADMIN") {
+			admin = true
+		}
+	}
+	if admin || plan == "NONE" || plan == "FREE_TRIAL" {
+		return nil
+	}
+	if err := s.rules.EnsureFresh(ctx); err != nil {
+		return api.Failure(503, "BILLING_UNAVAILABLE", "Los límites no están disponibles. Reintentá más tarde.")
+	}
+	return nil
 }
 func (s *Service) UpdatePatient(ctx context.Context, userID string, id int64, request map[string]any) (Patient, error) {
 	var result Patient

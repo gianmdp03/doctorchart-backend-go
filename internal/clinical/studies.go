@@ -62,6 +62,10 @@ func enqueueStudyDeletion(ctx context.Context, tx pgx.Tx, key string) error {
 }
 func (s *Service) DeletePatient(ctx context.Context, user string, id int64) error {
 	err := s.transaction(ctx, false, func(tx pgx.Tx) error {
+		// Keep the same patient-before-encounter ordering as encounter writers.
+		if err := lockPatient(ctx, tx, user, id); err != nil {
+			return err
+		}
 		patient, err := ownedPatient(ctx, tx, user, id)
 		if err != nil {
 			return err

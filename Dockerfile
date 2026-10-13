@@ -4,6 +4,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY cmd ./cmd
 COPY internal ./internal
+COPY db ./db
 RUN CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /doctorchart ./cmd/api \
     && mkdir -p /storage/studies && chmod 700 /storage/studies
 

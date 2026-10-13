@@ -189,7 +189,13 @@ func (s *Service) CreateEncounter(ctx context.Context, identity api.Identity, re
 	if err != nil {
 		return result, err
 	}
+	if err := s.refreshQuotaRules(ctx, identity); err != nil {
+		return result, err
+	}
 	err = s.transaction(ctx, false, func(tx pgx.Tx) error {
+		if err := lockPatient(ctx, tx, identity.UserID, patientID); err != nil {
+			return err
+		}
 		p, err := ownedPatient(ctx, tx, identity.UserID, patientID)
 		if err != nil {
 			return err
@@ -221,6 +227,11 @@ func (s *Service) CreateEncounter(ctx context.Context, identity api.Identity, re
 		}
 		if !admin {
 			plan := billing.Plan(identity.Plan)
+			if plan != "NONE" && plan != "FREE_TRIAL" {
+				if !s.rules.Available() {
+					return api.Failure(503, "BILLING_UNAVAILABLE", "Los límites no están disponibles. Reintentá más tarde.")
+				}
+			}
 			max := s.rules.Int(plan, "max_records_per_patient", 100)
 			if plan == "NONE" || max != -1 && count >= int64(max) {
 				return api.Failure(403, "FORBIDDEN", "No se pudo completar la solicitud.")
@@ -283,6 +294,15 @@ func (s *Service) UpdateEncounter(ctx context.Context, userID string, id int64, 
 	}
 	err = s.transaction(ctx, false, func(tx pgx.Tx) error {
 		e, err := ownedEncounter(ctx, tx, userID, id)
+		if err != nil {
+			return err
+		}
+		if err := lockPatient(ctx, tx, userID, e.PatientID); err != nil {
+			return err
+		}
+		// Re-read after waiting: another writer may have changed the encounter
+		// version or removed it while this transaction acquired the patient lock.
+		e, err = ownedEncounter(ctx, tx, userID, id)
 		if err != nil {
 			return err
 		}
@@ -412,10 +432,17 @@ func (s *Service) EncounterRoutes(mux *http.ServeMux) {
 		id, err := pathID(r, "id")
 		if err == nil {
 			err = s.transaction(r.Context(), false, func(tx pgx.Tx) error {
+				e, err := ownedEncounter(r.Context(), tx, api.User(r.Context()).UserID, id)
+				if err != nil {
+					return err
+				}
+				if err := lockPatient(r.Context(), tx, api.User(r.Context()).UserID, e.PatientID); err != nil {
+					return err
+				}
 				if _, err := ownedEncounter(r.Context(), tx, api.User(r.Context()).UserID, id); err != nil {
 					return err
 				}
-				_, err := tx.Exec(r.Context(), "DELETE FROM clinical_encounters WHERE id=$1", id)
+				_, err = tx.Exec(r.Context(), "DELETE FROM clinical_encounters WHERE id=$1", id)
 				return err
 			})
 		}

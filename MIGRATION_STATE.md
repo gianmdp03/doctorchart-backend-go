@@ -1,5 +1,17 @@
 # DoctorChart migration state
 
+## PostgreSQL baseline follow-up — 2026-10-12, stage 3
+
+DoctorChart now uses the same PostgreSQL initialization procedure as Billing and Pointly, with its own dedicated database and clinical tables. [db/schema.sql](db/schema.sql) is the single embedded structural baseline: 20 functional tables plus `app_schema_state`, 21 tables total. The previous bootstrap SQL, duplicated reference SQL and temporary FIRST_VISIT preparation have been consolidated; no preproduction migration chain or backfill is needed for an empty installation.
+
+Normal startup calls `bootstrap.Run` once. `db.Ensure` owns one READ COMMITTED transaction and advisory lock `(17209, 3)` for DDL, clinical catalogs and baseline metadata; HTTP and jobs start after commit. Seeds preserve administered catalog values on restart. Existing FIRST_VISIT, patient/record quota transactions, immutable vaccination catalogs, identity and clinical rules remain in place.
+
+A genuinely empty database initializes. A valid initialized baseline is accepted after identity/version/SQL checksum and normalized live-catalog fingerprint checks. An old, partial, unknown or drifting schema fails explicitly without adoption, automatic repair or deletion. PostgreSQL configuration is now exclusively `DATABASE_URL` with PostgreSQL URI credentials; JDBC, `SPRING_DATASOURCE_*` and separate DB username/password settings are no longer inputs. Drivers remain `pgxpool`; no Java runtime is required.
+
+The [database guide](db/README.md) documents the common mechanism, validation, future versioned migrations and the future development reset procedure. No development reset has been executed. Stage 3 verification and its final result are recorded separately from the October 9 evidence below; those older PASS counts do not certify this baseline.
+
+## Historical Go integration handoff — 2026-10-09
+
 **Shared converter follow-up (2026-10-09):** the local optimizer has been removed at the user's request. Compatible uploads now use `syntah-image-converter-go` with the backend-selected `doctorchart-study` profile and an independent credential. Dimensions, format and quality belong to that service; explicit backend configuration controls whether transformation is allowed. Live HTTP/PostgreSQL tests and local/S3 protocol tests passed, alongside all Go tests, vet, build and Linux race tests. See [configuration, policy and reproducible proof](integration/SHARED_IMAGE_CONVERTER.md). Earlier storage/browser evidence below describes previous implementations.
 
 **Configuration follow-up (2026-10-09):** user requested `.env` exclusively. Go now reads optional `.env` with process variables taking priority; Java properties support and its local file were removed. Original local values were transferred privately and validated without connecting to their database. `.env.example` documents the variables. New Go checks are recorded separately in `integration/evidence/dotenv`; previous integration hashes represent the earlier verified snapshot, not this configuration follow-up. HTTP/clinical contracts were not changed.

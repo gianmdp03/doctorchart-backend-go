@@ -1,5 +1,5 @@
-// Package bootstrap creates the schema in an empty DoctorChart database and
-// initializes empty catalogs without overwriting persisted configuration.
+// Package bootstrap initializes DoctorChart's schema and catalogs atomically
+// without overwriting persisted configuration.
 package bootstrap
 
 import (
@@ -15,6 +15,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/syntah/doctorchart-backend-go/db"
 	"github.com/syntah/doctorchart-backend-go/internal/wizard"
 )
 
@@ -25,27 +26,21 @@ import (
 var seedJSON []byte
 
 func Run(ctx context.Context, pool *pgxpool.Pool, validator *wizard.Validator) error {
+	return db.Ensure(ctx, pool, func(ctx context.Context, tx pgx.Tx) error {
+		return seed(ctx, tx, validator)
+	})
+}
+
+// seed uses the transaction and advisory lock owned by db.Ensure. Both catalog
+// groups succeed together, including when an existing database is checked.
+func seed(ctx context.Context, tx pgx.Tx, validator *wizard.Validator) error {
 	var seeds map[string][]map[string]any
 	decoder := json.NewDecoder(bytes.NewReader(seedJSON))
 	decoder.UseNumber()
 	if err := decoder.Decode(&seeds); err != nil {
 		return fmt.Errorf("decode bootstrap definitions: %w", err)
 	}
-	transaction := func(run func(pgx.Tx) error) error {
-		tx, err := pool.Begin(ctx)
-		if err != nil {
-			return err
-		}
-		defer tx.Rollback(ctx)
-		if err = run(tx); err != nil {
-			return err
-		}
-		return tx.Commit(ctx)
-	}
-	if err := transaction(func(tx pgx.Tx) error {
-		if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(17209,41001)"); err != nil {
-			return err
-		}
+	if err := func() error {
 		var count int
 		if err := tx.QueryRow(ctx, "SELECT count(*) FROM specialties").Scan(&count); err != nil {
 			return err
@@ -139,14 +134,10 @@ func Run(ctx context.Context, pool *pgxpool.Pool, validator *wizard.Validator) e
 			}
 		}
 		return nil
-	}); err != nil {
+	}(); err != nil {
 		return fmt.Errorf("initialize specialty/chart/calculator catalogs: %w", err)
 	}
-	// VaccinationConfiguration is a separate Spring runner/transaction.
-	return transaction(func(tx pgx.Tx) error {
-		if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(742010)"); err != nil {
-			return err
-		}
+	return func() error {
 		calendar := seeds["vaccination_calendars"][0]
 		var existing []byte
 		err := tx.QueryRow(ctx, "SELECT definition FROM vaccination_calendars WHERE id=$1", calendar["id"]).Scan(&existing)
@@ -200,7 +191,7 @@ func Run(ctx context.Context, pool *pgxpool.Pool, validator *wizard.Validator) e
 			}
 		}
 		return nil
-	})
+	}()
 }
 
 // Identifiers here are fixed call-site literals, never request/configuration data.

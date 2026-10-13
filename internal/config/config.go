@@ -56,7 +56,7 @@ func Load() (Config, error) {
 	values := map[string]string{}
 	for _, item := range [][3]string{
 		{"server.port", "PORT", "8083"}, {"app.security.gateway-secret", "GATEWAY_SHARED_SECRET", ""}, {"services.billing.shared-secret", "SERVICES_BILLING_SHARED_SECRET", ""}, {"services.billing.url", "SERVICES_BILLING_URL", ""},
-		{"spring.datasource.url", "SPRING_DATASOURCE_URL", ""}, {"spring.datasource.username", "DB_USERNAME", ""}, {"spring.datasource.password", "DB_PASSWORD", ""},
+		{"DATABASE_URL", "", ""},
 		{"app.storage.type", "STORAGE_TYPE", "local"}, {"app.storage.studies-dir", "STUDIES_STORAGE_DIR", ""}, {"app.storage.s3.endpoint", "S3_ENDPOINT", ""}, {"app.storage.s3.bucket", "S3_BUCKET", ""}, {"app.storage.s3.access-key", "S3_ACCESS_KEY", ""}, {"app.storage.s3.secret-key", "S3_SECRET_KEY", ""}, {"app.storage.s3.region", "S3_REGION", "auto"},
 		{"services.image-converter.url", "IMAGE_CONVERTER_URL", ""}, {"services.image-converter.api-key", "IMAGE_CONVERTER_API_KEY", ""}, {"app.storage.allow-study-image-transformation", "STUDIES_ALLOW_IMAGE_TRANSFORM", "false"},
 	} {
@@ -87,20 +87,29 @@ func Load() (Config, error) {
 	if c.Storage.Converter.APIKey != "" && (c.Storage.Converter.APIKey == c.GatewaySecret || c.Storage.Converter.APIKey == c.BillingSecret) {
 		return c, errors.New("Configuración inválida: IMAGE_CONVERTER_API_KEY debe ser independiente de Gateway y Billing.")
 	}
-	for _, key := range []string{"spring.datasource.username", "spring.datasource.password", "spring.datasource.url", "services.billing.url"} {
+	for _, key := range []string{"DATABASE_URL", "services.billing.url"} {
 		if api.JavaBlank(values[key]) {
 			return c, fmt.Errorf("Configuración inválida: %s es obligatorio.", key)
 		}
 	}
-	raw := values["spring.datasource.url"]
-	if !strings.HasPrefix(raw, "jdbc:postgresql://") {
-		return c, fmt.Errorf("Configuración inválida: spring.datasource.url debe identificar una base PostgreSQL.")
+	raw := values["DATABASE_URL"]
+	db, err := url.Parse(raw)
+	if err != nil || strings.TrimSpace(raw) != raw ||
+		(db.Scheme != "postgres" && db.Scheme != "postgresql") ||
+		db.Hostname() == "" || strings.TrimSpace(strings.TrimPrefix(db.Path, "/")) == "" ||
+		db.User == nil || strings.TrimSpace(db.User.Username()) == "" || db.Fragment != "" || db.Opaque != "" {
+		return c, errors.New("Configuración inválida: DATABASE_URL debe ser una URL PostgreSQL con host, base y credenciales.")
 	}
-	db, err := url.Parse(strings.TrimPrefix(raw, "jdbc:"))
-	if err != nil || db.Hostname() == "" {
-		return c, fmt.Errorf("Configuración inválida: spring.datasource.url.")
+	password, present := db.User.Password()
+	if !present || strings.TrimSpace(password) == "" {
+		return c, errors.New("Configuración inválida: DATABASE_URL requiere una contraseña.")
 	}
-	db.User = url.UserPassword(values["spring.datasource.username"], values["spring.datasource.password"])
+	if db.Port() != "" {
+		port, err := strconv.Atoi(db.Port())
+		if err != nil || port < 1 || port > 65535 {
+			return c, errors.New("Configuración inválida: DATABASE_URL contiene un puerto inválido.")
+		}
+	}
 	c.DatabaseURL = db.String()
 	billingURL, err := url.Parse(c.BillingURL)
 	if err != nil || billingURL.Hostname() == "" || billingURL.Scheme != "http" && billingURL.Scheme != "https" || billingURL.User != nil || billingURL.ForceQuery || strings.Contains(c.BillingURL, "#") || billingURL.RawQuery != "" || billingURL.Fragment != "" {
