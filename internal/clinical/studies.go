@@ -15,6 +15,8 @@ import (
 	"time"
 	"unicode"
 
+	common "github.com/bycode/bycode-image-converter-go/pkg/media"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/syntah/doctorchart-backend-go/internal/api"
 	"github.com/syntah/doctorchart-backend-go/internal/storage"
@@ -235,7 +237,17 @@ func (s *Service) StudyRoutes(mux *http.ServeMux) {
 						originalName = name
 					}
 				}
-				stored, err = upload.Save(ctx, originalName, input)
+				uploadContext := ctx
+				if s.files.Managed() {
+					var stable string
+					err = s.pool.QueryRow(ctx, "SELECT media_identity::text FROM patients WHERE id=$1 AND user_id=$2", id, api.User(ctx).UserID).Scan(&stable)
+					if err == nil {
+						uploadContext = storage.WithOwner(ctx, api.User(ctx).UserID, stable)
+					}
+				}
+				if err == nil {
+					stored, err = upload.Save(uploadContext, originalName, input)
+				}
 			}
 			if err == nil {
 				err = s.transaction(ctx, false, func(tx pgx.Tx) error {
@@ -244,6 +256,33 @@ func (s *Service) StudyRoutes(mux *http.ServeMux) {
 						return err
 					}
 					at := time.Now().UTC()
+					if stored.Asset != nil {
+						// Identity is rechecked after conversion, including sequence reuse.
+						var identity string
+						if err := tx.QueryRow(ctx, "SELECT media_identity::text FROM patients WHERE id=$1", id).Scan(&identity); err != nil {
+							return err
+						}
+						if identity != stored.Asset.Associations[0].EntityID {
+							return api.Failure(409, "PATIENT_CHANGED", "El paciente cambió durante la carga.")
+						}
+						asset := *stored.Asset
+						asset.Status = common.Associated
+						asset.UpdatedAt = at
+						data, err := common.Encode(asset)
+						if err != nil {
+							return err
+						}
+						if _, err = tx.Exec(ctx, common.CatalogUpsert, asset.ID, string(data)); err != nil {
+							return err
+						}
+						eventID, event, err := common.QueuedEvent("association-confirmed", asset)
+						if err != nil {
+							return err
+						}
+						if _, err = tx.Exec(ctx, common.OutboxInsert, eventID, string(event)); err != nil {
+							return err
+						}
+					}
 					err := tx.QueryRow(ctx, "INSERT INTO patient_medical_studies(patient_id,original_file_name,stored_file_name,content_type,file_size,description,uploaded_at) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id", id, stored.Name, stored.Key, stored.ContentType, stored.Size, description, at).Scan(&result.ID)
 					result.PatientID = id
 					result.Name = stored.Name
@@ -252,10 +291,18 @@ func (s *Service) StudyRoutes(mux *http.ServeMux) {
 					result.Description = description
 					result.Uploaded = at.Format(time.RFC3339Nano)
 					result.key = stored.Key
+					if err == nil && stored.Asset != nil {
+						_, err = tx.Exec(ctx, "UPDATE patient_medical_studies SET media_asset_id=$1 WHERE id=$2", stored.Asset.ID, result.ID)
+					}
 					return err
 				})
 			}
-			if err != nil && stored.Key != "" {
+			if err == nil && stored.Asset != nil {
+				if flushErr := s.files.Flush(ctx); flushErr != nil {
+					slog.Warn("study media outbox awaits retry")
+				}
+			}
+			if err != nil && stored.Key != "" && stored.Asset == nil {
 				cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 				defer cancel()
 				if deleteErr := s.files.Delete(cleanup, stored.Key); deleteErr != nil {
@@ -399,6 +446,12 @@ func studyDisposition(name string) string {
 	return "inline; filename=\"" + strings.ReplaceAll(encoded.String(), "\"", "\\\"") + "\"; filename*=UTF-8''" + extended.String()
 }
 func (s *Service) deletePendingFiles(ctx context.Context) {
+	if s.files.RecoveryMode() {
+		return
+	}
+	if err := s.files.Flush(ctx); err != nil {
+		slog.Warn("media recovery outbox awaits retry")
+	}
 	cursor := ""
 	for ctx.Err() == nil {
 		rows, err := s.pool.Query(ctx, "SELECT storage_key FROM study_file_deletions WHERE storage_key>$1 ORDER BY storage_key LIMIT 100", cursor)
@@ -426,6 +479,25 @@ func (s *Service) deletePendingFiles(ctx context.Context) {
 		}
 		cursor = keys[len(keys)-1]
 		for _, key := range keys {
+			if s.files.Managed() {
+				// Retire owns a catalog transaction on this same pool. Do not
+				// hold a queue connection while it acquires its connection.
+				var referenced bool
+				if err := s.pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM patient_medical_studies WHERE stored_file_name=$1)", key).Scan(&referenced); err != nil {
+					slog.Warn("study deletion queue unavailable")
+					return
+				}
+				if referenced {
+					continue
+				}
+				if err := s.files.Delete(ctx, key); err != nil {
+					continue // durable queue and catalog intent remain for retry
+				}
+				if _, err := s.pool.Exec(ctx, "DELETE FROM study_file_deletions WHERE storage_key=$1 AND NOT EXISTS(SELECT 1 FROM patient_medical_studies WHERE stored_file_name=$1)", key); err != nil {
+					slog.Warn("study file deletion retained for retry")
+				}
+				continue
+			}
 			err := s.transaction(ctx, false, func(tx pgx.Tx) error {
 				var locked string
 				err := tx.QueryRow(ctx, "SELECT storage_key FROM study_file_deletions WHERE storage_key=$1 FOR UPDATE", key).Scan(&locked)
@@ -466,22 +538,8 @@ func (s *Service) Maintain(ctx context.Context) {
 		case <-timer.C:
 		}
 		s.deletePendingFiles(ctx)
-		err := s.files.Candidates(ctx, time.Now().UTC().Add(-24*time.Hour), func(key string) error {
-			var referenced bool
-			if err := s.pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM patient_medical_studies WHERE stored_file_name=$1)", key).Scan(&referenced); err != nil {
-				return err
-			}
-			if referenced {
-				return nil
-			}
-			if err := s.files.Delete(ctx, key); err != nil {
-				slog.Warn("orphan study deletion retained for retry")
-			}
-			return nil
-		})
-		if err != nil && ctx.Err() == nil {
-			slog.Warn("study reconciliation will retry")
-		}
+		// Absence from a restored database never authorizes physical deletion.
+		// Inventory and orphan classification are manual, read-only operations.
 		timer.Reset(300 * time.Second)
 	}
 }

@@ -25,6 +25,7 @@ type printAuthor struct {
 	Specialty *string `json:"specialtyName"`
 }
 type printDocument struct {
+	IssuanceZone  string          `json:"issuanceZone"`
 	Source        string          `json:"source"`
 	ID            int64           `json:"id"`
 	Code          string          `json:"code"`
@@ -80,6 +81,12 @@ func (s *Service) printable(ctx context.Context, user string, patientID, id int6
 			doc.ID = record.ID
 			doc.Code = fmt.Sprintf("HC-%d-%d", id, patientID)
 			doc.at = record.instant
+			var origin map[string]any
+			if err := json.Unmarshal(record.Context, &origin); err != nil {
+				return err
+			}
+			zone, _ := origin["zone"].(string)
+			doc.IssuanceZone = s.documentZone(zone).String()
 			doc.Author = printAuthor{UserID: patient.owner, Specialty: &record.Specialty.Name}
 			doc.DiagnosisCode = record.DiagnosisCode
 			doc.Diagnosis = record.Diagnosis
@@ -133,6 +140,7 @@ func (s *Service) printable(ctx context.Context, user string, patientID, id int6
 			if err != nil {
 				return err
 			}
+			doc.IssuanceZone = s.documentZone(record.IssuanceZone).String()
 			doc.Type = record.Type
 			doc.Diagnosis = &record.Diagnosis
 			doc.Instructions = &record.Instructions
@@ -160,7 +168,7 @@ func (s *Service) printable(ctx context.Context, user string, patientID, id int6
 		if err != nil {
 			return err
 		}
-		local := doc.at.In(s.zone)
+		local := doc.at.In(s.documentZone(doc.IssuanceZone))
 		reference := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.UTC)
 		doc.Patient = printPatient{patient.ID, patient.FullName, patient.NationalID, patient.BirthDate, printAge(birth, reference), patient.Insurance}
 		doc.Issued = api.FormatInstant(doc.at)

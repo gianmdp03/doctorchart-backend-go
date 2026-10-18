@@ -76,6 +76,7 @@ func Public(method, path string) bool {
 }
 
 func Gateway(secret string, next http.Handler) http.Handler {
+	next = WithTimeZone(next)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Match Spring Security's default headers, including errors.
 		w.Header().Set("X-Content-Type-Options", "nosniff")

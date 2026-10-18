@@ -177,7 +177,7 @@ func (s *Service) ListPatients(ctx context.Context, userID string, query url.Val
 	default:
 		return nil, api.Invalid("La solicitud contiene datos inválidos.")
 	}
-	todayText := time.Now().In(s.zone).Format("2006-01-02")
+	todayText := time.Now().In(s.viewZone(ctx)).Format("2006-01-02")
 	today, err := time.Parse("2006-01-02", todayText)
 	if err != nil {
 		return nil, err
@@ -230,7 +230,7 @@ func (s *Service) ListPatients(ctx context.Context, userID string, query url.Val
 		item.Age = directoryAge(birth, today, item.Months)
 		item.Group = ageGroup(item.Months)
 		if last != nil {
-			date := last.In(s.zone).Format("2006-01-02")
+			date := last.In(s.viewZone(ctx)).Format("2006-01-02")
 			item.LastDate = &date
 		}
 		content = append(content, item)

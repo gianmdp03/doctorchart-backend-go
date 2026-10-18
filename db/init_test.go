@@ -58,7 +58,7 @@ func TestBaselineEmptyRestartAndSequences(t *testing.T) {
 		t.Fatal(err)
 	}
 	var count int
-	if err := pool.QueryRow("SELECT count(*) FROM pg_tables WHERE schemaname='public'").Scan(&count); err != nil || count != 21 {
+	if err := pool.QueryRow("SELECT count(*) FROM pg_tables WHERE schemaname='public'").Scan(&count); err != nil || count != 23 {
 		t.Fatal(count, err)
 	}
 	// Normal sequence advancement is data, never catalog drift.

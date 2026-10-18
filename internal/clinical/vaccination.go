@@ -120,7 +120,7 @@ func projectDose(cal calendar, vaccine vaccine, app application, months int, app
 	return Dose{app.ID, cal.ID, vaccine.ID, vaccine.Name, app.Dose, rule.From, rule.To, monthLabel(rule.From), status, applied}
 }
 func (s *Service) schedule(ctx context.Context, tx pgx.Tx, p Patient, cal calendar) (Schedule, error) {
-	todayText := time.Now().In(s.zone).Format("2006-01-02")
+	todayText := time.Now().In(s.viewZone(ctx)).Format("2006-01-02")
 	today, err := time.Parse("2006-01-02", todayText)
 	if err != nil {
 		return Schedule{}, err
@@ -282,7 +282,7 @@ func (s *Service) SaveVaccination(ctx context.Context, userID string, patientID 
 			return vaccinationError("Una dosis no aplicada no puede tener fecha de aplicación.")
 		}
 		if applied {
-			dateText := time.Now().In(s.zone).Format("2006-01-02")
+			dateText := time.Now().In(s.viewZone(ctx)).Format("2006-01-02")
 			if existing != nil {
 				dateText = existing.Applied
 			}
@@ -297,7 +297,7 @@ func (s *Service) SaveVaccination(ctx context.Context, userID string, patientID 
 			if err != nil {
 				return err
 			}
-			today, err := time.Parse("2006-01-02", time.Now().In(s.zone).Format("2006-01-02"))
+			today, err := time.Parse("2006-01-02", time.Now().In(s.viewZone(ctx)).Format("2006-01-02"))
 			if err != nil {
 				return err
 			}

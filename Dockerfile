@@ -1,5 +1,6 @@
 FROM golang:1.27.2 AS build
-WORKDIR /src
+WORKDIR /workspace/doctorchart-backend-go
+COPY --from=media / /workspace/bycode-image-email-service-go/pkg/media
 COPY go.mod go.sum ./
 RUN go mod download
 COPY cmd ./cmd

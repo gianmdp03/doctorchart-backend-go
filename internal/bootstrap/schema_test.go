@@ -75,7 +75,7 @@ func assertFixtureReady(t *testing.T, pool *pgxpool.Pool) {
 	if err := pool.QueryRow(context.Background(), "SELECT count(*) FROM vaccination_calendars").Scan(&calendars); err != nil {
 		t.Fatal(err)
 	}
-	if tables != 21 || constraints != 19 || specialties == 0 || calendars != 1 {
+	if tables != 23 || constraints != 20 || specialties == 0 || calendars != 1 {
 		t.Fatalf("startup produced %d tables, %d foreign keys, %d specialties and %d calendars", tables, constraints, specialties, calendars)
 	}
 	var expected map[string][]json.RawMessage

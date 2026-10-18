@@ -156,7 +156,9 @@ func (s *Service) printPDF(doc printDocument, metadata url.Values) ([]byte, erro
 	pdf.SetX(40)
 	line(309, 19.5, title, "B", 13, accent, "L")
 	pdf.SetXY(349, y)
-	line(206, 12.75, "Fecha: "+doc.at.In(s.zone).Format("02/01/2006")+"  |  ID: "+doc.Code, "", 8.5, dark, "R")
+	line(206, 12.75, "Fecha: "+doc.at.In(s.documentZone(doc.IssuanceZone)).Format("02/01/2006")+"  |  ID: "+doc.Code, "", 8.5, dark, "R")
+	pdf.SetXY(349, y+12.75)
+	line(206, 10, "Zona de emisión: "+s.documentZone(doc.IssuanceZone).String(), "", 7.5, dark, "R")
 	pdf.SetY(y + 27.5)
 	insurance, err := wizard.Decode(doc.Patient.Insurance)
 	if err != nil {

@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"errors"
 	"fmt"
 	"io"
@@ -15,6 +16,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+
+	common "github.com/bycode/bycode-image-converter-go/pkg/media"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -28,10 +31,12 @@ const MaxBytes = 10_000_000
 var storageKey = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
 
 type Config struct {
+	Managed                                                         *common.Config
 	Type, Directory, Endpoint, Bucket, AccessKey, SecretKey, Region string
 	Converter                                                       ConverterConfig
 }
 type Store struct {
+	library   *common.Library
 	root      string
 	client    *s3.Client
 	bucket    string
@@ -40,6 +45,7 @@ type Store struct {
 	converter *studyConverter
 }
 type File struct {
+	Asset                  *common.Asset
 	Key, Name, ContentType string
 	Size                   int64
 }
@@ -64,6 +70,14 @@ func New(config Config) (*Store, error) {
 	store.converter, err = newStudyConverter(config.Converter)
 	if err != nil {
 		return nil, err
+	}
+	if config.Managed != nil {
+		manager, err := common.NewManager(*config.Managed)
+		if err != nil {
+			return nil, err
+		}
+		store.library = &common.Library{Manager: manager}
+		return store, nil
 	}
 	if config.Type == "s3" {
 		if api.JavaBlank(config.Bucket) {
@@ -210,7 +224,16 @@ func (s *Store) save(ctx context.Context, name string, input io.Reader) (File, e
 	if err != nil {
 		return File{}, unavailable()
 	}
-	stored := File{key, name, contentType, int64(len(content))}
+	stored := File{Key: key, Name: name, ContentType: contentType, Size: int64(len(content))}
+	if s.library != nil {
+		identity, _ := ctx.Value(mediaIdentityKey{}).(mediaIdentity)
+		asset, err := s.library.Manager.Prepare(ctx, key, identity.owner, "studies", "original", contentType, "private", "doctorchart-study", identity.refs, content)
+		if err != nil {
+			return File{}, unavailable()
+		}
+		stored.Asset = &asset
+		return stored, nil
+	}
 	if s.client != nil {
 		_, err := s.client.PutObject(ctx, &s3.PutObjectInput{Bucket: &s.bucket, Key: &key, ContentType: &contentType, ContentLength: &stored.Size, Body: bytes.NewReader(content)})
 		if err != nil {
@@ -274,6 +297,14 @@ func (s *Store) readOriginal(ctx context.Context, name string, input io.Reader) 
 	return content, contentType, err
 }
 func (s *Store) Open(ctx context.Context, key string) (io.ReadCloser, int64, error) {
+	if s.library != nil {
+		asset, err := s.library.Catalog.Get(ctx, key)
+		if err != nil {
+			return nil, 0, mediaReadError(err)
+		}
+		f, err := s.library.Manager.Open(ctx, asset)
+		return f, asset.Size, mediaReadError(err)
+	}
 	if err := validateKey(key); err != nil {
 		return nil, 0, err
 	}
@@ -314,6 +345,9 @@ func (s *Store) Open(ctx context.Context, key string) (io.ReadCloser, int64, err
 	return file, opened.Size(), nil
 }
 func (s *Store) Delete(ctx context.Context, key string) error {
+	if s.library != nil {
+		return s.library.Retire(ctx, key)
+	}
 	if err := validateKey(key); err != nil {
 		return err
 	}
@@ -346,6 +380,10 @@ func (s *Store) Delete(ctx context.Context, key string) error {
 	return err
 }
 func (s *Store) Candidates(ctx context.Context, cutoff time.Time, visit func(string) error) error {
+	// Managed inventories belong to the manual, read-only reconciler.
+	if s.library != nil {
+		return nil
+	}
 	if s.client != nil {
 		pages := s3.NewListObjectsV2Paginator(s.client, &s3.ListObjectsV2Input{Bucket: &s.bucket}, func(options *s3.ListObjectsV2PaginatorOptions) {
 			options.StopOnDuplicateToken = true
@@ -398,4 +436,38 @@ func (s *Store) Candidates(ctx context.Context, cutoff time.Time, visit func(str
 			return err
 		}
 	}
+}
+
+type mediaIdentityKey struct{}
+type mediaIdentity struct {
+	owner string
+	refs  []common.Association
+}
+
+func WithOwner(ctx context.Context, owner, patientIdentity string) context.Context {
+	return context.WithValue(ctx, mediaIdentityKey{}, mediaIdentity{owner, []common.Association{{EntityType: "patient", EntityID: patientIdentity, Role: "study"}}})
+}
+func (s *Store) Managed() bool { return s.library != nil }
+func (s *Store) SetCatalog(db *sql.DB) {
+	if s.library != nil {
+		s.library.Catalog = common.Catalog{DB: db}
+	}
+}
+func (s *Store) Flush(ctx context.Context) error {
+	if s.library == nil {
+		return nil
+	}
+	return s.library.Flush(ctx)
+}
+func (s *Store) RecoveryMode() bool {
+	return s.library != nil && s.library.Manager.Config.Policy.RecoveryMode
+}
+func mediaReadError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, common.ErrMissing) {
+		return Missing()
+	}
+	return unavailable()
 }

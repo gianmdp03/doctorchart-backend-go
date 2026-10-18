@@ -94,9 +94,9 @@ func (s *Service) encounterQueryRoutes(mux *http.ServeMux) {
 		clinicalReply(w, result, err, 200)
 	})
 	mux.HandleFunc("GET /api/doctorchart/encounters/dashboard", func(w http.ResponseWriter, r *http.Request) {
-		today := time.Now().In(s.zone)
-		start := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, s.zone)
-		month := time.Date(today.Year(), today.Month(), 1, 0, 0, 0, 0, s.zone)
+		today := time.Now().In(s.viewZone(r.Context()))
+		start := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, s.viewZone(r.Context()))
+		month := time.Date(today.Year(), today.Month(), 1, 0, 0, 0, 0, s.viewZone(r.Context()))
 		result := encounterDashboard{Date: today.Format("2006-01-02"), Recent: []recentEncounter{}}
 		err := s.readSnapshot(r.Context(), func(tx pgx.Tx) error {
 			owner := api.User(r.Context()).UserID
@@ -124,7 +124,7 @@ func (s *Service) encounterQueryRoutes(mux *http.ServeMux) {
 				if err != nil {
 					return err
 				}
-				result.Recent = append(result.Recent, recentEncounter{e.EncounterSummary, dashboardAge(birth, day), national, e.instant.In(s.zone).Format("2006-01-02")})
+				result.Recent = append(result.Recent, recentEncounter{e.EncounterSummary, dashboardAge(birth, day), national, e.instant.In(s.viewZone(r.Context())).Format("2006-01-02")})
 			}
 			return rows.Err()
 		})

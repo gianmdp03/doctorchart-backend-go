@@ -177,7 +177,7 @@ func (s *Service) CalculatorRoutes(mux *http.ServeMux) {
 			err = s.workspaces.RequireFeature(r.Context(), api.User(r.Context()).UserID, "CALCULATORS")
 		}
 		if err == nil {
-			result, err = s.calculate(request["calculationCode"].(string), request["inputSnapshot"].(map[string]any), time.Now().UTC())
+			result, err = s.calculateForZone(r.Context(), request["calculationCode"].(string), request["inputSnapshot"].(map[string]any), time.Now().UTC())
 		}
 		clinicalReply(w, result, err, 200)
 	})
@@ -210,7 +210,7 @@ func (s *Service) CalculatorRoutes(mux *http.ServeMux) {
 					}
 					encounterID = &id
 				}
-				result, err := s.calculate(request["calculationCode"].(string), request["inputSnapshot"].(map[string]any), time.Now().UTC())
+				result, err := s.calculateForZone(r.Context(), request["calculationCode"].(string), request["inputSnapshot"].(map[string]any), time.Now().UTC())
 				if err != nil {
 					return err
 				}
@@ -419,7 +419,7 @@ func (s *Service) calculatorAutofill(ctx context.Context, tx pgx.Tx, user string
 	if err != nil {
 		return nil, err
 	}
-	months := ageMonths(birth, time.Now().In(s.zone))
+	months := ageMonths(birth, time.Now().In(s.viewZone(ctx)))
 	var age *int
 	if months != nil {
 		years := *months / 12
@@ -431,7 +431,7 @@ func (s *Service) calculatorAutofill(ctx context.Context, tx pgx.Tx, user string
 		result["heightCm"] = patient.Measurements.Height
 	}
 	aliases := map[string][]string{"creatinineMgDl": {"creatinine", "serumcreatinine", "creatinina", "creatinina_serica", "creatininaserica", "cr"}, "serumCalciumMgDl": {"calcium", "serumcalcium", "calcio", "calcio_serico", "calcioserico", "ca"}, "serumAlbuminGDl": {"albumin", "serumalbumin", "albumina", "albumina_serica", "albuminaserica", "alb"}}
-	rows, err := tx.Query(ctx, "SELECT encounter_date,id,vital_signs,form_values FROM clinical_encounters WHERE patient_id=$1 AND encounter_date<=$2 AND (encounter_date AT TIME ZONE 'America/Argentina/Buenos_Aires')::date>=$3::date ORDER BY encounter_date DESC,id DESC", id, time.Now().UTC(), patient.BirthDate)
+	rows, err := tx.Query(ctx, "SELECT encounter_date,id,vital_signs,form_values FROM clinical_encounters WHERE patient_id=$1 AND encounter_date<=$2 AND (encounter_date AT TIME ZONE $4)::date>=$3::date ORDER BY encounter_date DESC,id DESC", id, time.Now().UTC(), patient.BirthDate, s.viewZone(ctx).String())
 	if err != nil {
 		return nil, err
 	}

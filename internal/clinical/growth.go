@@ -103,7 +103,7 @@ func (s *Service) PatientGrowth(ctx context.Context, user string, id int64, opti
 		}
 		now := time.Now()
 		result.BirthDate = p.BirthDate
-		result.AsOfDate = now.In(s.zone).Format("2006-01-02")
+		result.AsOfDate = now.In(s.viewZone(ctx)).Format("2006-01-02")
 		birth, err := time.Parse("2006-01-02", p.BirthDate)
 		if err != nil || p.BirthDate > result.AsOfDate {
 			result.Status = "INVALID_BIRTH_DATE"
@@ -155,7 +155,7 @@ func (s *Service) PatientGrowth(ctx context.Context, user string, id int64, opti
 				}
 			}
 		}
-		rows, err := tx.Query(ctx, `SELECT id,encounter_date,weight_kg,height_cm,head_circumference_cm,form_values FROM clinical_encounters WHERE patient_id=$1 AND encounter_date<=$2 AND (encounter_date AT TIME ZONE 'America/Argentina/Buenos_Aires')::date >= $3::date AND (weight_kg IS NOT NULL OR height_cm IS NOT NULL OR head_circumference_cm IS NOT NULL) ORDER BY encounter_date ASC,id ASC`, id, now.UTC(), p.BirthDate)
+		rows, err := tx.Query(ctx, `SELECT id,encounter_date,weight_kg,height_cm,head_circumference_cm,form_values FROM clinical_encounters WHERE patient_id=$1 AND encounter_date<=$2 AND (encounter_date AT TIME ZONE $4)::date >= $3::date AND (weight_kg IS NOT NULL OR height_cm IS NOT NULL OR head_circumference_cm IS NOT NULL) ORDER BY encounter_date ASC,id ASC`, id, now.UTC(), p.BirthDate, s.viewZone(ctx).String())
 		if err != nil {
 			return err
 		}
@@ -177,7 +177,7 @@ func (s *Service) PatientGrowth(ctx context.Context, user string, id int64, opti
 			// A wizard SELECT field named heightMeasurementMode records the position
 			// in the existing form_values storage, without changing old snapshots/schema.
 			mode, _ := values["heightMeasurementMode"].(string)
-			if err := appendObservation("ENCOUNTER", &encounterID, instant.In(s.zone).Format("2006-01-02"), m, mode); err != nil {
+			if err := appendObservation("ENCOUNTER", &encounterID, instant.In(s.viewZone(ctx)).Format("2006-01-02"), m, mode); err != nil {
 				return err
 			}
 		}

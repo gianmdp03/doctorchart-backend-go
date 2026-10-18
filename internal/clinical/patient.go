@@ -297,7 +297,7 @@ func patientContext(reference string, projections map[string]any) (map[string]an
 }
 
 func (s *Service) detail(ctx context.Context, tx pgx.Tx, p *Patient) error {
-	rows, err := tx.Query(ctx, `SELECT weight_kg,height_cm,head_circumference_cm FROM clinical_encounters WHERE patient_id=$1 AND encounter_date<$2 AND (encounter_date AT TIME ZONE 'America/Argentina/Buenos_Aires')::date >= $3::date AND (weight_kg IS NOT NULL OR height_cm IS NOT NULL OR head_circumference_cm IS NOT NULL) ORDER BY encounter_date DESC,id DESC`, p.ID, time.Now().UTC(), p.BirthDate)
+	rows, err := tx.Query(ctx, `SELECT weight_kg,height_cm,head_circumference_cm FROM clinical_encounters WHERE patient_id=$1 AND encounter_date<$2 AND (encounter_date AT TIME ZONE $4)::date >= $3::date AND (weight_kg IS NOT NULL OR height_cm IS NOT NULL OR head_circumference_cm IS NOT NULL) ORDER BY encounter_date DESC,id DESC`, p.ID, time.Now().UTC(), p.BirthDate, s.viewZone(ctx).String())
 	if err != nil {
 		return err
 	}
@@ -440,11 +440,12 @@ func (s *Service) CreatePatient(ctx context.Context, identity api.Identity, requ
 		if !ok {
 			return api.Failure(409, "INVALID_WIZARD_DEFINITION", "La configuración no es válida.")
 		}
-		reference := time.Now().In(s.zone).Format("2006-01-02")
+		reference := time.Now().In(s.viewZone(ctx)).Format("2006-01-02")
 		context, err := patientContext(reference, map[string]any{})
 		if err != nil {
 			return err
 		}
+		context["zone"] = s.viewZone(ctx).String()
 		validated, err := s.forms.Evaluate(form, values, context)
 		if err != nil {
 			return err
@@ -453,6 +454,7 @@ func (s *Service) CreatePatient(ctx context.Context, identity api.Identity, requ
 		if err != nil {
 			return err
 		}
+		context["zone"] = s.viewZone(ctx).String()
 		evaluation, err := s.forms.Evaluate(form, values, context)
 		if err != nil {
 			return err
@@ -527,6 +529,7 @@ func (s *Service) UpdatePatient(ctx context.Context, userID string, id int64, re
 		if err != nil {
 			return err
 		}
+		savedZone := context["zone"]
 		reference, ok := context["referenceDate"].(string)
 		if !ok {
 			return fmt.Errorf("patient saved context has no reference date")
@@ -543,6 +546,7 @@ func (s *Service) UpdatePatient(ctx context.Context, userID string, id int64, re
 		if err != nil {
 			return err
 		}
+		context["zone"] = savedZone
 		evaluation, err := s.forms.Evaluate(form, values, context)
 		if err != nil {
 			return err

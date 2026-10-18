@@ -10,6 +10,9 @@ import (
 	"syscall"
 	"time"
 
+	common "github.com/bycode/bycode-image-converter-go/pkg/media"
+	"github.com/jackc/pgx/v5/stdlib"
+
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/syntah/doctorchart-backend-go/internal/api"
 	"github.com/syntah/doctorchart-backend-go/internal/billing"
@@ -26,6 +29,11 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	mediaConfig, err := common.Load("doctorchart")
+	if err != nil {
+		return err
+	}
+	c.Storage.Managed = &mediaConfig
 	files, err := storage.New(c.Storage)
 	if err != nil {
 		return err
@@ -47,6 +55,9 @@ func run() error {
 		return errors.New("create PostgreSQL pool failed")
 	}
 	defer pool.Close()
+	mediaDB := stdlib.OpenDBFromPool(pool)
+	defer mediaDB.Close()
+	files.SetCatalog(mediaDB)
 	startup, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	if err := pool.Ping(startup); err != nil {

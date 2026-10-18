@@ -98,16 +98,17 @@ func encounterDate(request map[string]any) (time.Time, error) {
 	return date, nil
 }
 func (s *Service) encounterContext(ctx context.Context, tx pgx.Tx, p Patient, date time.Time, excluded *int64) (map[string]any, error) {
-	result, err := patientContext(date.In(s.zone).Format("2006-01-02"), map[string]any{"patient.birthDate": p.BirthDate, "patient.gender": p.Gender})
+	result, err := patientContext(date.In(s.viewZone(ctx)).Format("2006-01-02"), map[string]any{"patient.birthDate": p.BirthDate, "patient.gender": p.Gender})
 	if err != nil {
 		return nil, err
 	}
+	result["zone"] = s.viewZone(ctx).String()
 	if p.Gender == nil {
 		result["patient.gender"] = nil
 	} else {
 		result["patient.gender"] = *p.Gender
 	}
-	rows, err := tx.Query(ctx, `SELECT weight_kg,height_cm FROM clinical_encounters WHERE patient_id=$1 AND encounter_date<$2 AND ($3::bigint IS NULL OR id<>$3) AND (encounter_date AT TIME ZONE 'America/Argentina/Buenos_Aires')::date >= $4::date AND (weight_kg IS NOT NULL OR height_cm IS NOT NULL OR head_circumference_cm IS NOT NULL) ORDER BY encounter_date DESC,id DESC`, p.ID, date, excluded, p.BirthDate)
+	rows, err := tx.Query(ctx, `SELECT weight_kg,height_cm FROM clinical_encounters WHERE patient_id=$1 AND encounter_date<$2 AND ($3::bigint IS NULL OR id<>$3) AND (encounter_date AT TIME ZONE $5)::date >= $4::date AND (weight_kg IS NOT NULL OR height_cm IS NOT NULL OR head_circumference_cm IS NOT NULL) ORDER BY encounter_date DESC,id DESC`, p.ID, date, excluded, p.BirthDate, s.viewZone(ctx).String())
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +208,8 @@ func (s *Service) CreateEncounter(ctx context.Context, identity api.Identity, re
 		if err := s.workspaces.Feature(ctx, tx, identity.UserID, "NEW_ENCOUNTER"); err != nil {
 			return err
 		}
-		date := time.Now().UTC()
+		// PostgreSQL/pgx persist microseconds. Return the exact persisted instant.
+		date := time.Now().UTC().Truncate(time.Microsecond)
 		var count int64
 		var first bool
 		if err := tx.QueryRow(ctx, `SELECT count(*),coalesce(bool_or(consultation_type='FIRST_VISIT'),false) FROM clinical_encounters WHERE patient_id=$1`, patientID).Scan(&count, &first); err != nil {
@@ -280,9 +282,13 @@ func (s *Service) UpdateEncounter(ctx context.Context, userID string, id int64, 
 	if err != nil {
 		return result, err
 	}
-	date, err := encounterDate(request)
-	if err != nil {
-		return result, err
+	var requestedDate *time.Time
+	if _, present := request["encounterDate"]; present {
+		date, err := encounterDate(request)
+		if err != nil {
+			return result, err
+		}
+		requestedDate = &date
 	}
 	kind, err := consultation(request)
 	if err != nil {
@@ -306,6 +312,10 @@ func (s *Service) UpdateEncounter(ctx context.Context, userID string, id int64, 
 		if err != nil {
 			return err
 		}
+		date := e.instant
+		if requestedDate != nil && !requestedDate.UTC().Truncate(time.Microsecond).Equal(date) {
+			return api.Failure(400, "IMMUTABLE_ENCOUNTER_DATE", "La fecha de creación es asignada por el servidor y no se puede modificar.")
+		}
 		if *expected != e.Version {
 			return api.Failure(409, "VERSION_CONFLICT", "El registro cambió. Actualizá los datos antes de guardar.")
 		}
@@ -322,16 +332,6 @@ func (s *Service) UpdateEncounter(ctx context.Context, userID string, id int64, 
 		if err != nil {
 			return err
 		}
-		if !date.Equal(e.instant) {
-			p, err := ownedPatient(ctx, tx, userID, e.PatientID)
-			if err != nil {
-				return err
-			}
-			context, err = s.encounterContext(ctx, tx, p, date, &id)
-			if err != nil {
-				return err
-			}
-		}
 		form, err := wizard.Decode(e.Snapshot)
 		if err != nil {
 			return err
@@ -344,7 +344,7 @@ func (s *Service) UpdateEncounter(ctx context.Context, userID string, id int64, 
 			return err
 		}
 		e.Type = kind
-		e.Date = date.Format(time.RFC3339Nano)
+		e.Date = date.UTC().Format(time.RFC3339Nano)
 		e.Context, err = json.Marshal(context)
 		if err != nil {
 			return err

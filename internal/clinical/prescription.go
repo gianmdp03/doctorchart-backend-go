@@ -22,6 +22,7 @@ type PrescriptionItem struct {
 	Instructions string `json:"instructions"`
 }
 type Prescription struct {
+	IssuanceZone string             `json:"issuanceZone"`
 	ID           int64              `json:"id"`
 	PatientID    int64              `json:"patientId"`
 	Author       string             `json:"authorUserId"`
@@ -164,7 +165,7 @@ func prescriptionChildren(ctx context.Context, tx pgx.Tx, p *Prescription) error
 func ownedPrescription(ctx context.Context, tx pgx.Tx, user string, patientID, id int64) (Prescription, error) {
 	var p Prescription
 	var date time.Time
-	err := tx.QueryRow(ctx, `SELECT id,patient_id,author_user_id,created_at,type,diagnosis_description,general_instructions FROM patient_prescription_records WHERE id=$1 AND patient_id=$2 AND author_user_id=$3`, id, patientID, user).Scan(&p.ID, &p.PatientID, &p.Author, &date, &p.Type, &p.Diagnosis, &p.Instructions)
+	err := tx.QueryRow(ctx, `SELECT id,patient_id,author_user_id,created_at,type,diagnosis_description,general_instructions,issuance_zone FROM patient_prescription_records WHERE id=$1 AND patient_id=$2 AND author_user_id=$3`, id, patientID, user).Scan(&p.ID, &p.PatientID, &p.Author, &date, &p.Type, &p.Diagnosis, &p.Instructions, &p.IssuanceZone)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return p, api.Failure(404, "PRESCRIPTION_NOT_FOUND", "No se encontró la receta u orden.")
 	}
@@ -191,11 +192,12 @@ func (s *Service) CreatePrescription(ctx context.Context, user string, patientID
 		if err != nil {
 			return err
 		}
-		date := time.Now().UTC()
+		date := time.Now().UTC().Truncate(time.Microsecond)
 		p.PatientID = patientID
 		p.Author = user
 		p.Created = api.FormatInstant(date)
-		if err := tx.QueryRow(ctx, `INSERT INTO patient_prescription_records(patient_id,author_user_id,created_at,type,diagnosis_description,general_instructions) VALUES($1,$2,$3,$4,$5,$6) RETURNING id`, patientID, user, date, p.Type, p.Diagnosis, p.Instructions).Scan(&p.ID); err != nil {
+		p.IssuanceZone = s.viewZone(ctx).String()
+		if err := tx.QueryRow(ctx, `INSERT INTO patient_prescription_records(patient_id,author_user_id,created_at,type,diagnosis_description,general_instructions,issuance_zone) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id`, patientID, user, date, p.Type, p.Diagnosis, p.Instructions, p.IssuanceZone).Scan(&p.ID); err != nil {
 			return err
 		}
 		for pos, m := range p.Medications {
@@ -256,14 +258,14 @@ func (s *Service) PrescriptionRoutes(mux *http.ServeMux) {
 				if err := s.prescriptionAccess(ctx, tx, user, id); err != nil {
 					return err
 				}
-				rows, err := tx.Query(ctx, `SELECT id,patient_id,author_user_id,created_at,type,diagnosis_description,general_instructions FROM patient_prescription_records WHERE patient_id=$1 AND author_user_id=$2 ORDER BY created_at DESC,id DESC`, id, user)
+				rows, err := tx.Query(ctx, `SELECT id,patient_id,author_user_id,created_at,type,diagnosis_description,general_instructions,issuance_zone FROM patient_prescription_records WHERE patient_id=$1 AND author_user_id=$2 ORDER BY created_at DESC,id DESC`, id, user)
 				if err != nil {
 					return err
 				}
 				for rows.Next() {
 					var p Prescription
 					var date time.Time
-					if err := rows.Scan(&p.ID, &p.PatientID, &p.Author, &date, &p.Type, &p.Diagnosis, &p.Instructions); err != nil {
+					if err := rows.Scan(&p.ID, &p.PatientID, &p.Author, &date, &p.Type, &p.Diagnosis, &p.Instructions, &p.IssuanceZone); err != nil {
 						rows.Close()
 						return err
 					}

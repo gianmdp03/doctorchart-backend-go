@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/url"
+	"os"
 	"testing"
 	"time"
 
@@ -28,6 +29,32 @@ func TestDocumentAgeAtIssue(t *testing.T) {
 	}
 	if printAge(birth, birth.AddDate(0, 0, -1)) != nil {
 		t.Fatal("future birth printed with an age")
+	}
+}
+
+func TestClinicalPDFTimeZoneLabel(t *testing.T) {
+	zone, err := time.LoadLocation("America/Argentina/Buenos_Aires")
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := &Service{zone: zone}
+	at := time.Date(2026, 10, 15, 1, 30, 0, 0, time.UTC)
+	doc := printDocument{Source: "PRESCRIPTION_RECORD", ID: 1, Code: "RX-1-1", at: at, IssuanceZone: zone.String(), Issued: api.FormatInstant(at), Patient: printPatient{Name: "Paciente de prueba", Insurance: json.RawMessage("null")}, Medications: json.RawMessage("[]"), Orders: []string{"Laboratorio clínico de demostración"}}
+	data, err := service.printPDF(doc, url.Values{"doctorName": {"Profesional de prueba"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pdf, err := pdfapi.ReadContext(context.Background(), bytes.NewReader(data), model.NewDefaultConfiguration())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := pdf.EnsurePageCount(); err != nil || pdf.PageCount != 1 {
+		t.Fatal("timezone label broke pagination", err)
+	}
+	if path := os.Getenv("DOCTORCHART_PDF_VISUAL_PATH"); path != "" {
+		if err := os.WriteFile(path, data, 0600); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 
