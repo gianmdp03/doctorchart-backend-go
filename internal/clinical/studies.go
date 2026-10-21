@@ -117,6 +117,9 @@ func (s *Service) DeletePatient(ctx context.Context, user string, id int64) erro
 	})
 	if err == nil {
 		s.deletePendingFiles(ctx)
+		if err := s.files.PruneRecovery(ctx); err != nil {
+			slog.Warn("media recovery retention awaits retry")
+		}
 	}
 	return err
 }

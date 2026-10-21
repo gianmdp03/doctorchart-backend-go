@@ -462,6 +462,12 @@ func (s *Store) Flush(ctx context.Context) error {
 func (s *Store) RecoveryMode() bool {
 	return s.library != nil && s.library.Manager.Config.Policy.RecoveryMode
 }
+func (s *Store) PruneRecovery(ctx context.Context) error {
+	if s.library == nil {
+		return nil
+	}
+	return s.library.PruneRecovery(ctx)
+}
 func mediaReadError(err error) error {
 	if err == nil {
 		return nil
