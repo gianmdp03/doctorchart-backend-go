@@ -317,7 +317,7 @@ func (s *Service) SaveVaccination(ctx context.Context, userID string, patientID 
 				return err
 			}
 		}
-		if err := tx.QueryRow(ctx, "UPDATE patients SET emergency_contact=$3,insurance_info=$4,guardian_info=$5,perinatal_history=$6,personal_history=$7,family_history=$8,immunization_and_nutrition=$9,allergies=$10,chronic_conditions=$11,version=version+1,updated_at=greatest(clock_timestamp(),updated_at+interval '1 microsecond') WHERE id=$1 AND version=$2 RETURNING version", p.ID, p.Version, p.Emergency, p.Insurance, p.Guardian, p.Perinatal, p.Personal, p.Family, p.Immunization, p.Allergies, p.Chronic).Scan(&p.Version); err != nil {
+		if err := tx.QueryRow(ctx, "UPDATE patients SET version=version+1,updated_at=greatest(clock_timestamp(),updated_at+interval '1 microsecond') WHERE id=$1 AND version=$2 RETURNING version", p.ID, p.Version).Scan(&p.Version); err != nil {
 			return err
 		}
 		if err := s.detail(ctx, tx, &p); err != nil {

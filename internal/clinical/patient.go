@@ -66,15 +66,12 @@ type Patient struct {
 	Phone            *string         `json:"phone"`
 	Email            *string         `json:"email"`
 	Address          *string         `json:"address"`
-	Emergency        json.RawMessage `json:"emergencyContact"`
 	Insurance        json.RawMessage `json:"insuranceInfo"`
 	Allergies        json.RawMessage `json:"allergies"`
 	Chronic          json.RawMessage `json:"chronicConditions"`
 	Guardian         json.RawMessage `json:"guardianInfo"`
-	Perinatal        json.RawMessage `json:"perinatalHistory"`
 	Personal         json.RawMessage `json:"personalHistory"`
 	Family           json.RawMessage `json:"familyHistory"`
-	Immunization     json.RawMessage `json:"immunizationAndNutrition"`
 	Measurements     *Measurements   `json:"latestMeasurements"`
 	Values           json.RawMessage `json:"formValues"`
 	Results          json.RawMessage `json:"formulaResults"`
@@ -84,31 +81,27 @@ type Patient struct {
 	owner            string
 }
 
-const patientColumns = "id,version,full_name,birth_date::text,national_id,gender,blood_type,phone,email,address,emergency_contact,insurance_info,allergies,chronic_conditions,guardian_info,perinatal_history,personal_history,family_history,immunization_and_nutrition,form_values,formula_results,form_definition_snapshot,formula_context,workspace_version,user_id"
+const patientColumns = "id,version,full_name,birth_date::text,national_id,gender,blood_type,phone,email,address,insurance_info,allergies,chronic_conditions,guardian_info,personal_history,family_history,form_values,formula_results,form_definition_snapshot,formula_context,workspace_version,user_id"
 
 func scanPatient(row pgx.Row) (Patient, error) {
 	var p Patient
-	err := row.Scan(&p.ID, &p.Version, &p.FullName, &p.BirthDate, &p.NationalID, &p.Gender, &p.BloodType, &p.Phone, &p.Email, &p.Address, &p.Emergency, &p.Insurance, &p.Allergies, &p.Chronic, &p.Guardian, &p.Perinatal, &p.Personal, &p.Family, &p.Immunization, &p.Values, &p.Results, &p.Snapshot, &p.Context, &p.WorkspaceVersion, &p.owner)
+	err := row.Scan(&p.ID, &p.Version, &p.FullName, &p.BirthDate, &p.NationalID, &p.Gender, &p.BloodType, &p.Phone, &p.Email, &p.Address, &p.Insurance, &p.Allergies, &p.Chronic, &p.Guardian, &p.Personal, &p.Family, &p.Values, &p.Results, &p.Snapshot, &p.Context, &p.WorkspaceVersion, &p.owner)
 	if err == nil {
 		err = normalizePatientHistory(&p)
 	}
 	return p, err
 }
 
-// Hibernate materializes JSON record components, including omitted nullable fields.
-// Match that read representation and its subsequent persistence on entity updates.
+// Keep current clinical fields without materializing absent values as JSON null.
 func normalizePatientHistory(p *Patient) error {
 	for _, field := range []struct {
 		raw  *json.RawMessage
 		keys []string
 	}{
-		{&p.Emergency, []string{"fullName", "phone", "relationship", "nationalId", "address"}},
 		{&p.Insurance, []string{"providerName", "planName", "affiliateNumber"}},
-		{&p.Guardian, []string{"fatherFullName", "motherFullName", "siblingsCount", "firstGuardianFullName", "secondGuardianFullName", "firstGuardianPhone", "secondGuardianPhone", "firstGuardianNationalId", "secondGuardianNationalId", "address", "primaryGuardian", "primaryContactPhone", "hasSiblings", "siblingOrder", "livingArrangement"}},
-		{&p.Perinatal, []string{"gestationCount", "prenatalVisitsSummary", "pregnancyComplications"}},
+		{&p.Guardian, []string{"fatherFullName", "motherFullName", "siblingsCount", "primaryGuardian", "primaryContactPhone", "hasSiblings", "siblingOrder", "livingArrangement"}},
 		{&p.Personal, []string{"chronicOrPreviousDiseases", "hospitalizationsOrSurgeries", "allergies", "habitualMedication", "birthMeasurements"}},
-		{&p.Family, []string{"familyChronicDiseases", "familyAllergies", "geneticDiseases", "paternalDiseases", "maternalDiseases", "siblingDiseases"}},
-		{&p.Immunization, []string{"vaccinationHistory", "feedingDiet"}},
+		{&p.Family, []string{"paternalDiseases", "maternalDiseases", "siblingDiseases"}},
 	} {
 		if len(*field.raw) == 0 || string(*field.raw) == "null" {
 			continue
@@ -119,14 +112,22 @@ func normalizePatientHistory(p *Patient) error {
 		}
 		value := map[string]any{}
 		for _, key := range field.keys {
-			value[key] = old[key]
+			if v := old[key]; v != nil {
+				value[key] = v
+			}
 		}
 		if field.raw == &p.Personal && value["birthMeasurements"] != nil {
 			birth, ok := value["birthMeasurements"].(map[string]any)
 			if !ok {
 				return fmt.Errorf("invalid birth measurements record")
 			}
-			value["birthMeasurements"] = map[string]any{"weightKg": birth["weightKg"], "heightCm": birth["heightCm"], "headCircumferenceCm": birth["headCircumferenceCm"]}
+			measurements := map[string]any{}
+			for _, key := range []string{"weightKg", "heightCm", "headCircumferenceCm"} {
+				if v := birth[key]; v != nil {
+					measurements[key] = v
+				}
+			}
+			value["birthMeasurements"] = measurements
 		}
 		*field.raw, err = json.Marshal(value)
 		if err != nil {
@@ -231,32 +232,26 @@ func applyPatient(p *Patient, evaluation wizard.Evaluation) error {
 		*destination = value
 	}
 	guardian := map[string]any{}
-	for _, key := range []string{"fatherFullName", "motherFullName", "siblingsCount", "firstGuardianFullName", "secondGuardianFullName", "firstGuardianPhone", "secondGuardianPhone", "firstGuardianNationalId", "secondGuardianNationalId", "address", "primaryGuardian", "primaryContactPhone", "hasSiblings", "siblingOrder", "livingArrangement"} {
-		guardian[key] = nil
-	}
 	for _, key := range []string{"fatherFullName", "motherFullName", "siblingsCount", "primaryGuardian", "primaryContactPhone", "hasSiblings", "siblingOrder", "livingArrangement"} {
-		guardian[key] = projections["patient.guardianInfo."+key]
+		if v := projections["patient.guardianInfo."+key]; v != nil {
+			guardian[key] = v
+		}
 	}
 	family := map[string]any{}
-	if len(p.Family) > 0 {
-		previous, err := wizard.Decode(p.Family)
-		if err != nil {
-			return err
-		}
-		for _, key := range []string{"familyChronicDiseases", "familyAllergies", "geneticDiseases"} {
-			family[key] = previous[key]
-		}
-	} else {
-		for _, key := range []string{"familyChronicDiseases", "familyAllergies", "geneticDiseases"} {
-			family[key] = nil
-		}
-	}
 	for _, key := range []string{"paternalDiseases", "maternalDiseases", "siblingDiseases"} {
-		family[key] = projections["patient.familyHistory."+key]
+		if v := projections["patient.familyHistory."+key]; v != nil {
+			family[key] = v
+		}
 	}
 	provider, plan, affiliate := projections["patient.insurance"], projections["patient.insurance.plan"], projections["patient.insurance.affiliate"]
 	if provider != nil || plan != nil || affiliate != nil {
-		p.Insurance, err = json.Marshal(map[string]any{"providerName": provider, "planName": plan, "affiliateNumber": affiliate})
+		insurance := map[string]any{}
+		for key, value := range map[string]any{"providerName": provider, "planName": plan, "affiliateNumber": affiliate} {
+			if value != nil {
+				insurance[key] = value
+			}
+		}
+		p.Insurance, err = json.Marshal(insurance)
 		if err != nil {
 			return err
 		}
@@ -558,7 +553,7 @@ func (s *Service) UpdatePatient(ctx context.Context, userID string, id int64, re
 		if err := applyPatient(&p, evaluation); err != nil {
 			return err
 		}
-		err = tx.QueryRow(ctx, `UPDATE patients SET full_name=$2,birth_date=$3::date,national_id=$4,gender=$5,blood_type=$6,phone=$7,email=$8,address=$9,guardian_info=$10,family_history=$11,insurance_info=$12,form_values=$13,formula_results=$14,formula_context=$15,emergency_contact=$17,personal_history=$18,perinatal_history=$19,immunization_and_nutrition=$20,allergies=$21,chronic_conditions=$22,version=version+1,updated_at=greatest(clock_timestamp(),updated_at+interval '1 microsecond') WHERE id=$1 AND version=$16 RETURNING version`, id, p.FullName, p.BirthDate, p.NationalID, p.Gender, p.BloodType, p.Phone, p.Email, p.Address, p.Guardian, p.Family, p.Insurance, p.Values, p.Results, p.Context, *expected, p.Emergency, p.Personal, p.Perinatal, p.Immunization, p.Allergies, p.Chronic).Scan(&p.Version)
+		err = tx.QueryRow(ctx, `UPDATE patients SET full_name=$2,birth_date=$3::date,national_id=$4,gender=$5,blood_type=$6,phone=$7,email=$8,address=$9,guardian_info=$10,family_history=$11,insurance_info=$12,form_values=$13,formula_results=$14,formula_context=$15,personal_history=$17,allergies=$18,chronic_conditions=$19,version=version+1,updated_at=greatest(clock_timestamp(),updated_at+interval '1 microsecond') WHERE id=$1 AND version=$16 RETURNING version`, id, p.FullName, p.BirthDate, p.NationalID, p.Gender, p.BloodType, p.Phone, p.Email, p.Address, p.Guardian, p.Family, p.Insurance, p.Values, p.Results, p.Context, *expected, p.Personal, p.Allergies, p.Chronic).Scan(&p.Version)
 		if err != nil {
 			return err
 		}

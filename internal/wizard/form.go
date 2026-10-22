@@ -36,7 +36,7 @@ func personalTextError(key, value string) string {
 		if !emailInput.MatchString(value) {
 			return "INVALID_EMAIL"
 		}
-	case "sys_dni", "nationalId", "patient.nationalId", "patient.guardianInfo.firstGuardianNationalId", "patient.guardianInfo.secondGuardianNationalId":
+	case "sys_dni", "nationalId", "patient.nationalId":
 		if !dniInput.MatchString(value) {
 			return "INVALID_DNI"
 		}

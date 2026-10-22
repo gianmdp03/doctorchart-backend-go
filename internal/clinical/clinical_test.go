@@ -139,8 +139,8 @@ func TestGrowthQueryRejectsInvalidReferencesAndModes(t *testing.T) {
 		t.Fatal(options, err)
 	}
 }
-func TestExistingPatientHistoryMaterialization(t *testing.T) {
-	p := Patient{Personal: json.RawMessage(`{"birthMeasurements":{"weightKg":3.2}}`), Perinatal: json.RawMessage(`{"gestationCount":2}`)}
+func TestPatientHistoryDoesNotMaterializeAbsentFields(t *testing.T) {
+	p := Patient{Personal: json.RawMessage(`{"birthMeasurements":{"weightKg":3.2}}`)}
 	if err := normalizePatientHistory(&p); err != nil {
 		t.Fatal(err)
 	}
@@ -148,14 +148,14 @@ func TestExistingPatientHistoryMaterialization(t *testing.T) {
 	if err := json.Unmarshal(p.Personal, &personal); err != nil {
 		t.Fatal(err)
 	}
-	if len(personal) != 5 || personal["habitualMedication"] != nil {
+	if len(personal) != 1 || personal["habitualMedication"] != nil {
 		t.Fatalf("history: %s", p.Personal)
 	}
 	birth, ok := personal["birthMeasurements"].(map[string]any)
-	if !ok || len(birth) != 3 || birth["heightCm"] != nil || birth["weightKg"] != 3.2 {
+	if !ok || len(birth) != 1 || birth["heightCm"] != nil || birth["weightKg"] != 3.2 {
 		t.Fatalf("birth: %v", birth)
 	}
-	if p.Emergency != nil {
+	if p.Insurance != nil {
 		t.Fatal("null history became an object")
 	}
 	before := string(p.Personal)

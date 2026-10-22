@@ -164,7 +164,7 @@ func TestStartupCreatesSchemaAndServesHealth(t *testing.T) {
 	command.Dir = commandDirectory
 	// Exclude developer settings: only the synthetic .env and OS runtime paths.
 	command.Env = []string{}
-	for _, name := range []string{"PATH", "SystemRoot", "WINDIR", "TMP", "TEMP", "HOME"} {
+	for _, name := range []string{"PATH", "SystemRoot", "WINDIR", "TMP", "TEMP", "HOME", "LOCALAPPDATA", "APPDATA", "USERPROFILE"} {
 		if value, ok := os.LookupEnv(name); ok {
 			command.Env = append(command.Env, name+"="+value)
 		}
@@ -216,7 +216,7 @@ func TestStartupCreatesSchemaAndServesHealth(t *testing.T) {
 	if err := pool.QueryRow(ctx, "SELECT count(*) FROM specialties").Scan(&specialties); err != nil {
 		t.Fatal(err)
 	}
-	if tables != 21 || specialties == 0 {
+	if tables != 23 || specialties == 0 {
 		t.Fatalf("health served with %d tables and %d specialties", tables, specialties)
 	}
 	probe := func(path string, expected int) {
