@@ -1,6 +1,6 @@
 # Idiomatic Go and correctness — code review standard
 
-Read when producing or reviewing core Go code. Go 1.27.1 toolchain target. Canonical sources: https://go.dev/wiki/CodeReviewComments ; https://google.github.io/styleguide/go/ ; https://go.dev/doc/effective_go ; https://go.dev/doc/go1.27
+Read when producing or reviewing core Go code. Go 1.27.3 toolchain target. Canonical sources: https://go.dev/wiki/CodeReviewComments ; https://google.github.io/styleguide/go/ ; https://go.dev/doc/effective_go ; https://go.dev/doc/go1.27
 
 ## Types, mutability and ownership
 - Decide pointer vs value receiver deliberately: avoid copying types containing mutexes; preserve method sets; pointer receiver when mutating or expensive copies. Keep receiver choice consistent for a type.

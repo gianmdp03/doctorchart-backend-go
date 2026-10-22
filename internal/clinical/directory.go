@@ -172,6 +172,8 @@ func (s *Service) ListPatients(ctx context.Context, userID string, query url.Val
 		category = "p.birth_date>($3::date-interval '13 months')::date AND p.birth_date<=$3::date"
 	case "TODDLER":
 		category = "p.birth_date<=($3::date-interval '13 months')::date AND p.birth_date>($3::date-interval '73 months')::date"
+	case "NEONATAL", "EARLY_CHILDHOOD", "CHILD", "ADOLESCENT":
+		// These filters are validated against the stored specialty below.
 	case "VACCINE_PENDING":
 		category = "pending"
 	default:
@@ -191,6 +193,20 @@ func (s *Service) ListPatients(ctx context.Context, userID string, query url.Val
 			slog.Warn("directory rollback failed")
 		}
 	}()
+	// Read the authoritative specialty in the same snapshot as the directory.
+	// A growth-chart module does not make another specialty pediatric.
+	var pediatrics bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM doctor_workspaces w JOIN specialties s ON s.id=w.specialty_id WHERE w.user_id=$1 AND lower(s.code)='pediatrics')`, userID).Scan(&pediatrics); err != nil {
+		return nil, err
+	}
+	var bounds pediatricAgeRange
+	if pediatrics {
+		if pediatric, ok := pediatricRange(filter, today); ok {
+			bounds, category = pediatric, "true"
+		}
+	} else if filter == "NEONATAL" || filter == "EARLY_CHILDHOOD" || filter == "CHILD" || filter == "ADOLESCENT" {
+		return nil, api.Invalid("Este filtro está disponible solamente en Pediatría.")
+	}
 	var calendar json.RawMessage
 	err = tx.QueryRow(ctx, "SELECT definition FROM vaccination_calendars WHERE id=$1", "argentina-2026-v1").Scan(&calendar)
 	if err == pgx.ErrNoRows {
@@ -203,13 +219,13 @@ func (s *Service) ListPatients(ctx context.Context, userID string, query url.Val
 	if category == "pending" {
 		category = pending
 	}
-	where := `$3::date IS NOT NULL AND p.user_id=$1 AND (lower(p.full_name) LIKE $2 ESCAPE '!' OR lower(p.national_id) LIKE $2 ESCAPE '!' OR lower(p.phone) LIKE $2 ESCAPE '!') AND (` + category + `)`
+	where := `$3::date IS NOT NULL AND p.user_id=$1 AND (lower(p.full_name) LIKE $2 ESCAPE '!' OR lower(p.national_id) LIKE $2 ESCAPE '!' OR lower(p.phone) LIKE $2 ESCAPE '!') AND (` + category + `) AND ($4::date IS NULL OR p.birth_date>$4::date) AND ($5::date IS NULL OR p.birth_date<=$5::date)`
 	var total int64
-	err = tx.QueryRow(ctx, "SELECT count(*) FROM patients p WHERE "+where, userID, pattern, todayText).Scan(&total)
+	err = tx.QueryRow(ctx, "SELECT count(*) FROM patients p WHERE "+where, userID, pattern, todayText, bounds.after, bounds.through).Scan(&total)
 	if err != nil {
 		return nil, err
 	}
-	rows, err := tx.Query(ctx, `SELECT p.id,p.full_name,p.birth_date::text,p.national_id,p.phone,p.gender,(SELECT count(*) FROM clinical_encounters e WHERE e.patient_id=p.id),(SELECT max(e.encounter_date) FROM clinical_encounters e WHERE e.patient_id=p.id),`+pending+` FROM patients p WHERE `+where+` ORDER BY `+page.order+` LIMIT $4 OFFSET $5`, userID, pattern, todayText, page.size, page.number*page.size)
+	rows, err := tx.Query(ctx, `SELECT p.id,p.full_name,p.birth_date::text,p.national_id,p.phone,p.gender,(SELECT count(*) FROM clinical_encounters e WHERE e.patient_id=p.id),(SELECT max(e.encounter_date) FROM clinical_encounters e WHERE e.patient_id=p.id),`+pending+` FROM patients p WHERE `+where+` ORDER BY `+page.order+` LIMIT $6 OFFSET $7`, userID, pattern, todayText, bounds.after, bounds.through, page.size, page.number*page.size)
 	if err != nil {
 		return nil, err
 	}
@@ -229,6 +245,12 @@ func (s *Service) ListPatients(ctx context.Context, userID string, query url.Val
 		item.Months = ageMonths(birth, today)
 		item.Age = directoryAge(birth, today, item.Months)
 		item.Group = ageGroup(item.Months)
+		if pediatrics {
+			item.Group = pediatricAgeGroup(birth, today)
+			if item.Months != nil && *item.Months == 0 {
+				item.Age = fmt.Sprintf("%d días", int(today.Sub(birth).Hours()/24))
+			}
+		}
 		if last != nil {
 			date := last.In(s.viewZone(ctx)).Format("2006-01-02")
 			item.LastDate = &date

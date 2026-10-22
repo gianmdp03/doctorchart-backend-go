@@ -1,16 +1,16 @@
 ---
 name: go-backend
-description: Design, implement, review, test, optimize, or maintain production Go 1.27.1 HTTP APIs and backend services using idiomatic Go, minimal justified architecture, safe PostgreSQL, security, tests, and operational readiness. Use for new Go services and as the required engineering standard during Spring Boot to Go migrations.
+description: Design, implement, review, test, optimize, or maintain production Go 1.27.3 HTTP APIs and backend services using idiomatic Go, minimal justified architecture, safe PostgreSQL, security, tests, and operational readiness. Use for new Go services and as the required engineering standard during Spring Boot to Go migrations.
 ---
 
-# Go Backend Engineering — Go 1.27.1
+# Go Backend Engineering — Go 1.27.3
 
 ## Mission and priority
 Produce **correct, secure, idiomatic, comprehensible, production-ready Go backends** with the *least necessary complexity*. Optimize based on measurements, never by breaking business semantics. This skill is reusable for new Go projects and must be loaded by `spring-to-go` for migration implementation.
 
 Priority: **preserve specified behavior and invariants > security/correctness > operational reliability > clarity/maintainability > measured performance > incidental style**. All mandatory requirements must hold; never trade away security to reduce lines of code.
 
-Target Go toolchain: **go1.27.1** (verified release). Respect the project's `go.mod` minimum language level and dependency compatibility. Record the actual toolchain used. For a production security update to a newer supported patch, document/approve the change instead of silently overriding the target. Avoid assuming latest dependencies are compatible.
+Target Go toolchain: **go1.27.3** (verified release). Respect the project's `go.mod` minimum language level and dependency compatibility. Record the actual toolchain used. For a production security update to a newer supported patch, document/approve the change instead of silently overriding the target. Avoid assuming latest dependencies are compatible.
 
 ## Activation procedure
 1. Inspect the repository, task, `go.mod`, API contracts, tests, data stores, constraints, and deployment shape. Prefer existing conventions unless demonstrably harmful; do not redesign outside requested scope.

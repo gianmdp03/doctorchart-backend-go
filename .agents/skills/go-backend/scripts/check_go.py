@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Non-destructive Go module quality checks. Python 3.9+; Go 1.27.1 target.
+"""Non-destructive Go module quality checks. Python 3.9+; Go 1.27.3 target.
 
 Does not change sources, install tools, start databases, or contact production.
 Optional govulncheck may use its own vulnerability database network access.
@@ -42,7 +42,7 @@ def go_files(root):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('module_root', nargs='?', default='.')
-    parser.add_argument('--target', default='go1.27.1', help='Expected exact Go toolchain (default: go1.27.1)')
+    parser.add_argument('--target', default='go1.27.3', help='Expected exact Go toolchain (default: go1.27.3)')
     parser.add_argument('--skip-race', action='store_true', help='Explicitly skip race test; report NOT RUN')
     parser.add_argument('--require-vulncheck', action='store_true', help='Fail if govulncheck is unavailable')
     parser.add_argument('--timeout', type=int, default=600, help='Timeout per command in seconds')

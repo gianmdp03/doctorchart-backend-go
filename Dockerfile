@@ -1,4 +1,4 @@
-FROM golang:1.27.2 AS build
+FROM golang:1.27.3 AS build
 WORKDIR /workspace/doctorchart-backend-go
 COPY --from=media / /workspace/bycode-image-email-service-go/pkg/media
 COPY go.mod go.sum ./

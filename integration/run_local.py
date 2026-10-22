@@ -208,7 +208,7 @@ def main():
         for key in ['PORT','GATEWAY_SHARED_SECRET','POINTLY_SERVICE_URL','BILLING_SERVICE_URL','DOCTORCHART_SERVICE_URL','STOCK_SERVICE_URL',
                     'SUPABASE_JWT_ISSUER','SUPABASE_JWKS_URL','SUPABASE_JWT_AUDIENCE','CORS_ALLOWED_ORIGINS','GEMINI_API_KEY','SSL_CERT_FILE']:
             args += ['-e',key]
-        subprocess.run(args+['golang:1.27.2','/fixture/gateway'], env=environment, check=True, stdout=subprocess.DEVNULL)
+        subprocess.run(args+['golang:1.27.3','/fixture/gateway'], env=environment, check=True, stdout=subprocess.DEVNULL)
         wait('http://127.0.0.1:18080/health')
         front_env = dict(os.environ, PUBLIC_APP_URL='http://localhost:4202', PUBLIC_API_URL='http://localhost:18080/api/doctorchart',
             PUBLIC_AI_GATEWAY_URL='http://localhost:18080/api/ai/doctorchart/chat', PUBLIC_SYNTAH_PLANS_URL='http://localhost:18999/fixture-plans',

@@ -1,5 +1,5 @@
 ---
-production: false
+production: true
 ---
 
 # Política obligatoria de PostgreSQL
