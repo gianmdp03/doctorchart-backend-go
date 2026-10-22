@@ -3,8 +3,7 @@ package clinical
 import "time"
 
 // Date ranges are (after, through], shared by badges and directory SQL filters.
-// Early childhood is operationalized as completed ages 0..8 (before birthday 9).
-// It overlaps infancy and childhood; choose the most specific badge first.
+// Each valid birth date belongs to exactly one age category.
 type pediatricAgeRange struct{ after, through *time.Time }
 
 func yearsBefore(today time.Time, years int) time.Time {
@@ -15,16 +14,16 @@ func yearsBefore(today time.Time, years int) time.Time {
 
 func pediatricRange(filter string, today time.Time) (pediatricAgeRange, bool) {
 	neonatal := today.AddDate(0, 0, -28)
-	one, nine, ten, twenty := yearsBefore(today, 1), yearsBefore(today, 9), yearsBefore(today, 10), yearsBefore(today, 20)
+	one, five, ten, twenty := yearsBefore(today, 1), yearsBefore(today, 5), yearsBefore(today, 10), yearsBefore(today, 20)
 	switch filter {
 	case "NEONATAL":
 		return pediatricAgeRange{&neonatal, &today}, true
 	case "INFANT":
 		return pediatricAgeRange{&one, &neonatal}, true
 	case "EARLY_CHILDHOOD":
-		return pediatricAgeRange{&nine, &today}, true
+		return pediatricAgeRange{&five, &one}, true
 	case "CHILD":
-		return pediatricAgeRange{&ten, &one}, true
+		return pediatricAgeRange{&ten, &five}, true
 	case "ADOLESCENT":
 		return pediatricAgeRange{&twenty, &ten}, true
 	case "ADULT":

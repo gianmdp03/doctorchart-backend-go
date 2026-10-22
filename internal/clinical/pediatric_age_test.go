@@ -2,10 +2,15 @@ package clinical
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"testing"
 	"time"
+
+	"github.com/syntah/doctorchart-backend-go/internal/api"
 )
 
 func TestPediatricAgeBoundaries(t *testing.T) {
@@ -14,7 +19,8 @@ func TestPediatricAgeBoundaries(t *testing.T) {
 		{"2026-10-21", "NEONATAL"}, {"2026-09-24", "NEONATAL"},
 		{"2026-09-23", "INFANT"}, {"2025-10-22", "INFANT"},
 		{"2025-10-21", "EARLY_CHILDHOOD"}, {"2024-07-11", "EARLY_CHILDHOOD"},
-		{"2017-10-22", "EARLY_CHILDHOOD"}, {"2017-10-21", "CHILD"},
+		{"2021-10-22", "EARLY_CHILDHOOD"}, {"2021-10-21", "CHILD"},
+		{"2017-10-22", "CHILD"}, {"2017-10-21", "CHILD"},
 		{"2016-10-22", "CHILD"}, {"2016-10-21", "ADOLESCENT"},
 		{"2008-10-21", "ADOLESCENT"}, {"2006-10-22", "ADOLESCENT"},
 		{"2006-10-21", "ADULT"}, {"2026-10-22", "UNKNOWN"},
@@ -34,7 +40,7 @@ func TestPediatricAgeBoundaries(t *testing.T) {
 	}
 }
 
-func TestPediatricLeapDayAndOverlappingFilters(t *testing.T) {
+func TestPediatricLeapDayAndExclusiveFilters(t *testing.T) {
 	today := time.Date(2028, 2, 29, 0, 0, 0, 0, time.UTC)
 	if got := yearsBefore(today, 1).Format("2006-01-02"); got != "2027-02-28" {
 		t.Fatal(got)
@@ -55,8 +61,33 @@ func TestPediatricLeapDayAndOverlappingFilters(t *testing.T) {
 	child := yearsBefore(today, 2)
 	for _, filter := range []string{"EARLY_CHILDHOOD", "CHILD"} {
 		bounds, _ := pediatricRange(filter, today)
-		if !bounds.contains(child) {
-			t.Fatalf("two-year-old missing from %s", filter)
+		if got, want := bounds.contains(child), filter == "EARLY_CHILDHOOD"; got != want {
+			t.Fatalf("two-year-old in %s=%v, want %v", filter, got, want)
+		}
+	}
+}
+
+func TestPediatricFiltersPartitionEveryAge(t *testing.T) {
+	groups := []string{"NEONATAL", "INFANT", "EARLY_CHILDHOOD", "CHILD", "ADOLESCENT", "ADULT"}
+	for _, date := range []string{"2026-10-22", "2028-02-29", "2029-02-28"} {
+		today, err := time.Parse("2006-01-02", date)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for birth := today.AddDate(-25, 0, 0); !birth.After(today); birth = birth.AddDate(0, 0, 1) {
+			matches := 0
+			for _, group := range groups {
+				bounds, _ := pediatricRange(group, today)
+				if bounds.contains(birth) {
+					matches++
+					if got := pediatricAgeGroup(birth, today); got != group {
+						t.Fatalf("%s on %s: badge=%s, filter=%s", birth.Format("2006-01-02"), date, got, group)
+					}
+				}
+			}
+			if matches != 1 {
+				t.Fatalf("%s on %s: belongs to %d filters, want exactly one", birth.Format("2006-01-02"), date, matches)
+			}
 		}
 	}
 }
@@ -78,7 +109,7 @@ func TestPediatricDirectoryFiltersAndSpecialtyIsolation(t *testing.T) {
 		t.Fatal(err)
 	}
 	births := []time.Time{today, today.AddDate(0, 0, -27), today.AddDate(0, 0, -28)}
-	for _, years := range []int{1, 2, 6, 9, 10, 18, 20} {
+	for _, years := range []int{1, 2, 5, 6, 9, 10, 18, 20} {
 		boundary := yearsBefore(today, years)
 		births = append(births, boundary.AddDate(0, 0, 1), boundary, boundary.AddDate(0, 0, -1))
 	}
@@ -109,6 +140,9 @@ func TestPediatricDirectoryFiltersAndSpecialtyIsolation(t *testing.T) {
 			t.Fatalf("%s: rows=%d want=%d page=%v", filter, len(items), want, page["page"])
 		}
 		for _, item := range items {
+			if filter != "ALL" && item.Group != filter {
+				t.Fatalf("%s: patient %d has a different badge %s", filter, item.ID, item.Group)
+			}
 			birth, err := time.Parse("2006-01-02", item.Birth)
 			if err != nil {
 				t.Fatal(err)
@@ -165,5 +199,45 @@ func TestPediatricDirectoryFiltersAndSpecialtyIsolation(t *testing.T) {
 	}
 	if len(page.(map[string]any)["content"].([]PatientList)) != 1 {
 		t.Fatal("filtered pagination failed")
+	}
+
+	// Reproduce the report through the HTTP route, with a real two-year-old row.
+	const name = "Two-year-old regression"
+	if _, err := pool.Exec(ctx, `INSERT INTO patients(birth_date,form_definition_snapshot,form_values,formula_context,formula_results,full_name,updated_at,user_id,version,workspace_version) VALUES($1,'{}','{}','{}','{}',$2,now(),'integrity-owner',0,0)`, yearsBefore(today, 2), name); err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	services[0].DirectoryRoutes(mux)
+	const secret = "pediatric-directory-fixture"
+	handler := api.Gateway(secret, mux)
+	for _, filter := range []string{"ALL", "NEONATAL", "INFANT", "EARLY_CHILDHOOD", "CHILD", "ADOLESCENT", "ADULT"} {
+		query := url.Values{"filter": {filter}, "search": {name}, "size": {"1"}, "page": {"0"}}
+		request := httptest.NewRequest(http.MethodGet, "/api/doctorchart/patients?"+query.Encode(), nil)
+		request.Header.Set("X-Gateway-Secret", secret)
+		request.Header.Set("X-User-Id", "integrity-owner")
+		request.Header.Set("X-User-Plan", "BASIC")
+		request.Header.Set("X-User-Plan-Expires-At", time.Now().Add(time.Hour).Format(time.RFC3339Nano))
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		if response.Code != http.StatusOK {
+			t.Fatalf("%s: HTTP %d: %s", filter, response.Code, response.Body)
+		}
+		var result struct {
+			Content []PatientList               `json:"content"`
+			Page    struct{ TotalElements int } `json:"page"`
+		}
+		if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
+			t.Fatal(err)
+		}
+		want := 0
+		if filter == "ALL" || filter == "EARLY_CHILDHOOD" {
+			want = 1
+		}
+		if len(result.Content) != want || result.Page.TotalElements != want {
+			t.Fatalf("two-year-old: %s returned %d rows / %d total, want %d", filter, len(result.Content), result.Page.TotalElements, want)
+		}
+		if want == 1 && (result.Content[0].Name != name || result.Content[0].Group != "EARLY_CHILDHOOD") {
+			t.Fatalf("two-year-old: wrong patient/category in %s: %+v", filter, result.Content)
+		}
 	}
 }
