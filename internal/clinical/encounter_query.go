@@ -58,11 +58,12 @@ type recentEncounter struct {
 	Date       string           `json:"encounterLocalDate"`
 }
 type encounterDashboard struct {
-	Patients int64             `json:"totalPatients"`
-	Month    int64             `json:"encountersThisMonth"`
-	Today    int64             `json:"encountersToday"`
-	Date     string            `json:"asOfDate"`
-	Recent   []recentEncounter `json:"recentEncounters"`
+	Patients int64              `json:"totalPatients"`
+	Month    int64              `json:"encountersThisMonth"`
+	Today    int64              `json:"encountersToday"`
+	Date     string             `json:"asOfDate"`
+	Recent   []recentEncounter  `json:"recentEncounters"`
+	Upcoming []upcomingFollowUp `json:"upcomingFollowUps"`
 }
 
 func (s *Service) encounterQueryRoutes(mux *http.ServeMux) {
@@ -101,6 +102,11 @@ func (s *Service) encounterQueryRoutes(mux *http.ServeMux) {
 		err := s.readSnapshot(r.Context(), func(tx pgx.Tx) error {
 			owner := api.User(r.Context()).UserID
 			if err := tx.QueryRow(r.Context(), `SELECT (SELECT count(*) FROM patients WHERE user_id=$1),count(*) FILTER(WHERE e.encounter_date>=$2 AND e.encounter_date<$3),count(*) FILTER(WHERE e.encounter_date>=$4 AND e.encounter_date<$5) FROM clinical_encounters e JOIN patients p ON p.id=e.patient_id WHERE p.user_id=$1`, owner, month, month.AddDate(0, 1, 0), start, start.AddDate(0, 0, 1)).Scan(&result.Patients, &result.Month, &result.Today); err != nil {
+				return err
+			}
+			var err error
+			result.Upcoming, err = dashboardFollowUps(r.Context(), tx, owner, result.Date, start.AddDate(0, 0, 3).Format("2006-01-02"))
+			if err != nil {
 				return err
 			}
 			// Read the additional patient fields in the same query and snapshot.

@@ -63,7 +63,7 @@ func date(value any) (time.Time, bool) {
 		return time.Time{}, false
 	}
 	d, err := time.Parse("2006-01-02", text)
-	return d, err == nil
+	return d, err == nil && d.Year() >= 1
 }
 
 func (v *Validator) Evaluate(form, values, context map[string]any) (Evaluation, error) {
