@@ -32,7 +32,7 @@ func TestDocumentAgeAtIssue(t *testing.T) {
 	}
 }
 
-func TestClinicalPDFTimeZoneLabel(t *testing.T) {
+func TestClinicalPDFIssuanceDate(t *testing.T) {
 	zone, err := time.LoadLocation("America/Argentina/Buenos_Aires")
 	if err != nil {
 		t.Fatal(err)
@@ -49,7 +49,7 @@ func TestClinicalPDFTimeZoneLabel(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := pdf.EnsurePageCount(); err != nil || pdf.PageCount != 1 {
-		t.Fatal("timezone label broke pagination", err)
+		t.Fatal("document date broke pagination", err)
 	}
 	if path := os.Getenv("DOCTORCHART_PDF_VISUAL_PATH"); path != "" {
 		if err := os.WriteFile(path, data, 0600); err != nil {

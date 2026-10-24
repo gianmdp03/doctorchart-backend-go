@@ -37,3 +37,12 @@ Ejemplo de decisión: agregar una columna después de publicar el baseline requi
 - Conservar tablas funcionales de auditoría, historial, pagos, idempotencia, movimientos y seguridad. No eliminar funciones por nombres como history/events/ledger/snapshots.
 - Esta política regula estructuras PostgreSQL; no confundir cambios en datos de negocio con cambios estructurales. No cambiar reglas comerciales por conveniencia.
 - No hacer commits, pushes, despliegues ni resets de desarrollo salvo autorización expresa para esas acciones.
+
+## Operación del VPS compartido
+
+Antes de preparar comandos o cambios para el VPS, leer
+[docs/vps-operations.md](docs/vps-operations.md). Contiene el mapa de servicios,
+rutas reales, uso de .env.production, construcción por servicio, comprobaciones
+posteriores y reinicialización acotada de bases cuando el propietario la autoriza.
+Leer esta guía no autoriza commits, pushes, despliegues ni wipes. Preservar las
+políticas de esquema y los cambios locales de este repositorio.

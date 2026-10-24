@@ -133,13 +133,12 @@ func (s *Service) printPDF(doc printDocument, metadata url.Values) ([]byte, erro
 	clinic := fallback(metadata.Get("clinicName"), "DoctorChart")
 	doctor := fallback(metadata.Get("doctorName"), "Profesional Médico")
 	specialty := fallback(metadata.Get("specialty"), api.JavaTrim(pointer(doc.Author.Specialty)))
-	license := fallback(metadata.Get("license"), "Matrícula en trámite / no informada")
 	phone := ""
 	if has(metadata.Get("clinicPhone")) {
 		phone = "Tel: " + api.JavaTrim(metadata.Get("clinicPhone"))
 	}
 	leftEnd := column(40, 283.25, 42, []string{clinic, api.JavaTrim(metadata.Get("clinicAddress")), phone}, []float64{13, 8.5, 8.5}, true, "L")
-	rightEnd := column(323.25, 231.75, 41.4, []string{doctor, specialty, license}, []float64{12, 8.5, 8.5}, true, "R")
+	rightEnd := column(323.25, 231.75, 41.4, []string{doctor, specialty}, []float64{12, 8.5}, true, "R")
 	end := leftEnd
 	if rightEnd > end {
 		end = rightEnd
@@ -157,8 +156,6 @@ func (s *Service) printPDF(doc printDocument, metadata url.Values) ([]byte, erro
 	line(309, 19.5, title, "B", 13, accent, "L")
 	pdf.SetXY(349, y)
 	line(206, 12.75, "Fecha: "+doc.at.In(s.documentZone(doc.IssuanceZone)).Format("02/01/2006")+"  |  ID: "+doc.Code, "", 8.5, dark, "R")
-	pdf.SetXY(349, y+12.75)
-	line(206, 10, "Zona de emisión: "+s.documentZone(doc.IssuanceZone).String(), "", 7.5, dark, "R")
 	pdf.SetY(y + 27.5)
 	insurance, err := wizard.Decode(doc.Patient.Insurance)
 	if err != nil {
@@ -317,8 +314,6 @@ func (s *Service) printPDF(doc printDocument, metadata url.Values) ([]byte, erro
 	if specialty != "" {
 		line(283.25, 12, specialty, "", 8, muted, "C")
 	}
-	pdf.SetX(271.75)
-	line(283.25, 12, license, "", 8, muted, "C")
 	pdf.SetX(271.75)
 	line(283.25, 12, "Firma y Sello del Profesional", "", 8, muted, "C")
 	var buffer bytes.Buffer
