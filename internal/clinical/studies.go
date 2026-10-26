@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	common "github.com/bycode/bycode-image-converter-go/pkg/media"
 
@@ -23,24 +24,44 @@ import (
 )
 
 type study struct {
-	ID          int64   `json:"id"`
-	PatientID   int64   `json:"patientId"`
-	Name        string  `json:"originalFileName"`
-	ContentType string  `json:"contentType"`
-	Size        int64   `json:"fileSize"`
-	Description *string `json:"description"`
-	Uploaded    string  `json:"uploadedAt"`
-	key         string
+	ID               int64   `json:"id"`
+	PatientID        int64   `json:"patientId"`
+	Name             string  `json:"name"`
+	OriginalFileName string  `json:"originalFileName"`
+	ContentType      string  `json:"contentType"`
+	Size             int64   `json:"fileSize"`
+	Description      *string `json:"description"`
+	Uploaded         string  `json:"uploadedAt"`
+	key              string
 }
 
-const studyColumns = "id,patient_id,original_file_name,content_type,file_size,description,uploaded_at,stored_file_name"
+const studyColumns = "id,patient_id,study_name,original_file_name,content_type,file_size,description,uploaded_at,stored_file_name"
 
 func scanStudy(row pgx.Row) (study, error) {
 	var result study
 	var uploaded time.Time
-	err := row.Scan(&result.ID, &result.PatientID, &result.Name, &result.ContentType, &result.Size, &result.Description, &uploaded, &result.key)
+	err := row.Scan(&result.ID, &result.PatientID, &result.Name, &result.OriginalFileName, &result.ContentType, &result.Size, &result.Description, &uploaded, &result.key)
 	result.Uploaded = uploaded.UTC().Format(time.RFC3339Nano)
 	return result, err
+}
+
+func studyName(values []string) (string, error) {
+	if len(values) == 0 || len(values) == 1 && strings.TrimSpace(values[0]) == "" {
+		return "", api.Failure(400, "STUDY_NAME_REQUIRED", "Ingresá el nombre del estudio.")
+	}
+	if len(values) != 1 || !utf8.ValidString(values[0]) {
+		return "", api.Failure(400, "INVALID_STUDY_NAME", "El nombre del estudio no es válido.")
+	}
+	for _, r := range values[0] {
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) || r == 0x2028 || r == 0x2029 {
+			return "", api.Failure(400, "INVALID_STUDY_NAME", "El nombre del estudio no admite caracteres de control.")
+		}
+	}
+	name := strings.TrimSpace(values[0])
+	if api.JavaLength(name) > 240 {
+		return "", api.Failure(400, "STUDY_NAME_TOO_LONG", "El nombre del estudio admite hasta 240 caracteres.")
+	}
+	return name, nil
 }
 func (s *Service) studyOwner(ctx context.Context, tx pgx.Tx, user string, patientID int64) error {
 	if _, err := ownedPatient(ctx, tx, user, patientID); err != nil {
@@ -215,8 +236,10 @@ func (s *Service) StudyRoutes(mux *http.ServeMux) {
 		}
 		var stored storage.File
 		if err == nil {
+			var name string
+			name, err = studyName(r.MultipartForm.Value["name"])
 			var description *string
-			if values, ok := r.MultipartForm.Value["description"]; ok && len(values) > 0 {
+			if values, ok := r.MultipartForm.Value["description"]; err == nil && ok && len(values) > 0 {
 				value := values[0]
 				if api.JavaLength(value) > 4000 {
 					err = api.Failure(400, "STUDY_DESCRIPTION_TOO_LONG", "La descripción admite hasta 4000 caracteres.")
@@ -286,9 +309,10 @@ func (s *Service) StudyRoutes(mux *http.ServeMux) {
 							return err
 						}
 					}
-					err := tx.QueryRow(ctx, "INSERT INTO patient_medical_studies(patient_id,original_file_name,stored_file_name,content_type,file_size,description,uploaded_at) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id", id, stored.Name, stored.Key, stored.ContentType, stored.Size, description, at).Scan(&result.ID)
+					err := tx.QueryRow(ctx, "INSERT INTO patient_medical_studies(patient_id,study_name,original_file_name,stored_file_name,content_type,file_size,description,uploaded_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id", id, name, stored.Name, stored.Key, stored.ContentType, stored.Size, description, at).Scan(&result.ID)
 					result.PatientID = id
-					result.Name = stored.Name
+					result.Name = name
+					result.OriginalFileName = stored.Name
 					result.ContentType = stored.ContentType
 					result.Size = stored.Size
 					result.Description = description
@@ -372,7 +396,7 @@ func (s *Service) StudyRoutes(mux *http.ServeMux) {
 		w.Header().Del("Pragma")
 		w.Header().Del("Expires")
 		w.Header().Set("Content-Security-Policy", "default-src 'none'; sandbox")
-		w.Header().Set("Content-Disposition", studyDisposition(result.Name))
+		w.Header().Set("Content-Disposition", studyDisposition(result.OriginalFileName))
 		http.ServeContent(w, r, "", time.Time{}, seeker)
 	})
 	mux.HandleFunc("DELETE /api/doctorchart/patients/{patientId}/studies/{studyId}", func(w http.ResponseWriter, r *http.Request) {

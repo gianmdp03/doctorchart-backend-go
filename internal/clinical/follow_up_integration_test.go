@@ -83,7 +83,7 @@ func TestFollowUpDatePersistenceAndValidation(t *testing.T) {
 	}
 	date := "2028-02-29"
 	assertStored(&date, 0)
-	edit := map[string]any{"expectedVersion": json.Number("0"), "consultationType": "FIRST_VISIT", "values": map[string]any{"chiefComplaint": "Edited", "followUpDate": "2028-03-01"}}
+	edit := map[string]any{"expectedVersion": json.Number("0"), "consultationType": "FIRST_VISIT", "values": map[string]any{"chiefComplaint": "Edited", "weightKg": json.Number("20"), "heightCm": json.Number("100"), "followUpDate": "2028-03-01"}}
 	if _, err := s.UpdateEncounter(zoneContext(t, "Pacific/Kiritimati"), identity.UserID, created.ID, edit); err != nil {
 		t.Fatal(err)
 	}
@@ -96,6 +96,13 @@ func TestFollowUpDatePersistenceAndValidation(t *testing.T) {
 		var failure *api.Error
 		if !errors.As(err, &failure) || failure.Status != 400 {
 			t.Fatalf("invalid date must produce a validation error: %v, got %v", invalid, err)
+		}
+		dateError := false
+		for _, issue := range failure.Errors {
+			dateError = dateError || issue.Path == "/values/followUpDate"
+		}
+		if !dateError {
+			t.Fatalf("expected follow-up date validation, got %+v", failure.Errors)
 		}
 		assertStored(&date, 1)
 	}
@@ -182,7 +189,7 @@ func TestFollowUpDashboardLatestDateWindowOwnershipAndRefresh(t *testing.T) {
 		t.Fatal("dashboard leaked another doctor's patients", private.Upcoming)
 	}
 	// A saved edit is reflected on the next aggregate read; no stale cache.
-	edit := map[string]any{"expectedVersion": json.Number("0"), "consultationType": "FIRST_VISIT", "values": map[string]any{"chiefComplaint": "Control", "followUpDate": nil}}
+	edit := map[string]any{"expectedVersion": json.Number("0"), "consultationType": "FIRST_VISIT", "values": map[string]any{"chiefComplaint": "Control", "weightKg": json.Number("20"), "heightCm": json.Number("100"), "followUpDate": nil}}
 	if _, err := s.UpdateEncounter(ctx, identity.UserID, later.ID, edit); err != nil {
 		t.Fatal(err)
 	}

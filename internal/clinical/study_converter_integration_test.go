@@ -181,6 +181,9 @@ func TestLiveStudyHTTPConverterAndPersistence(t *testing.T) {
 	upload := func(user, role, description string, authenticated bool) *httptest.ResponseRecorder {
 		var body bytes.Buffer
 		writer := multipart.NewWriter(&body)
+		if err := writer.WriteField("name", `Tomografía "control" / cerebral: anual`); err != nil {
+			t.Fatal(err)
+		}
 		part, err := writer.CreateFormFile("file", "study.png")
 		if err != nil {
 			t.Fatal(err)
@@ -250,7 +253,7 @@ func TestLiveStudyHTTPConverterAndPersistence(t *testing.T) {
 	mu.Lock()
 	stored := objects["/fixture/"+storedKey]
 	mu.Unlock()
-	if name != "study.webp" || mimeType != "image/webp" || size != int64(len(stored)) || result.Size != size || size >= int64(original.Len()) {
+	if result.Name != `Tomografía "control" / cerebral: anual` || result.OriginalFileName != name || name != "study.webp" || mimeType != "image/webp" || size != int64(len(stored)) || result.Size != size || size >= int64(original.Len()) {
 		t.Fatal("database metadata does not match stored conversion")
 	}
 	// Force a database failure after storage and verify the existing rollback cleanup.

@@ -22,6 +22,8 @@ Ejemplo de decisión: agregar una columna durante preproducción significa modif
 
 Desde la primera versión productiva, el baseline inicial publicado db/schema.sql es inmutable. Todo cambio estructural posterior requiere una migración incremental versionada que preserve datos; no reescribir retrospectivamente el baseline para evitarla.
 
+Excepción acotada autorizada por el propietario el 26/10/2026: separar el nombre clínico de los estudios del nombre del adjunto actualizando directamente db/schema.sql, sin migraciones, porque todavía no hay clientes y el propietario reconstruirá la base. Conservar production=true y los controles de identidad/checksum/catálogo. Esta excepción no autoriza ejecutar la reconstrucción, un wipe ni un despliegue.
+
 Gestionar orden, versión, checksums y estado previo esperado; utilizar el mismo criterio de transacciones y advisory locks en los tres backends, validar el catálogo resultante y probar sobre PostgreSQL descartable con datos representativos. Comprobar errores, rollback, reintentos y compatibilidad entre versiones/despliegues cuando corresponda. Preparar instrucciones de despliegue, respaldo y recuperación.
 
 El flag productivo permite PREPARAR migraciones, no ejecutarlas contra una base real sin permiso explícito. El mecanismo de baseline/fingerprint deberá ampliarse para reconocer versiones posteriores de forma segura cuando llegue la primera puesta en producción. No implementar anticipadamente ese runner mientras no haga falta ni crear arquitecturas diferentes por backend.

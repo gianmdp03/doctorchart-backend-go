@@ -110,6 +110,9 @@ func TestManagedStudyHTTPRecoveryAndRetention(t *testing.T) {
 	upload := func() study {
 		var body bytes.Buffer
 		form := multipart.NewWriter(&body)
+		if err := form.WriteField("name", `Estudio "control" / tórax: anual`); err != nil {
+			t.Fatal(err)
+		}
 		part, err := form.CreateFormFile("file", "clinical-fixture.png")
 		if err != nil {
 			t.Fatal(err)

@@ -199,6 +199,7 @@ CREATE TABLE public.media_events (
 
 CREATE TABLE public.patient_medical_studies (
     id bigint NOT NULL,
+    study_name character varying(240) NOT NULL CHECK (btrim(study_name) <> ''),
     media_asset_id uuid REFERENCES public.media_assets(asset_id),
     content_type character varying(255) NOT NULL,
     description text,
