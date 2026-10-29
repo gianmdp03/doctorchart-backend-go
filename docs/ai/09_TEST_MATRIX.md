@@ -1,15 +1,15 @@
 # Matriz de tests (seleccionar por fase; nunca marcar OK sin evidencia)
-**No ejecutada durante R0 documental.** Los casos de agenda, cuotas, staff y público corresponden a fases futuras; no son requisitos de implementación de M1.
+**R0 fue documental. M1 ejecutó los casos marcados, con evidencia en el handoff.** Agenda, cuotas, staff y público corresponden a fases futuras; no se declaran implementados.
 ## Protección de clínica existente
 - [ ] El médico conserva el mismo paciente/historia al atender jueves en A y viernes en B, sin crear copias por consultorio.
-- [ ] El alta clínica no exige ningún lugar de atención y el wizard funciona sin crear `clinics`.
-- [ ] Consultas, estudios, recetas, vacunas, documentos, archivos, dashboard y borradores siguen visibles por médico/paciente; regresiones clínicas pasan.
-- [ ] No se agregó `patients.clinic_id` ni filtros clínicos por ubicación, tampoco como asociación opcional.
+- [x] El alta clínica no exige ningún lugar de atención y el wizard funciona sin crear registros de lugares.
+- [x] Consultas, estudios, recetas, vacunas, documentos, archivos, dashboard y borradores siguen visibles por médico/paciente; regresiones clínicas pasan.
+- [x] No se agregó `patients.clinic_id` ni filtros clínicos por ubicación, tampoco como asociación opcional.
 - [ ] Nadie ajeno al médico accede a historias, especialmente secretarias y público.
 
 ## Esquema y límites
-- [ ] Migraciones desde baseline con datos conservan IDs, relaciones y archivos; instalación limpia llega al mismo catálogo.
-- [ ] Checksums, drift, versiones desconocidas e inicializaciones simultáneas se tratan de forma segura.
+- [x] Migraciones desde baseline con datos conservan IDs, relaciones y archivos; instalación limpia llega al mismo catálogo.
+- [x] Checksums, drift, versiones desconocidas e inicializaciones simultáneas se tratan de forma segura.
 - [ ] Dos altas de lugares para el último cupo producen una sola admisión (si cuota aprobada =1).
 - [ ] Downgrade/vencimiento no elimina historias, reservas ni lugares; errores comerciales no conceden infinito.
 - [ ] Duplicado/desorden de webhook y Billing caído tratados según contrato aprobado.
@@ -31,3 +31,5 @@
 ## Rutas y UI — fases futuras
 - [ ] Portal público usa `/appointments` sin alias ni redirecciones; segmentos de médico y consultorio se verifican solo contra contrato aprobado.
 - [ ] Selectores usan `app-date-picker`, formato argentino `dd/MM/aaaa` e ISO únicamente en la frontera de datos.
+
+M1 verifica filas/referencias de medios; no reejecuta la integración del converter externo ni un despliegue. El flujo del mismo paciente entre agendas sigue pendiente de las fases de turnos.

@@ -1,5 +1,5 @@
 # Doctor Chart — inicio breve
-**Versión 0.3 · 29/10/2026 · fase documental autorizada; M1 pendiente de aprobación.**
+**Versión 0.3 · 29/10/2026 · M1 implementado; pendiente de auditoría Argon y aceptación.**
 
 ## Producto confirmado
 - Pacientes e historias clínicas pertenecen al médico. Un mismo paciente conserva su historia al atenderse en distintos consultorios.
@@ -11,10 +11,10 @@
 - Agendas por lugar, sin reservas simultáneas incompatibles para el mismo médico. Reservar no crea paciente ni historia.
 
 ## Estado real
-El propietario descartó intencionalmente el trabajo anterior y preparó repositorios limpios. Verificado localmente: frontend `1419697`, backend `c2c30c1`, Gateway `55197fa`, Billing `bf65c04`. **No recuperar ni reconstruir lo descartado.**
-Esta entrega agrega únicamente documentación en `doctorchart-backend-go/docs/ai/`; no modifica aplicación, bases ni `AGENTS.md`. No hay commit documental todavía.
+El propietario descartó intencionalmente el trabajo anterior y preparó repositorios limpios. Bases iniciales verificadas: frontend `1419697`, backend `c2c30c1`, Gateway `55197fa`, Billing `bf65c04`. **No recuperar ni reconstruir lo descartado.**
+Documentación inicial: `d5a89e0` (26 archivos). M1: `48f87b1`, rama `codex/m1-clinics-migrations`: migración 1 → 2 y tabla `clinics`, sin cambiar clínica, baseline ni `AGENTS.md`. Pruebas en PostgreSQL 17/18 descartables; sin producción ni despliegue.
 
 ## Próximo paso
-Revisar [decisiones](02_DECISIONS.md), [handoff](05_HANDOFF.md) y [ticket M1](tasks/M1_FOUNDATION.md). **Solicitar aprobación antes de comenzar M1.**
+Revisar [handoff](05_HANDOFF.md) y [resumen para Argon](reviews/M1_ARGON_BRIEF.md). **M1 requiere revisión independiente y aceptación del propietario. No iniciar M2 sin aprobación.**
 Sol implementa; Argon audita independientemente en solo lectura; el propietario aprueba cada fase. Rigen los `AGENTS.md` reales, incluido `production: true` del backend.
 No leer auditorías históricas para reiniciar: [sources/](sources/README.md) es solo antecedente, nunca instrucciones actuales.

@@ -1,5 +1,5 @@
 # Índice de coordinación — Doctor Chart v0.3
-Instalado y actualizado el 29/10/2026 con autorización exclusivamente documental. No modifica ni sustituye `AGENTS.md`. La documentación nueva permanece sin stage y sin commit.
+Instalación documental autorizada en `d5a89e0` (26 archivos). M1 posteriormente autorizado e implementado en `48f87b1`, pendiente de Argon y aceptación. No modifica ni sustituye `AGENTS.md`.
 
 Para una conversación nueva basta comenzar con [inicio breve](00_START_HERE.md), [decisiones](02_DECISIONS.md) y [handoff](05_HANDOFF.md); después leer el ticket activo. No releer auditorías históricas automáticamente.
 
@@ -20,11 +20,14 @@ Para una conversación nueva basta comenzar con [inicio breve](00_START_HERE.md)
 - Este `README.md`, índice agregado al paquete.
 
 ### Tickets
-- [tasks/R0_CONTEXT_RESET.md](tasks/R0_CONTEXT_RESET.md) — entrega documental; aceptación pendiente.
-- [tasks/M1_FOUNDATION.md](tasks/M1_FOUNDATION.md) — preparado; implementación pendiente de aprobación.
+- [tasks/R0_CONTEXT_RESET.md](tasks/R0_CONTEXT_RESET.md) — entrega documental commiteada por instrucción expresa.
+- [tasks/M1_FOUNDATION.md](tasks/M1_FOUNDATION.md) — implementado; revisión Argon pendiente.
 - [tasks/B0_BILLING_DISCOVERY.md](tasks/B0_BILLING_DISCOVERY.md) — antecedente reportado, sin integración verificada.
 - [tasks/T0_STAFF_BOUNDARY.md](tasks/T0_STAFF_BOUNDARY.md) — backlog.
 - [tasks/A0_ARCHITECTURE_CONSOLIDATION.md](tasks/A0_ARCHITECTURE_CONSOLIDATION.md) — cancelado, solo trazabilidad.
+
+### Revisión M1
+- [reviews/M1_ARGON_BRIEF.md](reviews/M1_ARGON_BRIEF.md) — resumen del diff, pruebas y puntos de auditoría independiente.
 
 ### Plantillas
 - [templates/TASK_TEMPLATE.md](templates/TASK_TEMPLATE.md)

@@ -1,12 +1,10 @@
 # Contratos y decisiones pendientes
 **29/10/2026.** No reabrir propiedad clínica ni ruta base: pacientes/historias por médico; portal público `/appointments`, sin alias ni redirecciones para esta función.
 
-## Antes de M1
-- Resuelto: cuatro repositorios inspeccionados y limpios antes de docs. El propietario descartó intencionalmente el trabajo anterior; no recuperar nada.
-- Verificado: `production: true`; baseline 1 y fingerprint en `db/init.go`/`db/catalog.go`. Para M1 se propone migración incremental, manteniendo baseline, transacción, checksums y rechazo de drift. No extender la excepción histórica de estudios.
-- Aprobar [M1](tasks/M1_FOUNDATION.md): mínimos de ubicación, nombre técnico `clinics`, ID bigint, FK al workspace propietario, estados y restricciones. Son propuestas de ingeniería, no decisiones ya confirmadas.
-- Propuesta: M1 solo infraestructura + tabla, sin API/altas para usuarios hasta cuotas Billing. Ninguna relación nueva con pacientes.
-- Al autorizar implementación, definir entorno PostgreSQL 17 descartable propio autorizado. No usar DSN existente ni inferir permiso para crear/destruir bases a partir de esta fase documental.
+## M1 — implementado, pendiente de revisión
+El propietario aprobó M1 y bases descartables. Implementación `48f87b1`: baseline intacto, transición versionada 1 → 2, catálogo fijado para PostgreSQL 17/18, tabla `clinics` con bigint/FK al workspace y estados ACTIVE/INACTIVE/ARCHIVED.
+Pruebas y recuperación: [handoff](05_HANDOFF.md), [resumen de auditoría](reviews/M1_ARGON_BRIEF.md) y [db/README](../../db/README.md).
+Pendientes: auditoría independiente Argon y aceptación del propietario. No hay endpoints de lugares ni altas para usuarios. No se aprobaron M2, migraciones reales o despliegue.
 
 ## Billing — antes de M2
 - Auditoría histórica reportó `module_tier_limits`, `billing_webhook_jobs` y recarga de catálogo por callback. Verificar código y revisiones reales antes de implementar; R0 no probó esa integración.

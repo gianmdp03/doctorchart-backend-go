@@ -1,10 +1,10 @@
 # Roadmap revisado — clínica global por médico, ubicaciones solo para turnos
-**R0 documental autorizado y entregado, pendiente de aceptación. M1 y las demás fases de implementación no están autorizadas.**
+**R0 commiteado por autorización expresa. M1 implementado, pruebas PASS, pendiente de auditoría Argon y aceptación. M2 y demás fases no autorizadas.**
 
 | Fase | Resultado | Criterio clave |
 |---|---|---|
-| R0 | Documentación instalada desde estado limpio intencional | Entregado: Git registrado, docs persistidas sin commit, cero código/SQL; aceptación pendiente |
-| M1 | Migraciones versionadas + `clinics` como **ubicaciones** | BD vacía y upgrade convergen; integridad/conservación; sin cambios clínicos |
+| R0 | Documentación instalada desde estado limpio intencional | 26 documentos en d5a89e0; cero código/SQL en R0 |
+| M1 | Implementado en 48f87b1; pendiente de review | Vacío/upgrade convergen en PG17/18; clínica intacta; aprobación final pendiente |
 | M2 | Integración comercial y administración de lugares | Cuotas de Billing respetadas y serializadas; alta/archivo sin pérdida |
 | T0 | Auth local staff + contrato Gateway | Médico Supabase inalterado; secretaria aislada y revocable |
 | T1 | Agendas y excepciones | Franja por lugar, sin doble ocupación del médico y sin anular turnos sin aviso |

@@ -6,6 +6,6 @@ Ruta pública confirmada: `/appointments`, sin alias ni redirecciones; segmentos
 
 El propietario descartó intencionalmente los cambios anteriores y dejó repositorios limpios, verificados en R0. No recuperar ni reconstruir lo descartado. Comprobá Git actual para detectar solo cambios nuevos y preservar trabajo ajeno.
 
-La fase documental fue autorizada y entregada. **M1 sigue pendiente de aprobación explícita:** no escribir código, SQL ni migraciones hasta recibirla. Sol implementará la fase aprobada y Argon auditará independientemente en solo lectura; cada fase requiere aprobación del propietario. No ejecutar bases, commits, pushes o despliegues por inferencia.
+R0 quedó commiteado en `d5a89e0`. El propietario aprobó M1 y sus ensayos descartables; implementación entregada en `48f87b1`, rama `codex/m1-clinics-migrations`. Pruebas completas y race pasan; Argon todavía no auditó.
 
-Para continuar, revisá `tasks/M1_FOUNDATION.md` y pedí aprobación si aún no consta en el handoff. Respondé con un informe breve; no repitas auditorías históricas de `sources/`.
+Para continuar, leé `reviews/M1_ARGON_BRIEF.md` y el handoff: la próxima acción es revisión independiente de Gemini Argon y aceptación del propietario. **No comenzar M2 ni modificar más fases sin aprobación.** Sin bases reales, despliegues, pushes o cambios Supabase por inferencia. Respondé breve; no repitas auditorías históricas.

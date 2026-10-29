@@ -20,11 +20,15 @@ Fecha de producto y actualización documental: 29/10/2026. Estado = **CONFIRMADA
 | DC-052 | CONFIRMADA | El propietario descartó intencionalmente el trabajo anterior y preparó repositorios limpios. No recuperar ni reconstruir cambios de la arquitectura descartada. |
 | DC-053 | CONFIRMADA · AUTORIZACIÓN ACOTADA | Instalar y corregir únicamente documentación de coordinación en `docs/ai/`, actualizar handoff y preparar M1, conservando AGENTS.md. No autoriza implementación, migraciones ni aplicación. |
 
+## Ingeniería autorizada para M1
+El propietario autorizó comenzar M1 con el alcance del ticket el 29/10/2026, incluidos commit documental independiente, rama específica, migraciones incrementales y pruebas automatizadas en PostgreSQL descartable. Sin despliegue, bases reales, cambios de pacientes, Angular, Gateway, Billing o Supabase; M2 requiere nueva aprobación.
+- **DC-042 · APROBADA PARA M1:** tabla `clinics` de ubicaciones con FK al workspace del médico, sin relación con pacientes. La futura relación de reservas queda fuera de M1.
+- **DC-043 · APROBADA PARA M1:** ID bigint identity de lugares, consistente con el esquema.
+Implementación entregada en `48f87b1`, pendiente de Argon y aceptación; esto no implica autorización de publicación.
+
 ## Decisiones de ingeniería recomendadas, aún por aprobar
 | ID | Estado | Propuesta |
 |---|---|---|
-| DC-042 | PROPUESTA | `clinics` es entidad de ubicaciones del médico para agendas; paciente **sin clinic_id**; `appointments` referencia ubicación y opcionalmente paciente del mismo médico. |
-| DC-043 | PROPUESTA | `BIGINT` para ID de lugar; validar convenciones del esquema real. |
 | DC-044 | PROPUESTA | Exclusión por médico + rango `[inicio,fin)` PostgreSQL GiST y bloqueo estable para reservas/excepciones. |
 | DC-045 | PROPUESTA | Formularios de reserva versionados; predeterminado por médico con override por lugar. |
 | DC-046 | PROPUESTA | Auth staff: email verificado, invitación, hash Argon2id, sesiones opacas, HttpOnly/CORS/CSRF y revocación; contrato con Gateway por aprobar. |
@@ -34,7 +38,7 @@ Fecha de producto y actualización documental: 29/10/2026. Estado = **CONFIRMADA
 | DC-050 | PROPUESTA | Nuevas capacidades `clinics`, `staffRelations`, `appointmentManagement`, `onlineBooking` y mantener cuotas clínicas existentes. |
 
 La ruta base pública está confirmada. Segmentos de médico y consultorio, identificadores públicos y rutas administrativas continúan como propuestas hasta aprobar su contrato; ninguna URL anidada de auditorías queda aprobada por referencia.
-M1 está preparado, pero DC-042 a DC-050 siguen siendo propuestas. Las restricciones reales de AGENTS.md, incluido production=true, no se sustituyen con esta documentación.
+M1 está implementado bajo autorización; DC-044 a DC-050 siguen siendo propuestas para fases posteriores. Las restricciones reales de AGENTS.md, incluido production=true, no se sustituyen con esta documentación.
 
 ## Anuladas expresamente (¡NO IMPLEMENTAR!)
 | ID anterior | Estado | Qué se descarta |

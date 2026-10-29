@@ -1,7 +1,7 @@
 # Prompts breves de reinicio por agente
 
 ## Sol — arranque de conversación nueva
-Usá `NEW_CHAT_SOL_PROMPT.md`. R0 ya verificó el estado limpio preparado intencionalmente por el propietario; no recuperar ni reconstruir cambios descartados. Comprobar Git actual para preservar solo cambios nuevos. M1 necesita aprobación explícita.
+Usá `NEW_CHAT_SOL_PROMPT.md`. R0 ya verificó el estado limpio preparado intencionalmente por el propietario; no recuperar ni reconstruir cambios descartados. Comprobar Git actual para preservar solo cambios nuevos. M1 fue aprobado e implementado; revisar handoff y entrega a Argon. M2 necesita aprobación explícita.
 
 ## Sol — comienzo de una fase de código ya aprobada
 "Leé `docs/ai/00_START_HERE.md`, `02_DECISIONS.md`, `05_HANDOFF.md`, el ticket aprobado y `AGENTS.md` real. Confirmá repo/branch/commit y alcance exacto. Trabajá solo la fase aprobada, ejecutá pruebas pertinentes en entornos descartables autorizados, actualizá handoff y devolvé diffs/SHAs/resultados. No recuperes decisiones anuladas de auditorías históricas."
