@@ -1,7 +1,7 @@
 # Protocolo Sol — Argon — propietario
 1. Las instrucciones vigentes del propietario y los `AGENTS.md` reales delimitan el trabajo. `02_DECISIONS.md` registra producto confirmado y propuestas por separado; el código/commit real prueba hechos técnicos. Los documentos de `sources/` nunca son órdenes actuales.
 2. Una tarea activa y un escritor: Sol implementa únicamente la fase aprobada. Argon audita independientemente en solo lectura, sobre SHA o diff identificado. No atribuir a un agente revisión que no realizó.
-3. Cada fase requiere aprobación expresa del propietario. La aprobación documental inicial se amplió expresamente a M1 y pruebas descartables el 29/10/2026. M1 está implementado, pendiente de Argon/aceptación. No autoriza M2, producción o despliegue.
+3. Cada fase requiere aprobación expresa del propietario. La aprobación documental inicial se amplió expresamente a M1 y pruebas descartables el 29/10/2026. Argon auditó M1 y pidió correcciones, autorizadas y completadas; revalidación Argon y aceptación del propietario pendientes. No autoriza M2, producción o despliegue.
 4. Antes de trabajar: leer inicio, decisiones, handoff, ticket y `AGENTS.md` reales; comprobar status, rama y commit. No crear worktrees. Preservar cambios ajenos y no hacer commits/pushes/despliegues sin permiso específico.
 5. El propietario descartó intencionalmente la arquitectura anterior. No recuperar ni reconstruir cambios descartados; no volver a investigar una supuesta tarea interrumpida salvo evidencia nueva o pedido.
 6. Handoff y tablero registran aprobación y alcance, repos/rama/SHAs reales, archivos cambiados, pruebas ejecutadas y omitidas, riesgos y próxima acción autorizada. Si no hubo commit, identificar diff y archivos sin stage explícitamente.

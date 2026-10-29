@@ -34,7 +34,7 @@ Entornos autorizados y ejecutados:
 - `doctorchart-m1-pg18-20261029`: PostgreSQL 18.6, 127.0.0.1:55440.
 - Label `codex.task=doctorchart-m1`, rol `migration_fixture`, datos temporales sin volumen persistente. Verificar identidad antes de crear/destruir fixtures; nunca usar DSN de desarrollo.
 
-`db/init_test.go` crea/elimina únicamente `stage3_baseline_doctorchart_*`. Las otras suites requieren cuatro bases vacías separadas: `doctorchart_schema_test`, `doctorchart_integrity_test`, `doctorchart_growth_test` y `doctorchart_followups_query_test`.
+`db/init_test.go` crea/elimina únicamente `stage3_baseline_doctorchart_*`. Las otras suites requieren cinco bases vacías separadas: `doctorchart_schema_test`, `doctorchart_integrity_test`, `doctorchart_growth_test`, `doctorchart_followups_query_test` y `doctorchart_startup_test`.
 Con el servidor propio autorizado y esas bases creadas, definir variables solo para el proceso de pruebas (contraseña del fixture, no de una base real):
 
 ```powershell
@@ -44,6 +44,8 @@ $env:DOCTORCHART_SCHEMA_TEST_DATABASE_URL = "$fixtureRoot/doctorchart_schema_tes
 $env:DOCTORCHART_INTEGRITY_TEST_DATABASE_URL = "$fixtureRoot/doctorchart_integrity_test?sslmode=disable"
 $env:DOCTORCHART_GROWTH_TEST_DSN = "$fixtureRoot/doctorchart_growth_test?sslmode=disable"
 $env:DOCTORCHART_FOLLOWUP_TEST_DATABASE_URL = "$fixtureRoot/doctorchart_followups_query_test?sslmode=disable"
+$env:DOCTORCHART_STARTUP_TEST_DATABASE_URL = "$fixtureRoot/doctorchart_startup_test?sslmode=disable"
+go test ./cmd/api -run '^TestStartupCreatesSchemaAndServesHealth$' -count=1 -v
 go build ./...
 go vet ./...
 go test ./... -count=1
@@ -53,6 +55,8 @@ govulncheck ./...
 
 Race requiere CGO y compilador C. Windows tenía CGO=0; race se ejecutó realmente en `golang:1.27.3` Linux con GCC 14.2, fuentes montadas en solo lectura y red del PostgreSQL 17 propio. Un proxy loopback temporal del contenedor llevó 55442 a 5432; no se modificaron guards del fixture.
 No ejecutar dos suites simultáneas contra las mismas bases con nombres fijos. Growth exige empezar vacío y se limpia al terminar.
+
+La prueba de arranque debe mostrar `--- PASS: TestStartupCreatesSchemaAndServesHealth`; un `SKIP` por ausencia de `DOCTORCHART_STARTUP_TEST_DATABASE_URL` no valida esta integración. `TestBaselineUpgradeWithRealSeedsPreservesAdminConfiguration` usa `bootstrap.Run` y los seeds reales sobre baseline 1, verifica transición a 2, conservación de configuraciones administradas y reinicio idempotente.
 
 Cobertura: vacío/upgrade convergentes; todos los objetos originales intactos; snapshots de tablas originales con pacientes, consultas, recetas, estudios, medios y vacunas representativos; IDs, referencias, secuencias y marcador preservados; reinicios; 16 inicializadores; cancelación; errores SQL/seed; rollback y reintento; drift/historial/checksums y restricciones de lugares. Regresiones clínicas/wizard se ejecutan sin lugares.
 Converter externo y sincronización Billing requieren servicios opt-in adicionales y no se ejecutaron en M1.

@@ -1,5 +1,5 @@
 # Doctor Chart — inicio breve
-**Versión 0.3 · 29/10/2026 · M1 implementado; pendiente de auditoría Argon y aceptación.**
+**Versión 0.3 · 29/10/2026 · M1 corregido tras auditoría; listo para aprobación, revalidación Argon pendiente.**
 
 ## Producto confirmado
 - Pacientes e historias clínicas pertenecen al médico. Un mismo paciente conserva su historia al atenderse en distintos consultorios.
@@ -15,6 +15,6 @@ El propietario descartó intencionalmente el trabajo anterior y preparó reposit
 Documentación inicial: `d5a89e0` (26 archivos). M1: `48f87b1`, rama `codex/m1-clinics-migrations`: migración 1 → 2 y tabla `clinics`, sin cambiar clínica, baseline ni `AGENTS.md`. Pruebas en PostgreSQL 17/18 descartables; sin producción ni despliegue.
 
 ## Próximo paso
-Revisar [handoff](05_HANDOFF.md) y [resumen para Argon](reviews/M1_ARGON_BRIEF.md). **M1 requiere revisión independiente y aceptación del propietario. No iniciar M2 sin aprobación.**
+Revisar [handoff](05_HANDOFF.md) y [correcciones de auditoría](reviews/M1_CORRECTIONS.md). Argon reportó un hallazgo obligatorio y dos observaciones; atendidos con pruebas reales. **Listo para aprobación del propietario; revalidación Argon pendiente. No iniciar M2.**
 Sol implementa; Argon audita independientemente en solo lectura; el propietario aprueba cada fase. Rigen los `AGENTS.md` reales, incluido `production: true` del backend.
 No leer auditorías históricas para reiniciar: [sources/](sources/README.md) es solo antecedente, nunca instrucciones actuales.

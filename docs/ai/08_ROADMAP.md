@@ -1,11 +1,11 @@
 # Roadmap revisado — clínica global por médico, ubicaciones solo para turnos
-**R0 commiteado por autorización expresa. M1 implementado, pruebas PASS, pendiente de auditoría Argon y aceptación. M2 y demás fases no autorizadas.**
+**R0 commiteado por autorización expresa. M1 corregido tras auditoría Argon, pruebas PASS; revalidación y aprobación pendientes. M2 y demás fases no autorizadas.**
 
 | Fase | Resultado | Criterio clave |
 |---|---|---|
 | R0 | Documentación instalada desde estado limpio intencional | 26 documentos en d5a89e0; cero código/SQL en R0 |
-| M1 | Implementado en 48f87b1; pendiente de review | Vacío/upgrade convergen en PG17/18; clínica intacta; aprobación final pendiente |
-| M2 | Integración comercial y administración de lugares | Cuotas de Billing respetadas y serializadas; alta/archivo sin pérdida |
+| M1 | Implementado y corregido tras Argon | Startup real y transición con seeds PASS en PG17/18; listo para aprobación, revalidación pendiente |
+| M2 | Integración comercial y administración de lugares (NO AUTORIZADA) | Cuotas Billing, alta/archivo sin pérdida y validación IANA en Go adicional a SQL |
 | T0 | Auth local staff + contrato Gateway | Médico Supabase inalterado; secretaria aislada y revocable |
 | T1 | Agendas y excepciones | Franja por lugar, sin doble ocupación del médico y sin anular turnos sin aviso |
 | T2 | Motor de reservas + formularios versionados | Slot confirmado transaccionalmente, solicitante≠paciente posible, vínculo clínico opcional |

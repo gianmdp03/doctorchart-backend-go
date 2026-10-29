@@ -33,3 +33,9 @@
 - [ ] Selectores usan `app-date-picker`, formato argentino `dd/MM/aaaa` e ISO únicamente en la frontera de datos.
 
 M1 verifica filas/referencias de medios; no reejecuta la integración del converter externo ni un despliegue. El flujo del mismo paciente entre agendas sigue pendiente de las fases de turnos.
+
+## Correcciones posteriores a Argon
+- [x] Startup real habilitado con `DOCTORCHART_STARTUP_TEST_DATABASE_URL` y `doctorchart_startup_test`; 25 tablas, seeds y health/ping ante caída/recuperación PostgreSQL; PASS sin SKIP.
+- [x] Baseline 1 con seeds reales → `bootstrap.Run` → 2 y reinicio; configuraciones administradas preservadas, una migración y cero lugares inventados.
+- [ ] M2: validación IANA en Go además del CHECK SQL, pendiente de fase autorizada.
+Resultados, entornos y cinco pruebas externas omitidas: [correcciones](reviews/M1_CORRECTIONS.md).

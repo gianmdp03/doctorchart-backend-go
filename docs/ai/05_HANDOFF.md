@@ -1,71 +1,54 @@
-# Handoff — M1 implementado, revisión pendiente
+# Handoff — correcciones M1 completadas
 **29/10/2026 (Argentina) · v0.3 · rama `codex/m1-clinics-migrations`.**
+**M1 listo para aprobación del propietario; revalidación de Argon sobre las correcciones pendiente.**
 
-## Autorización y límites
-El propietario aprobó implementar M1 según ticket, crear primero un commit con los 26 documentos, trabajar en rama específica y crear/ejecutar pruebas automatizadas en bases descartables.
-Se preservaron pacientes/historias por médico, baseline y AGENTS.md (`production: true`). Sin cambios Angular, Gateway, Billing, autenticación Supabase, turnos/agenda/staff ni altas comerciales. No hubo bases reales, migraciones productivas, despliegues, pushes o merge.
-El trabajo anterior fue descartado intencionalmente: no recuperarlo ni reconstruirlo. Ruta pública futura confirmada `/appointments`, sin alias/redirecciones; segmentos de médico/consultorio pendientes.
+## Autorización y auditoría recibida
+El propietario informó el veredicto independiente de Gemini Argon: **REQUIERE CORRECCIONES, 0 críticos, 1 obligatorio y 2 observaciones menores**. Autorizó corregir exclusivamente M1, ejecutar pruebas descartables, crear un commit específico y actualizar coordinación.
+El test de arranque había quedado omitido en la fase anterior por faltar su DSN; la suite previa no acreditaba esa integración. Se reprodujo su fallo real con 25 tablas frente a la expectativa heredada de 23 y se corrigió.
+No se autorizó M2, merge a main, push, bases reales o despliegues. Tampoco cambiar mecanismo o esquema por observaciones sin defecto comprobado.
 
-## Commits y repositorios
-Raíz común `C:/Users/gcast/Documents/GitHub/`. Inspección local sin fetch.
+## Commits y estado
+- Baseline previo: `c2c30c1142b39519532eb986dcad811fbaa2619b`.
+- 26 documentos independientes: `d5a89e05eebf70de1dca72ed0b01a74467b6b1a4`, donde permanece main.
+- Implementación M1: `48f87b1d929e8496aecf203284cc4ca4d0c95820`.
+- Coordinación inicial: `32d03681e44b79d742da3e25c4cfbd122f343a81`, base de esta corrección.
+- Corrección: único commit específico posterior a `32d0368`, que contiene este handoff; obtener SHA final con `git log -1`.
+Se conserva la rama M1 sin merge/push. Árbol limpio al cierre. No se recuperó trabajo descartado ni se crearon worktrees.
 
-| Repo | Rama | HEAD / referencia |
-|---|---|---|
-| doctorchart-backend-go, baseline previo | main al iniciar | c2c30c1142b39519532eb986dcad811fbaa2619b |
-| Doctor Chart, 26 docs independientes | main; base de rama M1 | d5a89e05eebf70de1dca72ed0b01a74467b6b1a4 |
-| Doctor Chart, implementación M1 | codex/m1-clinics-migrations | 48f87b1d929e8496aecf203284cc4ca4d0c95820 |
-| doctorchart-frontend | main, limpio e intacto | 14196974125e5769c5a95e309896397acad96e63 |
-| api-ai-gateway-go | main, limpio e intacto | 55197fa5701d15ed67a69e395bee4e3699c5a705 |
-| bycode-backend-go | main, limpio e intacto | bf65c042cc7480cbf4603447becfeb14002dbde1 |
+## Correcciones y archivos
+- `cmd/api/main_test.go`: expectativa 23 → 25 tablas en `TestStartupCreatesSchemaAndServesHealth`.
+- `db/README.md`: añadir base `doctorchart_startup_test`, sexta variable `DOCTORCHART_STARTUP_TEST_DATABASE_URL`, comando focal y comprobación explícita de PASS en vez de SKIP.
+- `internal/bootstrap/migration_test.go`: nueva prueba `TestBaselineUpgradeWithRealSeedsPreservesAdminConfiguration`. Parte de baseline 1 real, usa seeds reales, conserva ocho tablas de catálogos/configuración administrada y verifica `bootstrap.Run` 1 → 2 y reinicio idempotente sin lugares inventados.
+- Coordinación actualizada: inicio, decisiones, pendientes, tablero, este handoff, protocolo, roadmap, matriz, prompt de reinicio, índice y ticket M1; entrega original Argon marcada como histórica y nuevo [registro de correcciones](reviews/M1_CORRECTIONS.md).
+- M2 solo registra validación IANA en Go adicional a SQL; no se implementó.
+Sin cambios en `AGENTS.md`, `db/schema.sql`, `db/catalog.go`, `db/init.go`, `db/migrations.go`, SQL de migración ni lógica productiva. Pacientes/historias siguen por médico; ninguna relación clínica se modifica.
 
-Este handoff y la actualización de coordinación se confirman en un commit documental posterior a `48f87b1`; consultar HEAD de la rama para su SHA final. `main` queda en `d5a89e0`, sin implementación M1. Árbol limpio al finalizar; sin PR o push.
+## Pruebas ejecutadas
+Go 1.27.3. Fixtures propios autorizados con label `codex.task=doctorchart-m1-fixes` y role `migration_fixture`:
+- `doctorchart-m1fix-pg18-20261029`: PostgreSQL 18.6, loopback 55440, tmpfs.
+- `doctorchart-m1fix-pg17-20261029`: PostgreSQL 17.11, loopback 55442, tmpfs.
+- `doctorchart-m1fix-race-20261029`: Linux golang:1.27.3/GCC, fuentes readonly y red del fixture 17, proxy loopback temporal como en M1.
+Bases de schema, integrity, growth, followups y **startup** separadas; admin baseline crea/elimina exclusivamente sus bases con prefijo controlado. Se habilitaron las **seis DSN**. Contenedores propios retirados al finalizar.
 
-## Resultado y archivos
-Commit funcional: siete archivos, 653 líneas agregadas / 34 eliminadas.
-- `db/init.go`: valida estado previo, migra versión 1 → 2 y seeds en una transacción, valida resultado y actualiza marcador; rollback cancelable con limpieza acotada.
-- `db/migrations.go`: migración embebida, checksum, historial estricto y catálogos esperados por PostgreSQL 17/18.
-- `db/migrations/0002_clinics.sql`: `clinics`, FK a workspace, datos de ubicación, zona IANA, estados, versión, timestamps, índice y ledger.
-- `db/migrations_test.go`: conservación, convergencia, rollback/reintento, concurrencia/cancelación, historial/drift e integridad.
-- `db/init_test.go` y `internal/bootstrap/schema_test.go`: actualizar conteos esperados (25 tablas / 21 FK).
-- `db/README.md`: contrato, pruebas y procedimiento futuro de respaldo/recuperación.
-Sin cambios en `AGENTS.md`, `db/schema.sql`, `db/catalog.go` ni código clínico de aplicación. El test de bootstrap cambia un único conteo.
-
-Coordinación de cierre: actualizados `00_START_HERE.md`, `02_DECISIONS.md`, `03_PENDING_CONTRACTS.md`, `04_TASK_BOARD.md`, `05_HANDOFF.md`, `06_PROTOCOL.md`, `07_SESSION_STARTERS.md`, `08_ROADMAP.md`, `09_TEST_MATRIX.md`, `10_REPOSITORY_MAP.md`, `NEW_CHAT_SOL_PROMPT.md`, `README.md`, `tasks/R0_CONTEXT_RESET.md` y `tasks/M1_FOUNDATION.md`; creado `reviews/M1_ARGON_BRIEF.md`. Sin modificar los históricos originales de R0 durante M1.
-
-## Contrato operativo
-En próximo arranque autorizado, este binario migra automáticamente una versión 1 intacta antes de HTTP/jobs. Vacío y upgrade llegan al mismo catálogo 2; no crea lugares por defecto. Versión 2 valida historial/checksums y catálogo; no reescribe metadatos en reinicios.
-Se conservan pgx, READ COMMITTED, contexto 30s, lock_timeout 10s, statement_timeout 20s y advisory lock (17209, 3). Baseline inmutable; la columna histórica `baseline_version` registra versión instalada 2.
-La guía del VPS indica PostgreSQL 18.6, distinto del objetivo inicial 17: se verificaron ambos en contenedores propios y se fijaron contratos distintos porque 18 expone constraints NOT NULL adicionales. Otras versiones mayores se rechazan antes de DDL; cambiar de motor requiere fase independiente.
-
-## Pruebas ejecutadas y resultados
-Go 1.27.3. PostgreSQL descartable propio, role `migration_fixture`, label `codex.task=doctorchart-m1`:
-- `doctorchart-m1-20261029`: 17.11, loopback 55442, datos tmpfs.
-- `doctorchart-m1-pg18-20261029`: 18.6, loopback 55440, datos tmpfs.
-- Race: `doctorchart-m1-race-20261029`, golang:1.27.3 Linux/GCC 14.2, repos montados solo lectura y red del PostgreSQL 17 propio. Proxy loopback temporal para puerto 55442, sin cambiar guards de tests.
-Los tres contenedores propios se retiran al cerrar M1; no se reutilizan servicios ajenos. No persistieron datos reales ni fixtures.
-
-| Comando / control | Resultado |
+| Comando / entorno | Resultado |
 |---|---|
-| gofmt -l sobre fuentes Go; git diff --check | PASS, sin salida |
-| go build ./... | PASS |
-| go vet ./... | PASS |
-| go test ./db -count=1, PostgreSQL 17.11 | PASS (ensayo focal) |
-| go test ./... -count=1, Windows/PG17.11 | PASS (antes de agregar compatibilidad 18) |
-| go test ./... -count=1, Windows/PG18.6 | PASS, código final |
-| go test -race ./... -count=1, Linux/PG17.11 | PASS, código final |
-| govulncheck ./... y -show verbose | exit 0; 0 vulnerabilidades alcanzables/importadas |
+| Test startup focal antes de corregir, Windows/PG18.6 | FAIL reproducido: health served with 25 tables and 1 specialties |
+| go test ./cmd/api ./internal/bootstrap -run '^(TestStartupCreatesSchemaAndServesHealth\|TestBaselineUpgradeWithRealSeedsPreservesAdminConfiguration)$' -count=1 -v, Windows/PG18.6 | PASS ambos, sin SKIP |
+| go test ./... -count=1 -json, Windows/PG18.6 | PASS, exit 0, startup habilitado |
+| go test -race ./... -count=1 -json, Linux/PG17.11 | PASS, exit 0; 395 casos/subcasos PASS, 5 omitidos |
+| go build ./...; go vet ./...; gofmt -l; git diff --check | PASS |
 
-Las cinco variables de BD se configuraron explícitamente para admin, schema, integrity, growth y followups. Las suites de PostgreSQL correspondientes no fueron omitidas. Reproducción y nombres de bases en [db/README](../../db/README.md).
-Se probó que los objetos clínicos originales y sus filas permanecen intactos (pacientes, consultas, recetas, estudios, medios, vacunas, IDs/referencias/secuencias), sin lugares obligatorios. La comparación de catálogo del test se corrigió para tratar constraints de nombre repetido como multiconjunto; no fue necesario cambiar el catálogo de producción.
-Python no estaba disponible: se ejecutaron manualmente los equivalentes de build/vet/tests/race/formato del checker Go.
-No ejecutados: converter HTTP externo, fixture end-to-end Billing/webhooks y servicios Supabase/Gateway reales, por no ser parte de M1. Fixtures sintéticos/locales sí ejecutados.
-Govulncheck informa GO-2026-5932 en módulo indirecto `golang.org/x/crypto/openpgp`, sin paquetes importados ni llamadas afectadas. No se cambiaron dependencias por ese aviso ajeno a M1.
+En race, startup PASS (21.39s) y nueva transición con seeds PASS (0.35s). El test de startup verificó health 503 al perder PostgreSQL, ping 200, y recuperación health/ping 200. La primera ejecución focal Windows también acreditó ambos PASS.
+Omitidos por falta de fixtures externos:
+- `TestLiveConverterLocalStorage`
+- `TestLiveConverterOrientationAndSpecialPreservation`
+- `TestLiveConverterS3AndApplicationIsolation`
+- `TestLiveStudyHTTPConverterAndPersistence`
+- `TestLimitsSyncDoctorChartFixture`
+No se omitieron startup, bootstrap ni las suites PostgreSQL de M1. Paquetes sin tests no cuentan como pruebas omitidas.
+No se reejecutó govulncheck en esta corrección: no cambian dependencias ni código productivo; su resultado previo no se presenta como nuevo. No hubo pruebas de servicios reales de Supabase/Gateway ni producción.
 
-## Riesgos y revisión pendiente
-- **Argon no auditó todavía.** No declarar aceptación de fase ni ausencia de hallazgos independientes.
-- El binario anterior rechaza marcador 2; rollback después del commit SQL requiere imagen compatible o restauración autorizada, no basta revertir imagen. Rollback transaccional por errores sí probado.
-- Ejecución real/ventana de mantenimiento, permisos DDL, respaldo y restauración se documentaron, no se ejecutaron ni autorizaron.
-- No hay API de lugares: autorización de negocio y cupos se implementan en M2 tras contrato Billing, nunca desde acceso SQL al fixture.
-
-## Próximo paso
-Gemini Argon revisa el rango `d5a89e0..48f87b1` en solo lectura con [brief](reviews/M1_ARGON_BRIEF.md); después el propietario evalúa resultados. **M2 no autorizado ni iniciado.**
+## Resultado y próximo paso
+Corrección obligatoria resuelta; observación de seeds implementada y probada; observación horaria registrada para M2. **M1 listo para aprobación**, sin afirmar que Argon haya revalidado este commit o que el propietario haya aceptado el cierre.
+Revalidar con Argon según protocolo y recibir aceptación. Luego el propietario definirá la reorganización de Sol/Argon para tareas independientes en paralelo sin worktrees. Esa reorganización y M2 no se iniciaron.
+El contrato operativo y recuperación de M1 no cambian: futuro arranque migra una versión 1 válida; el binario anterior rechaza versión 2. Todo acceso/migración real o despliegue requiere aprobación independiente.

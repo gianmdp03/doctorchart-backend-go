@@ -1,10 +1,13 @@
 # Contratos y decisiones pendientes
 **29/10/2026.** No reabrir propiedad clínica ni ruta base: pacientes/historias por médico; portal público `/appointments`, sin alias ni redirecciones para esta función.
 
-## M1 — implementado, pendiente de revisión
+## M1 — corregido, listo para aprobación
 El propietario aprobó M1 y bases descartables. Implementación `48f87b1`: baseline intacto, transición versionada 1 → 2, catálogo fijado para PostgreSQL 17/18, tabla `clinics` con bigint/FK al workspace y estados ACTIVE/INACTIVE/ARCHIVED.
 Pruebas y recuperación: [handoff](05_HANDOFF.md), [resumen de auditoría](reviews/M1_ARGON_BRIEF.md) y [db/README](../../db/README.md).
-Pendientes: auditoría independiente Argon y aceptación del propietario. No hay endpoints de lugares ni altas para usuarios. No se aprobaron M2, migraciones reales o despliegue.
+Auditoría Argon recibida: 0 críticos, 1 obligatorio, 2 observaciones menores; correcciones completadas. Pendientes: revalidación Argon y aceptación del propietario. No hay endpoints de lugares ni altas para usuarios. No se aprobaron M2, migraciones reales o despliegue.
+
+## M2 — validación horaria pendiente (observación de Argon)
+Registrar validación de zonas IANA en Go, adicional a la restricción SQL existente, con criterios coherentes y pruebas de entradas válidas/inválidas y disponibilidad de tzdata. No implementado en M1; M2 no autorizado.
 
 ## Billing — antes de M2
 - Auditoría histórica reportó `module_tier_limits`, `billing_webhook_jobs` y recarga de catálogo por callback. Verificar código y revisiones reales antes de implementar; R0 no probó esa integración.

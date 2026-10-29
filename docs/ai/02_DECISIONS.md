@@ -24,7 +24,7 @@ Fecha de producto y actualización documental: 29/10/2026. Estado = **CONFIRMADA
 El propietario autorizó comenzar M1 con el alcance del ticket el 29/10/2026, incluidos commit documental independiente, rama específica, migraciones incrementales y pruebas automatizadas en PostgreSQL descartable. Sin despliegue, bases reales, cambios de pacientes, Angular, Gateway, Billing o Supabase; M2 requiere nueva aprobación.
 - **DC-042 · APROBADA PARA M1:** tabla `clinics` de ubicaciones con FK al workspace del médico, sin relación con pacientes. La futura relación de reservas queda fuera de M1.
 - **DC-043 · APROBADA PARA M1:** ID bigint identity de lugares, consistente con el esquema.
-Implementación entregada en `48f87b1`, pendiente de Argon y aceptación; esto no implica autorización de publicación.
+Implementación inicial en `48f87b1`. Argon auditó y requirió correcciones (0 críticos, 1 obligatorio y 2 observaciones menores); el propietario autorizó corregir solo M1. Correcciones entregadas según [registro](reviews/M1_CORRECTIONS.md), listas para aprobación; revalidación Argon pendiente. No autoriza M2, publicación ni cambiar el mecanismo/esquema por observaciones sin defecto comprobado.
 
 ## Decisiones de ingeniería recomendadas, aún por aprobar
 | ID | Estado | Propuesta |

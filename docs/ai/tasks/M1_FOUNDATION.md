@@ -1,5 +1,5 @@
 # M1 — Migración versionada y lugares de atención
-**Estado:** IMPLEMENTED / READY_FOR_ARGON_REVIEW; aceptación final pendiente.
+**Estado:** CORRECTIONS_COMPLETE / READY_FOR_APPROVAL; revalidación Argon y aceptación final pendientes.
 **Implementador principal:** Sol. **Auditor independiente:** Argon, solo lectura.
 **Repo/rama/base:** `doctorchart-backend-go`, `codex/m1-clinics-migrations`, `d5a89e05eebf70de1dca72ed0b01a74467b6b1a4` (documentación independiente sobre c2c30c1).
 **Aprobación del propietario:** 29/10/2026, implementar este alcance y ensayos PostgreSQL descartables; primero commit documental y rama específica. Sin despliegue, bases reales o M2.
@@ -52,8 +52,10 @@ Sin ejecución contra bases reales, wipes, commits, pushes o despliegues sin aut
 - [x] Propietario aprobó M1 y propuestas de ingeniería incluidas.
 - [x] Tests anteriores con evidencia real, entorno identificado y omisiones documentadas.
 - [x] Baseline y AGENTS intactos; clínica sin nueva pertenencia por lugar.
-- [ ] Diff congelado por SHA o contenido identificado; Argon revisó independientemente en solo lectura, con P0/P1/P2 y limitaciones.
+- [x] Argon auditó la entrega inicial: 0 críticos, 1 obligatorio, 2 observaciones menores, según informe comunicado por el propietario.
+- [x] Corregido el hallazgo de startup, ejecutado sin SKIP; agregada transición con seeds reales y registrada validación Go para M2.
+- [ ] Argon revalidó el commit de correcciones.
 - [ ] Sol resolvió hallazgos bloqueantes; propietario aceptó la fase.
 - Implementación: `48f87b1d929e8496aecf203284cc4ca4d0c95820` (7 archivos), sin PR/push/merge.
 - Pruebas: PASS en Windows/PG18.6 y Linux con race/PG17.11, build/vet/formato; ver [brief Argon](../reviews/M1_ARGON_BRIEF.md).
-- Revisión Gemini Argon: pendiente. No iniciar M2.
+- Revisión inicial Gemini Argon: REQUIERE CORRECCIONES, ya atendidas; revalidación pendiente. [Resultados](../reviews/M1_CORRECTIONS.md). M1 listo para aprobación; no iniciar M2.

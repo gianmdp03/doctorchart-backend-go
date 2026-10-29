@@ -1,5 +1,5 @@
 # Índice de coordinación — Doctor Chart v0.3
-Instalación documental autorizada en `d5a89e0` (26 archivos). M1 posteriormente autorizado e implementado en `48f87b1`, pendiente de Argon y aceptación. No modifica ni sustituye `AGENTS.md`.
+Instalación documental autorizada en `d5a89e0` (26 archivos). M1 posteriormente autorizado e implementado en `48f87b1`, auditado y corregido, listo para aprobación con revalidación Argon pendiente. No modifica ni sustituye `AGENTS.md`.
 
 Para una conversación nueva basta comenzar con [inicio breve](00_START_HERE.md), [decisiones](02_DECISIONS.md) y [handoff](05_HANDOFF.md); después leer el ticket activo. No releer auditorías históricas automáticamente.
 
@@ -21,13 +21,14 @@ Para una conversación nueva basta comenzar con [inicio breve](00_START_HERE.md)
 
 ### Tickets
 - [tasks/R0_CONTEXT_RESET.md](tasks/R0_CONTEXT_RESET.md) — entrega documental commiteada por instrucción expresa.
-- [tasks/M1_FOUNDATION.md](tasks/M1_FOUNDATION.md) — implementado; revisión Argon pendiente.
+- [tasks/M1_FOUNDATION.md](tasks/M1_FOUNDATION.md) — corregido tras Argon; listo para aprobación, revalidación pendiente.
 - [tasks/B0_BILLING_DISCOVERY.md](tasks/B0_BILLING_DISCOVERY.md) — antecedente reportado, sin integración verificada.
 - [tasks/T0_STAFF_BOUNDARY.md](tasks/T0_STAFF_BOUNDARY.md) — backlog.
 - [tasks/A0_ARCHITECTURE_CONSOLIDATION.md](tasks/A0_ARCHITECTURE_CONSOLIDATION.md) — cancelado, solo trazabilidad.
 
 ### Revisión M1
-- [reviews/M1_ARGON_BRIEF.md](reviews/M1_ARGON_BRIEF.md) — resumen del diff, pruebas y puntos de auditoría independiente.
+- [reviews/M1_ARGON_BRIEF.md](reviews/M1_ARGON_BRIEF.md) — entrega original histórica previa a la auditoría.
+- [reviews/M1_CORRECTIONS.md](reviews/M1_CORRECTIONS.md) — hallazgos atendidos, pruebas ejecutadas/omitidas y estado actual.
 
 ### Plantillas
 - [templates/TASK_TEMPLATE.md](templates/TASK_TEMPLATE.md)

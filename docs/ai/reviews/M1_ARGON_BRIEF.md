@@ -1,3 +1,5 @@
+> **ENTREGA ORIGINAL HISTÓRICA (48f87b1), anterior a la auditoría.** Argon ya auditó y requirió correcciones. El startup no estaba habilitado en las suites originales; se ejecutó y corrigió después. Estado vigente y evidencia en [M1_CORRECTIONS.md](M1_CORRECTIONS.md). Las referencias a revisión pendiente de este documento describen solo la entrega original.
+
 # M1 — entrega para auditoría independiente Gemini Argon
 **29/10/2026 · Sol implementó; Argon aún no revisó.**
 **Estado:** READY_FOR_ARGON_REVIEW; aceptación del propietario pendiente. M2 no autorizado.
