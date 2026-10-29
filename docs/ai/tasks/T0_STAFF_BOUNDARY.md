@@ -1,0 +1,2 @@
+# T0 — Frontera de autenticación local para secretarias
+**Estado:** BACKLOG / sin autorización de implementación. El médico conserva Supabase y Gateway. Secretaria utiliza sesión local Go por rutas explícitas Gateway, solo agenda y lugares asignados, nunca lectura de pacientes o historias. Se requiere aprobar contrato CORS/cookie/CSRF/sesiones/recuperación y verificar entornos antes de programar. Revisar `sources/audit-03-staff-auth.md` solo para evidencia, no propuestas de clínica por sede.

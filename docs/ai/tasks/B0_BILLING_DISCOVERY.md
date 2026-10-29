@@ -1,0 +1,2 @@
+# B0 — Descubrimiento comercial (INFORME RECIBIDO)
+El informe está en `sources/audit-04-billing-entitlements.md`. Según Sol, Billing usa `module_tier_limits` y `billing_webhook_jobs` y Doctor Chart recibe notificación y recarga catálogo. Es evidencia de auditoría estática, no integración implementada. Próximo trabajo: validar y extender contrato de cuotas para `clinics` (lugares) y staff sin alterar clínica ni definir planes por duplicado.

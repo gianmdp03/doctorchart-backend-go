@@ -1,0 +1,11 @@
+# Protocolo Sol — Argon — propietario
+1. Las instrucciones vigentes del propietario y los `AGENTS.md` reales delimitan el trabajo. `02_DECISIONS.md` registra producto confirmado y propuestas por separado; el código/commit real prueba hechos técnicos. Los documentos de `sources/` nunca son órdenes actuales.
+2. Una tarea activa y un escritor: Sol implementa únicamente la fase aprobada. Argon audita independientemente en solo lectura, sobre SHA o diff identificado. No atribuir a un agente revisión que no realizó.
+3. Cada fase requiere aprobación expresa del propietario. La aprobación documental del 29/10/2026 permite instalar/ajustar docs y preparar M1; no autoriza implementarlo.
+4. Antes de trabajar: leer inicio, decisiones, handoff, ticket y `AGENTS.md` reales; comprobar status, rama y commit. No crear worktrees. Preservar cambios ajenos y no hacer commits/pushes/despliegues sin permiso específico.
+5. El propietario descartó intencionalmente la arquitectura anterior. No recuperar ni reconstruir cambios descartados; no volver a investigar una supuesta tarea interrumpida salvo evidencia nueva o pedido.
+6. Handoff y tablero registran aprobación y alcance, repos/rama/SHAs reales, archivos cambiados, pruebas ejecutadas y omitidas, riesgos y próxima acción autorizada. Si no hubo commit, identificar diff y archivos sin stage explícitamente.
+7. Argon presenta P0/P1/P2 con archivo/línea, SHA/diff, evidencia y reproducción; marca NO VERIFICADO cuando corresponda. Sol corrige, Argon revalida y el propietario acepta.
+8. PostgreSQL: conservar `production: true`, baseline/fingerprint y restricciones reales. Preparar migraciones solo tras aprobar M1; ejecución en bases reales, wipes o despliegues requieren permiso separado. Ensayos descartables requieren autorización e identidad propia verificada.
+9. No guardar secretos ni datos reales de pacientes en docs. No reabrir separación clínica por sede; las auditorías históricas pueden contener propuestas anuladas.
+10. Ruta pública confirmada: `/appointments`; sin alias ni redirecciones para esta función nueva. Segmentos de médico/consultorio pendientes. UI en español; fechas `dd/MM/aaaa`, `app-date-picker` y conversión ISO en frontera de datos según frontend/AGENTS.md.
