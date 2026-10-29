@@ -9,7 +9,40 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/syntah/doctorchart-backend-go/internal/billing"
 )
+
+func TestBillingCallbackInvalidatesBeforeFailedReload(t *testing.T) {
+	var invalidations atomic.Int32
+	remote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if invalidations.Load() == 0 {
+			t.Error("catalog reload preceded shared invalidation")
+		}
+		w.WriteHeader(503)
+	}))
+	defer remote.Close()
+	rules := billing.New(remote.URL)
+	rules.SetInvalidator(func(context.Context) error { invalidations.Add(1); return nil })
+	mux := http.NewServeMux()
+	BaseRoutes(mux, rules, "secret")
+	for _, credential := range []string{"wrong", "secret", "secret"} {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("POST", "/internal/webhooks/billing/limits-updated", nil)
+		r.Header.Set("X-Internal-Secret", credential)
+		mux.ServeHTTP(w, r)
+		if credential == "wrong" {
+			if w.Code != 401 || invalidations.Load() != 0 {
+				t.Fatal("unauthorized invalidation")
+			}
+		} else if w.Code != 503 {
+			t.Fatal("failed reload must retry", w.Code)
+		}
+	}
+	if invalidations.Load() != 2 {
+		t.Fatal("duplicate invalidation lost")
+	}
+}
 
 func healthFixture(checks ...func(context.Context) error) http.Handler {
 	mux := http.NewServeMux()

@@ -18,6 +18,7 @@ import (
 	"github.com/syntah/doctorchart-backend-go/internal/billing"
 	"github.com/syntah/doctorchart-backend-go/internal/bootstrap"
 	"github.com/syntah/doctorchart-backend-go/internal/clinical"
+	"github.com/syntah/doctorchart-backend-go/internal/clinics"
 	"github.com/syntah/doctorchart-backend-go/internal/config"
 	"github.com/syntah/doctorchart-backend-go/internal/storage"
 	"github.com/syntah/doctorchart-backend-go/internal/wizard"
@@ -64,6 +65,8 @@ func run() error {
 		return errors.New("PostgreSQL is unavailable")
 	}
 	rules := billing.New(c.BillingURL)
+	entitlements := billing.NewEntitlements(pool, c.BillingURL, c.BillingSecret)
+	rules.SetInvalidator(entitlements.Invalidate)
 	rules.Load(startup)
 	mux := http.NewServeMux()
 	api.BaseRoutes(mux, rules, c.BillingSecret, func(ctx context.Context) error {
@@ -84,6 +87,7 @@ func run() error {
 	}
 	workspaces := workspace.New(pool, validator)
 	workspaces.Routes(mux)
+	clinics.New(pool, entitlements).Routes(mux)
 	clinicalService, err := clinical.New(pool, workspaces, validator, rules, files)
 	if err != nil {
 		return err

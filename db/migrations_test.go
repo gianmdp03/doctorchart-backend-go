@@ -81,7 +81,7 @@ SELECT nextval('patients_id_seq');
 
 func dataSnapshot(t *testing.T, pool *sql.DB) map[string]string {
 	t.Helper()
-	rows, err := pool.Query("SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename NOT IN ('app_schema_state','app_schema_migrations','clinics') ORDER BY tablename")
+	rows, err := pool.Query("SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename NOT IN ('app_schema_state','app_schema_migrations','clinics','clinic_entitlement_epoch') ORDER BY tablename")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -161,8 +161,50 @@ func TestMigrationConvergesAndPreservesClinicalData(t *testing.T) {
 	if readString(t, fresh, catalogSQL, []string{}) != newCatalog {
 		t.Fatal("empty installation and conservative upgrade diverged")
 	}
-	if readString(t, upgraded, "SELECT baseline_version::text FROM app_schema_state") != "2" {
+	if readString(t, upgraded, "SELECT baseline_version::text FROM app_schema_state") != "3" {
 		t.Fatal("old binaries would not reject the upgraded schema version")
+	}
+}
+
+func TestM2UpgradeFromPublishedSchemaTwoPreservesDataAndRollsBack(t *testing.T) {
+	pool := baselineFixture(t)
+	clinicalFixture(t, pool)
+	pins := fixtureCatalogPins(t, pool)
+	instance := mustPool(t.Context(), pool)
+	defer instance.Close()
+	tx, err := instance.Begin(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := migrateClinics(t.Context(), tx, pins); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(t.Context(), "UPDATE app_schema_state SET baseline_version=2,catalog_sha256=$1", pins.clinics); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	before := dataSnapshot(t, pool)
+	state := readString(t, pool, "SELECT to_jsonb(s)::text FROM app_schema_state s")
+	original := entitlementMigration
+	t.Cleanup(func() { entitlementMigration = original })
+	entitlementMigration += "; CREATE TABLE clinic_entitlement_epoch(id integer);"
+	if err := Ensure(t.Context(), instance, nil); err == nil {
+		t.Fatal("failing migration 3 accepted")
+	}
+	if readString(t, pool, "SELECT to_jsonb(s)::text FROM app_schema_state s") != state || !reflect.DeepEqual(before, dataSnapshot(t, pool)) {
+		t.Fatal("failed 2->3 changed existing data/marker")
+	}
+	entitlementMigration = original
+	if err := Ensure(t.Context(), instance, nil); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(before, dataSnapshot(t, pool)) {
+		t.Fatal("2->3 modified clinical data")
+	}
+	if digest(readString(t, pool, catalogSQL, []string{})) != pins.entitlements {
+		t.Fatal("2->3 catalog diverged")
 	}
 }
 
@@ -212,11 +254,11 @@ func TestMigrationRollbackAndRetry(t *testing.T) {
 func TestMigrationRejectsTamperedHistoryAndDrift(t *testing.T) {
 	for _, mutation := range []string{
 		"DELETE FROM app_schema_migrations",
-		"UPDATE app_schema_migrations SET version=3",
+		"UPDATE app_schema_migrations SET version=4 WHERE version=3",
 		"UPDATE app_schema_migrations SET sql_sha256=repeat('0',64)",
 		"UPDATE app_schema_migrations SET previous_catalog_sha256=repeat('0',64)",
 		"UPDATE app_schema_migrations SET catalog_sha256=repeat('0',64)",
-		"INSERT INTO app_schema_migrations SELECT 3,sql_sha256,previous_catalog_sha256,catalog_sha256,now() FROM app_schema_migrations WHERE version=2",
+		"INSERT INTO app_schema_migrations SELECT 4,sql_sha256,previous_catalog_sha256,catalog_sha256,now() FROM app_schema_migrations WHERE version=2",
 		"DROP INDEX clinics_workspace_status_idx",
 		"ALTER TABLE clinics DROP CONSTRAINT clinics_workspace_id_fkey",
 		"UPDATE app_schema_state SET baseline_version=1",
@@ -317,7 +359,7 @@ func TestMigrationConcurrentUpgradeAndCancellation(t *testing.T) {
 			t.Error(err)
 		}
 	}
-	if readString(t, pool, "SELECT count(*)::text FROM app_schema_migrations") != "1" {
+	if readString(t, pool, "SELECT count(*)::text FROM app_schema_migrations") != "2" {
 		t.Fatal("migration applied more than once")
 	}
 }

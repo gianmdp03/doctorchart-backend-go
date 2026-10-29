@@ -85,12 +85,15 @@ func Ensure(ctx context.Context, pool *pgxpool.Pool, seed func(context.Context, 
 		if err = tx.QueryRow(ctx, "SELECT backend,baseline_version,sql_sha256,catalog_sha256 FROM public.app_schema_state WHERE id=1").Scan(&backend, &version, &sqlHash, &catalogHash); err != nil {
 			return fmt.Errorf("invalid baseline metadata: %w", err)
 		}
-		if backend != Backend || (version != 1 && version != currentVersion) || sqlHash != digest(Schema) {
+		if backend != Backend || (version < 1 || version > currentVersion) || sqlHash != digest(Schema) {
 			return fmt.Errorf("%s incompatible baseline identity/version/checksum", Backend)
 		}
 		expected := pins.baseline
-		if version == currentVersion {
+		if version == 2 {
 			expected = pins.clinics
+		}
+		if version == 3 {
+			expected = pins.entitlements
 		}
 		if catalogHash != expected {
 			return fmt.Errorf("%s schema drift: recorded catalog differs from expected version %d", Backend, version)
@@ -98,8 +101,8 @@ func Ensure(ctx context.Context, pool *pgxpool.Pool, seed func(context.Context, 
 		if err = validateCatalog(ctx, tx, expected); err != nil {
 			return err
 		}
-		if version == currentVersion {
-			if err = validateMigration(ctx, tx, pins); err != nil {
+		if version >= 2 {
+			if err = validateMigration(ctx, tx, pins, version); err != nil {
 				return err
 			}
 		}
@@ -109,21 +112,26 @@ func Ensure(ctx context.Context, pool *pgxpool.Pool, seed func(context.Context, 
 			return err
 		}
 	}
+	if version < 3 {
+		if err = migrateEntitlements(ctx, tx, pins); err != nil {
+			return err
+		}
+	}
 	if seed != nil {
 		if err = seed(ctx, tx); err != nil {
 			return fmt.Errorf("seed %s baseline: %w", Backend, err)
 		}
 	}
 	// Seed hooks may change managed rows, never the structural contract.
-	if err = validateCatalog(ctx, tx, pins.clinics); err != nil {
+	if err = validateCatalog(ctx, tx, pins.entitlements); err != nil {
 		return err
 	}
 	if !marker {
-		if _, err = tx.Exec(ctx, "INSERT INTO public.app_schema_state(id,backend,baseline_version,sql_sha256,catalog_sha256) VALUES(1,$1,$2,$3,$4)", Backend, currentVersion, digest(Schema), pins.clinics); err != nil {
+		if _, err = tx.Exec(ctx, "INSERT INTO public.app_schema_state(id,backend,baseline_version,sql_sha256,catalog_sha256) VALUES(1,$1,$2,$3,$4)", Backend, currentVersion, digest(Schema), pins.entitlements); err != nil {
 			return err
 		}
-	} else if version == 1 {
-		if _, err = tx.Exec(ctx, "UPDATE public.app_schema_state SET baseline_version=$1,catalog_sha256=$2 WHERE id=1", currentVersion, pins.clinics); err != nil {
+	} else if version < currentVersion {
+		if _, err = tx.Exec(ctx, "UPDATE public.app_schema_state SET baseline_version=$1,catalog_sha256=$2 WHERE id=1", currentVersion, pins.entitlements); err != nil {
 			return err
 		}
 	}

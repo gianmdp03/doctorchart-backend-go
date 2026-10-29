@@ -15,12 +15,23 @@ import (
 )
 
 type Rules struct {
-	mu       sync.RWMutex
-	reload   sync.Mutex
-	tiers    map[string]map[string]any
-	url      string
-	client   *http.Client
-	loadedAt time.Time
+	mu         sync.RWMutex
+	reload     sync.Mutex
+	tiers      map[string]map[string]any
+	url        string
+	client     *http.Client
+	loadedAt   time.Time
+	invalidate func(context.Context) error
+}
+
+// SetInvalidator is wired once before HTTP starts. Legacy rules remain separate
+// from effective-owner clinic rights, but share the authenticated callback.
+func (r *Rules) SetInvalidator(fn func(context.Context) error) { r.invalidate = fn }
+func (r *Rules) InvalidateEntitlements(ctx context.Context) error {
+	if r.invalidate != nil {
+		return r.invalidate(ctx)
+	}
+	return nil
 }
 
 const rulesRefreshInterval = time.Minute
