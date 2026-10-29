@@ -83,7 +83,7 @@ INSERT INTO doctor_workspaces(created_at,current_step_key,definition,onboarding_
 	if err := pool.QueryRow(ctx, "SELECT initialized_at FROM app_schema_state").Scan(&initialized); err != nil {
 		t.Fatal(err)
 	}
-	// The first Run must upgrade 1 -> 3; the second must preserve the result.
+	// The first Run must upgrade 1 -> 4; the second must preserve the result.
 	for range 2 {
 		if err := Run(ctx, pool, validator); err != nil {
 			t.Fatal(err)
@@ -95,10 +95,10 @@ INSERT INTO doctor_workspaces(created_at,current_step_key,definition,onboarding_
 		var version, migrations, clinics int
 		var timestamp time.Time
 		var checksum string
-		if err := pool.QueryRow(ctx, "SELECT baseline_version,initialized_at,sql_sha256,(SELECT count(*) FROM app_schema_migrations WHERE version IN (2,3)),(SELECT count(*) FROM clinics) FROM app_schema_state").Scan(&version, &timestamp, &checksum, &migrations, &clinics); err != nil {
+		if err := pool.QueryRow(ctx, "SELECT baseline_version,initialized_at,sql_sha256,(SELECT count(*) FROM app_schema_migrations WHERE version IN (2,3,4)),(SELECT count(*) FROM clinics) FROM app_schema_state").Scan(&version, &timestamp, &checksum, &migrations, &clinics); err != nil {
 			t.Fatal(err)
 		}
-		if version != 3 || migrations != 2 || clinics != 0 || !initialized.Equal(timestamp) || checksum != sqlHash {
+		if version != 4 || migrations != 3 || clinics != 0 || !initialized.Equal(timestamp) || checksum != sqlHash {
 			t.Fatal("upgrade/restart changed baseline identity, duplicated migration or invented places")
 		}
 	}

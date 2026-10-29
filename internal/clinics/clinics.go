@@ -243,7 +243,7 @@ func values(body map[string]any, op string) (map[string]string, int64, error) {
 		}
 		if key == "timezone" {
 			_, err := time.LoadLocation(text)
-			if err != nil || (text != "UTC" && !strings.Contains(text, "/")) || strings.HasPrefix(text, "posix/") || strings.HasPrefix(text, "right/") || strings.ContainsAny(text, "\\\x00") {
+			if err != nil || (text != "UTC" && !strings.Contains(text, "/")) || strings.HasPrefix(text, "posix/") || strings.HasPrefix(text, "right/") || strings.HasPrefix(text, "Etc/") || strings.ContainsAny(text, "\\\x00") {
 				return nil, 0, field(key, "INVALID_TIMEZONE")
 			}
 		}

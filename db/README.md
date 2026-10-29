@@ -1,22 +1,22 @@
-# PostgreSQL — baseline 1 y esquema 3 (M2)
+# PostgreSQL — baseline 1 y esquema 4 (M2)
 
-`db/schema.sql` permanece inmutable (23 tablas). `migrations/0002_clinics.sql` agrega `clinics`, `app_schema_migrations`, un índice y el validador IANA; el esquema 2 tiene 25 tablas y 21 FK. M2 agrega solo clinic_entitlement_epoch mediante 0003_entitlement_epoch.sql (26 tablas, mismas 21 FK); baseline y SQL 0002 intactos. No modifica pacientes ni relaciones clínicas. `AGENTS.md` conserva `production: true`.
+`db/schema.sql` permanece inmutable (23 tablas). `migrations/0002_clinics.sql` agrega `clinics`, `app_schema_migrations`, un índice y el validador IANA; el esquema 2 tiene 25 tablas y 21 FK. M2 agrega clinic_entitlement_epoch mediante 0003_entitlement_epoch.sql. La corrección 0004_clinic_timezone_policy.sql alinea la función IANA y revalida el CHECK: esquema 4 conserva 26 tablas y 21 FK. Baseline y migraciones 0002/0003 intactos. No modifica pacientes ni relaciones clínicas. `AGENTS.md` conserva `production: true`.
 
 ## Arranque y contrato
 
 `Ensure` conserva pgxpool, READ COMMITTED, contexto 30s, lock_timeout 10s, statement_timeout 20s, search_path public/pg_catalog y advisory lock transaccional (17209, 3).
-- Vacío real: baseline → validación catálogo 1 → migración 2 → catálogo 2 → migración 3 → catálogo 3 → seeds → marcador.
-- Versión 1: verifica identidad, checksum del baseline y catálogo anterior esperado antes de DDL; migra 1 → 2 → 3 conservando initialized_at y datos administrados.
-- Versión 2: valida catálogo/historial publicados y aplica migración 3.
-- Versión 3: verifica identidad, checksums, historial y catálogo; seeds idempotentes sin reescribir marcador/historial.
+- Vacío real: baseline → catálogo 1 → migración 2 → catálogo 2 → migración 3 → catálogo 3 → migración 4 → catálogo 4 → seeds → marcador.
+- Versión 1: verifica identidad, checksum del baseline y catálogo anterior esperado antes de DDL; migra 1 → 2 → 3 → 4 conservando initialized_at y datos administrados.
+- Versiones 2/3: valida catálogo/historial publicados antes de aplicar las transiciones restantes hasta 4.
+- Versión 4: verifica identidad, checksums, historial y catálogo; seeds idempotentes sin reescribir marcador/historial.
 - Sin marcador con objetos, versiones desconocidas, historial ausente/extra/alterado, checksum incompatible o drift: rechazo sin adopción ni reparación.
 
-**Este binario aplica el upgrade en el próximo arranque sobre versión 1 válida.** No iniciarlo contra una base real sin autorización específica de migración. M1 solo se ejecutó en bases descartables propias.
+**Este binario aplica el upgrade en el próximo arranque sobre versión 1/2/3 válida.** No iniciarlo contra una base real sin autorización específica de migración. Solo se ejecutó en bases descartables propias.
 DDL, seeds y metadatos confirman en una sola transacción antes de HTTP/jobs. Error/cancelación revierte todo; rollback usa contexto de limpieza independiente acotado a 5s.
 
 ## Catálogo e historial
 
-`app_schema_state.sql_sha256` identifica el baseline inmutable; la columna histórica `baseline_version` registra ahora la versión instalada (1, 2 o 3). `app_schema_migrations` registra versiones 2 y 3, checksum SQL, catálogo anterior/final y applied_at.
+`app_schema_state.sql_sha256` identifica el baseline inmutable; la columna histórica `baseline_version` registra ahora la versión instalada (1..4). `app_schema_migrations` registra versiones 2, 3 y 4, checksum SQL, catálogo anterior/final y applied_at.
 Hashes SQL equivalentes para CRLF/LF. Los hashes de catálogo esperados están fijados en `migrations.go`, obtenidos de bases vacías independientes desde los SQL publicados; nunca recalcularlos desde una base existente para ocultar drift.
 
 `catalog.go` permanece intacto: estructura, constraints/índices, secuencias, funciones, tipos y extensiones; excluye filas, OIDs, valores de secuencias, propietarios y permisos. Las constraints heredadas pueden repetir nombre; las pruebas comparan definiciones completas como multiconjunto.
@@ -59,7 +59,17 @@ govulncheck ./...
 Race requiere CGO y compilador C. Windows tenía CGO=0; race se ejecutó realmente en `golang:1.27.3` Linux con GCC 14.2, fuentes montadas en solo lectura y red del PostgreSQL 17 propio. Un proxy loopback temporal del contenedor llevó 55442 a 5432; no se modificaron guards del fixture.
 No ejecutar dos suites simultáneas contra las mismas bases con nombres fijos. Growth exige empezar vacío y se limpia al terminar.
 
-La prueba de arranque debe mostrar `--- PASS: TestStartupCreatesSchemaAndServesHealth`; un `SKIP` por ausencia de `DOCTORCHART_STARTUP_TEST_DATABASE_URL` no valida esta integración. `TestBaselineUpgradeWithRealSeedsPreservesAdminConfiguration` usa `bootstrap.Run` y los seeds reales sobre baseline 1, verifica transición a 2, conservación de configuraciones administradas y reinicio idempotente.
+La prueba de arranque debe mostrar `--- PASS: TestStartupCreatesSchemaAndServesHealth`; un `SKIP` por ausencia de `DOCTORCHART_STARTUP_TEST_DATABASE_URL` no valida esta integración. `TestBaselineUpgradeWithRealSeedsPreservesAdminConfiguration` usa `bootstrap.Run` y los seeds reales sobre baseline 1, verifica transición hasta 4, conservación de configuraciones administradas y reinicio idempotente.
+
+## Política horaria de consultorios y upgrade 3 → 4
+
+UTC explícito y nombres regionales IANA exactos; Go carga tzdata y SQL consulta pg_timezone_names. Se excluyen offsets, abreviaturas sin región, Local, posix/, right/ y todo Etc/ (incluye Etc/GMT±N y aliases Etc/UTC/Etc/GMT; usar UTC explícito al crear una sede). La política es del campo timezone del consultorio, no cambia el contexto clínico global timeZone.
+
+Migración 4 toma lock de clinics contra escrituras durante el preflight. Si **cualquier fila**, incluso archivada, contiene Etc/, aborta con conteo y mensaje de conciliación explícita del propietario. No actualiza, normaliza ni borra datos. La transacción preserva catálogo, filas, secuencias, historial y marcador de versión 3 al fallar; no alcanza readiness. No se debe sortear el rechazo editando fingerprints o migraciones históricas. Resolver datos incompatibles requiere decisión/autorización independiente; nunca reparación automática.
+
+El CHECK se recrea y valida dentro de la misma transacción porque reemplazar su función no revalida filas antiguas por sí solo. Las pruebas cubren datos clínicos/consultorios, estado de secuencia, rechazo de filas excluidas, fallo SQL, drift, seed tardío, rollback/reintento y catálogo idéntico entre instalación vacía y upgrade. Fingerprints independientes de esquema 4: PG17 85cbcbb463c81876f40babf1d156444bb64793e41388c511bd5c661159b362d6; PG18 1eb0e7bb7b9e3f10aa39c0eaa0101727f304d834ecd5ce9fdbbf77764e73ae7f.
+
+El rollback probado es transaccional ante un upgrade fallido. No hay DOWN automático tras confirmar versión 4: binarios previos rechazan ese marcador; recuperación operativa requiere binario compatible o respaldo/restauración autorizada y verificada. No se ejecutó ninguna recuperación real.
 
 Cobertura: vacío/upgrade convergentes; todos los objetos originales intactos; snapshots de tablas originales con pacientes, consultas, recetas, estudios, medios y vacunas representativos; IDs, referencias, secuencias y marcador preservados; reinicios; 16 inicializadores; cancelación; errores SQL/seed; rollback y reintento; drift/historial/checksums y restricciones de lugares. Regresiones clínicas/wizard se ejecutan sin lugares.
 Converter externo y sincronización Billing requieren servicios opt-in adicionales y no se ejecutaron en M1.
@@ -70,10 +80,10 @@ Leer `../docs/vps-operations.md` y revalidar identidad/versión/servicio. Este p
 1. Obtener revisión de Argon y aprobación del propietario. Validar el contrato sobre copia aislada representativa y permisos DDL del propietario.
 2. Respaldar consistentemente la base DoctorChart, medios referenciados y configuración; probar restauración aislada y conservar imagen/SHA previos.
 3. Planificar ventana sin escrituras y detener únicamente consumidores DoctorChart, preservando PostgreSQL compartido y servicios vecinos.
-4. Solo con autorización específica, iniciar imagen nueva: el bootstrap aplicará 1 → 2 → 3 (o 2 → 3). Verificar salud, versión 3, dos filas de historial, catálogo, conteos clínicos y reinicio antes de reabrir escrituras.
-5. Si falla dentro de la transacción, versión 1/datos permanecen intactos; corregir causa y reintentar. Nunca reparar hashes manualmente.
-6. Tras confirmar versión 3, M1 y el binario anterior rechazan el marcador 3. No sirve como rollback directo: se necesita imagen compatible o restauración autorizada del respaldo verificado, antes de reabrir escrituras. Si ya hubo escrituras nuevas, resolver su conservación antes de restaurar.
+4. Solo con autorización específica y preflight de zonas aprobado, iniciar imagen nueva: bootstrap aplicará las transiciones pendientes hasta 4. Verificar salud, versión 4, tres filas de historial, catálogo, datos clínicos/consultorios y reinicio antes de reabrir escrituras.
+5. Si falla dentro de la transacción, versión anterior (1/2/3), catálogo y datos permanecen intactos; corregir causa y reintentar. Nunca reparar hashes manualmente. Filas Etc/ requieren conciliación explícita, no conversión automática.
+6. Tras confirmar versión 4, M1 y el binario M2 anterior rechazan el marcador 4. No sirve como rollback directo: se necesita imagen compatible o restauración autorizada del respaldo verificado, antes de reabrir escrituras. Si ya hubo escrituras nuevas, resolver su conservación antes de restaurar.
 
 No hay DOWN destructivo ni eliminación de lugares. No se actualizaron servicios reales, configuración de conexión ni autenticación Supabase.
 
-M2 prueba 2→3 desde esquema publicado, rollback y conservación. El fence de invalidación comparte generación entre réplicas; el marcador nunca se rebaja para volver a M1. La recuperación real exige procedimiento y permiso separados. El esquema Billing no se modificó.
+M2 conserva pruebas desde esquemas publicados 1/2/3 hasta 4, rollback y conservación. El fence de invalidación comparte generación entre réplicas; el marcador nunca se rebaja para volver a M1. La recuperación real exige procedimiento y permiso separados. El esquema Billing no se modificó.
