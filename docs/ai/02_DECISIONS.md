@@ -59,6 +59,8 @@ M1 está cerrado. El [contrato M2](contracts/M2_CLINICS_API.md) concreta propues
 | Plan antiguo M2–M5 | **ANULADO** | Reescritura transversal de clínica, permisos, dashboard, adjuntos, PDFs y wizard por pertenencia a sede. |
 
 ## Procedimiento de cambios
+Decisión comercial definitiva M2: solo BASIC, PRO y UNLIMITED están vigentes. FREE_TRIAL no activado; ENTERPRISE fuera de oferta. Conservar reconocimiento legacy y alias de metadata sin comercializarlos, configurarlos ni inicializarlos. No ampliar Billing por el P2 referido sobre esos tiers. Verificación y dependencias en [contrato técnico](contracts/M2_EFFECTIVE_ENTITLEMENTS.md) y [entrega](reviews/M2_SOL_DELIVERY.md). No se definen cuotas ni precios aquí.
+
 Última corrección de rutas del propietario prevalece sobre la aclaración transitoria anterior que permitía un alias.
 
 Nueva decisión del propietario → registrar ADR/impacto → actualizar `01_REQUIREMENTS`, `08_ROADMAP`, ticket y handoff → implementar solo tras aprobación. Los `sources/audit-*` no tienen autoridad para reactivar decisiones anuladas.

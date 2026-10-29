@@ -14,7 +14,7 @@
 [Contrato técnico](../contracts/M2_EFFECTIVE_ENTITLEMENTS.md) reutiliza metadata administrada, catálogo Billing, secreto interno existente y outbox/callback. No implementa suscripciones nuevas.
 Snapshot autenticado/firmado por propietario, lease máximo 60s sin superar cobertura y generación compartida: puede autorizar con Billing caído si todavía es apto. Firma/propietario/módulo/tipos/tiempos/generación inválidos: no hay permisos. No renovar desde caché ni extender cobertura.
 La respuesta 503 ENTITLEMENTS_UNAVAILABLE significa que no hay derechos aptos ni online ni en snapshot; no equivale por sí sola a toda caída remota.
-**max_clinics real no configurado:** no se agregaron cantidades a planes/seeds ni se ejecutaron PUT reales. Sin clave/tier apto, mutaciones dependientes bloqueadas; lecturas seguras siguen. Trial sin catálogo apto también bloquea esas mutaciones. Requiere decisión/configuración expresa del propietario, no permiso ilimitado por defecto.
+**max_clinics real no configurado:** no se agregaron cantidades a planes/seeds ni se ejecutaron PUT reales. Sin clave/tier apto, mutaciones dependientes bloqueadas; lecturas seguras siguen. Solo BASIC, PRO y UNLIMITED son oferta vigente. FREE_TRIAL no activado y ENTERPRISE fuera de oferta; no ampliar esos tiers. Requiere configuración expresa del propietario para los tres planes vigentes, no permiso ilimitado por defecto.
 
 ## Resumen del diff
 DoctorChart:
@@ -83,6 +83,56 @@ No se validó contra Supabase/Gateway reales, checkout real o producción. No se
 - Nueva versión de esquema es 3; binario M1 rechaza marcador3. Recuperación real requiere imagen compatible o respaldo/restauración verificada con autorización, no bajar hashes.
 - Integración futura: conservar respuesta legacy de Billing; habilitar proveedor nuevo y clave comercial solo tras pruebas/revisión. No hubo cambios de Gateway.
 - Argon debe revisar ambos diffs y esta API congelada; no inferir aprobación de su trabajo Angular ni de M3.
+
+## Verificación comercial posterior, sin cambios de aplicación
+- Decisión del propietario: oferta BASIC/PRO/UNLIMITED; ampliar configuración/seeds FREE_TRIAL/ENTERPRISE por el P2 referido es **NO BLOQUEANTE / FUERA DE ALCANCE COMERCIAL**, únicamente para ese hallazgo. UTC, consistencia de API y hallazgos frontend siguen pendientes.
+- PASS sin SKIP: TestDoctorChartEffectiveEntitlementsAndLegacyCompatibility, TestDoctorChartEffectiveQuotaValidation y TestM2CurrentCommercialTiersVerification (subcasos BASIC, PRO, UNLIMITED y noncommercial_tiers_remain_unconfigurable).
+- Go1.27.3 Windows + PostgreSQL17 propio: container doctorchart-m2-commercial-check, ID 4c1ab4c74546642731eb1e0ab687a0fa702891cabf8175d9d2d8729359269205, label codex.task=doctorchart-m2-commercial-review, loopback55444, tmpfs, rol migration_fixture. Identidad/label/puerto verificados antes de retirarlo. Solo datos sintéticos; sin bases reales.
+- Prueba adicional mediante **Go overlay externo**, sin escribir código/tests en repositorios: C:/Users/gcast/AppData/Local/Temp/doctorchart-m2-commercial-1793306121389/overlay.json; fuente y results.log conservados allí. Comando: go test -overlay <fixtureRoot>/overlay.json ./internal/billing -run '^(TestM2CurrentCommercialTiersVerification|TestDoctorChartEffectiveEntitlementsAndLegacyCompatibility|TestDoctorChartEffectiveQuotaValidation)$' -count=1 -v.
+- Cada plan vigente: falta de clave falla cerrado; PUT explícito/resolución con 2, 0 y -1 **solo como fixtures**, vigencia limitada por cobertura y revisión no vacía; PUT legacy preserva cuota y respuesta legacy no filtra clave nueva. Estas cifras no definen planes ni autorizan configurar producción.
+- FREE_TRIAL/ENTERPRISE: PutLimit y tierLevel los rechazan; no se crean filas. Metadata FREE_TRIAL sin catálogo apto no concede consultorios; alias ENTERPRISE consume la configuración explícita existente de UNLIMITED, sin comercializar otro tier.
+- Dependencias preservadas: Billing types.go:71–80 y constraints de billing_plans/module_tier_limits/order_items/admin_grants solo permiten tres tiers; bycode-frontend PlanTier y matrices/grants muestran esos tres. DoctorChart rules.go:209–246, api/http.go:132 y políticas clínicas reconocen FREE_TRIAL/ENTERPRISE heredados; Gateway auth.go:114 y auth Angular conservan lectura de metadata. No se encontró emisión/alta comercial necesaria de esos tiers en los flujos revisados. No se inspeccionó configuración/datos reales de Supabase.
+- Limitación operativa: API administrativa PUT /api/billing/limits/DOCTORCHART/{tier} admite max_clinics; MODULE_PRESET_FIELDS de bycode-frontend todavía no presenta editor visual de esa clave. No se modificó ese frontend ni se agregó un editor.
+- No se reejecutó toda la suite ni pruebas UTC/E2E; verificación acotada comercial. Aplicación permanece en 1dd09bc / 80c171c y DTO público/hash intactos.
+
+## Verificación final de UTC, IANA y contrato (29/10/2026)
+Código examinado sin cambios: DoctorChart 1dd09bc, Billing 80c171c y frontend ea4f4d7. **UTC verificado; integración M2 todavía bloqueada por defectos confirmados.** No se reabre la decisión comercial FREE_TRIAL/ENTERPRISE, que sigue no bloqueante.
+
+### Origen exacto de los hashes
+| Documento | Git blob (no commit) | SHA-256 | Bytes |
+|---|---|---|---|
+| M2-CLINICS-v0.1 propuesto | 84657c21e9bfab278ce8b9aedc9e314f95598542 | aa7ff31d75cd8c34b2dbc5e8fde93b948fc1d0bb4af396b1d3a39b37b53b6150 | 10083 |
+| M2-CLINICS-v1 congelado, canónico | 9007d55be2620e852b083ba51dff041bd24eba15 | 70e096102182fb5d0880997b6ff428e058d756b987c3d8c2238c8743f780e2fd | 10535 |
+
+Calculados sobre bytes de git cat-file blob; UTF-8/LF sin BOM. No es LF/CRLF: las huellas CRLF serían 44d8a451… y 268de042…, respectivamente. La propuesta aparece en 6d7b0d6 y en el commit solo-aplicación 1dd09bc; el documento v1 pendiente de entonces quedó publicado en 961c77a. Por eso revisar solo el archivo documental de 1dd09bc conduce al hash anterior aunque la implementación se haya hecho con v1 en el working tree.
+Argon cita el SHA de v0.1 y ambos blobs, afirmando alineación con v1. No se trata de dos DTO incompatibles: comparación byte a byte de tablas de rutas/errores y de los **seis ejemplos JSON: idénticos**. Clinic, capacidades, requests y códigos consumidos en Angular coinciden con Go/v1. Orden por id y estado idéntico sin incremento ya figuraban en v0.1.
+Sí cambió contenido semántico fuera de DTOs: aprobación/congelación, proveedor firmado y política de snapshot apto durante caída de Billing, lease/callback e implementación autorizada. No describirlo como mero renombrado. Frontend decide por VERIFIED/actions del servidor y no infiere caída remota ni implementa fallback a mocks, por lo que esa evolución no exige un DTO distinto. El informe de entrega de Argon debe identificar v1/hash canónico al corregirse, sin cambiar unilateralmente el contrato.
+
+### Resultado de zonas horarias
+Matriz ejecutada sobre validación real Go values + HTTP y función SQL public.is_iana_timezone instalada por bootstrap; Angular validateIanaTimezone ejecutado por transpileModule/VM sin escribir frontend.
+| Valores | Go | PostgreSQL17.11 | Angular / Node24.20.0, ICU78.3, tz2026c |
+|---|---|---|---|
+| UTC (también trim de espacios en frontera) | acepta | acepta | acepta |
+| America/Argentina/Buenos_Aires, America/New_York, Europe/Madrid, Asia/Kolkata, Pacific/Auckland, America/Coyhaique | acepta | acepta | acepta |
+| Local, GMT, ART, EST, +03:00, UTC-3, posix/right, Mars/Olympus | rechaza / HTTP400 INVALID_TIMEZONE | rechaza | rechaza |
+| Etc/GMT+3, Etc/GMT-3 | **acepta / HTTP201** | **acepta** | rechaza |
+| Etc/UTC, Etc/GMT | acepta | acepta | rechaza por blacklist Etc/ completa |
+| america/argentina/buenos_aires | rechaza | rechaza | acepta por comparación case-insensitive de Intl |
+
+**P2 confirmado:** internal/clinics/clinics.go:244–247 y db/migrations/0002_clinics.sql:16–19 permiten offsets fijos Etc/GMT±N contra v1. Prueba de contrato falla en esos dos casos; UTC no es el defecto. Propuesta mínima: rechazar esos offsets en Go y alinear defensa SQL mediante migración incremental autorizada; no reescribir 0002/baseline publicados. Antes de aplicar en una base existente se debe detectar incompatibilidad con datos ya guardados y preservar registros, sin convertirlos ni borrarlos automáticamente.
+**Desajustes adicionales de validación:** clinics.models.ts:229–250 veta todo Etc/ y acepta capitalización que Go/SQL no reconocen. Alinear validadores y pruebas con los nombres exactos aceptados por Go/SQL. El tratamiento de aliases UTC (Etc/UTC, Etc/GMT) requiere acuerdo explícito entre agentes al preparar el parche; no cambiar silenciosamente el contrato ni rechazar/borrar datos existentes. Intl/browser tiene catálogo propio, por lo que esta matriz focal no demuestra equivalencia de todas las versiones IANA en todos los navegadores.
+
+### Incompatibilidad real de integración, independiente de los hashes
+**P1:** src/app/core/interceptors/time-zone.interceptor.ts:7–9 agrega timeZone a llamadas clínicas (registrado en app.config.ts:37); internal/clinics/clinics.go:131–147 solo permite page/size/status y rechaza ese contexto global. GET /clinics?page=0&size=20 →200; agregando timeZone=UTC o America/Argentina/Buenos_Aires →400 INVALID_REQUEST. Gateway conserva el query; no hay adaptación que lo elimine.
+La prueba HTTP con PostgreSQL reprodujo el fallo; la revisión frontend anterior no había detectado la interacción con este interceptor. Es compatible en forma de DTO/ruta, pero **incompatible al conectar el cliente real**. Propuesta mínima: Go debe aceptar/ignorar timeZone como contexto de presentación existente, manteniendo rechazo de parámetros desconocidos/duplicados, propiedad, paginación y el timezone propio del consultorio; no retirar el interceptor global, cambiar endpoints ni usar ese query para autorizar o asignar una sede.
+
+### Pruebas, evidencia y alcance
+- Go1.27.3 + fixture PostgreSQL17.11 propio, container doctorchart-m2-contract-check, label codex.task=doctorchart-m2-contract-review, loopback55446, tmpfs, rol migration_fixture. Retirado después de verificar ID/label/puerto; ninguna base real.
+- Overlay fuera del repo en **C:/Users/gcast/AppData/Local/Temp/doctorchart-m2-contract-check-1793306452867**; fuente clinics_test.go, overlay.json, timezone-go-pg.log, api-timezone-query.log, timezone-angular.json, contract-v0.1.md, contract-v1.md y contract-hashes.json conservados para reproducción.
+- go test -overlay <fixtureRoot>/overlay.json ./internal/clinics -run '^TestM2TimezoneContractVerification$' -count=1 -v: **FAIL**, 16 subcasos PASS y 2 FAIL (Etc/GMT±3), ninguno SKIP; cuatro diagnósticos adicionales sin aserción de contrato.
+- Mismo comando con -run '^TestM2GlobalPresentationTimezoneQuery$': **FAIL**, 1 subcaso PASS y 2 FAIL (query timeZone), ninguno SKIP.
+- Matriz Angular: 22 valores registrados; ejecución de función real en Node, sin suite Angular/build/browser. Comparación de hashes/tablas/ejemplos PASS. No se reejecutó toda la suite, no se aplicaron correcciones, no se modificó el contrato público ni se habilitó el flag.
+- Cierre permitido ahora: commit exclusivamente documental de los seis archivos pendientes. Antes de integrar M2: corregir P1/P2 confirmados y hallazgos frontend anteriores, revalidar y obtener aprobación. Configurar cuotas reales por Billing antes de habilitar operaciones; frontend comercial tiene ticket pendiente para exponer max_clinics, sin cantidades inventadas.
 
 ## Manifiesto de archivos de código/tests (bytes actuales)
 Estas huellas identifican los bytes de código/tests probados y verificados antes de los commits de consolidación, incluidos los archivos que eran nuevos. No cambiar checkout o finales de línea durante la auditoría.
