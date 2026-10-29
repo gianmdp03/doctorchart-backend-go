@@ -30,6 +30,7 @@ Para una conversación nueva basta comenzar con [inicio breve](00_START_HERE.md)
 - [contracts/M2_CLINICS_API.md](contracts/M2_CLINICS_API.md) — API v1 congelada (hash en handoff).
 - [contracts/M2_EFFECTIVE_ENTITLEMENTS.md](contracts/M2_EFFECTIVE_ENTITLEMENTS.md) — fuente comercial, firma, snapshot e invalidación.
 - [reviews/M2_SOL_DELIVERY.md](reviews/M2_SOL_DELIVERY.md) — pruebas y hashes para revisar diffs.
+- [reviews/M2_SOL_CORRECTIONS.md](reviews/M2_SOL_CORRECTIONS.md) — esquema 4, protección de datos y coordinación timeZone con Argon.
 - [reviews/M2_ARGON_CROSS_REVIEW.md](reviews/M2_ARGON_CROSS_REVIEW.md) — revisión de ea4f4d7 en solo lectura; correcciones pendientes.
 - [tasks/M2_SOL.md](tasks/M2_SOL.md) — backend y capacidades.
 - [tasks/M2_ARGON.md](tasks/M2_ARGON.md) — frontend y mocks.

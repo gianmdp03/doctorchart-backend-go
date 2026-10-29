@@ -5,7 +5,7 @@
 |---|---|---|
 | R0 | Documentación base en d5a89e0 | Completada |
 | M1 | Esquema 2 + clinics, commit final 6152867, APROBADO | Integración controlada pendiente; no merge/despliegue |
-| M2-SOL | Congelado: DoctorChart 1dd09bc / Billing 80c171c | Auditoría Argon y aceptación; max_clinics real todavía por configurar |
+| M2-SOL | Corrección congelada: DoctorChart 594402e / Billing 80c171c | Revalidar esquema 4; Argon quita contexto timeZone de consultorios; cuotas reales por configurar |
 | M2-ARGON | ea4f4d7 auditado por Sol en solo lectura | Corregir tres P2; observación P3 en informe cruzado; autorización e integración pendientes |
 | Integración M2 | Validar API real/UI/derechos y revisión cruzada | Ambos entregan evidencia; propietario autoriza integración/activación |
 | T0 | Auth local staff | Contrato propio y permiso; fuera de M2 |

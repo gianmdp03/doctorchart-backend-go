@@ -4,7 +4,7 @@ Repo: `doctorchart-backend-go`. Rama: `codex/m2-clinics-backend`, desde `6152867
 Responsable: Sol. Revisor cruzado: Gemini Argon. Contrato único: [M2-CLINICS-v1](../contracts/M2_CLINICS_API.md), congelado; [derechos técnicos](../contracts/M2_EFFECTIVE_ENTITLEMENTS.md).
 
 ## Dependencias y propiedad
-M1 aprobado por Argon en `6152867`; M2-SOL autorizado. Documentación previa commiteada en 6d7b0d6; aplicación congelada en DoctorChart 1dd09bc y Billing 80c171c por autorización expresa de consolidación. CLAIM de escritura de aplicación liberado para revisión según [protocolo](../06_PROTOCOL.md); no worktrees.
+M1 aprobado por Argon en `6152867`; M2-SOL autorizado. Entrega inicial 1dd09bc y corrección autorizada 594402e (esquema 4); Billing 80c171c intacto. [Correcciones y coordinación timeZone](../reviews/M2_SOL_CORRECTIONS.md) para revalidación independiente. CLAIM de escritura de aplicación liberado según [protocolo](../06_PROTOCOL.md); no worktrees.
 Ámbito: nuevo módulo `internal/clinics/`, integración mínima en `cmd/api/main.go`, consumidor `internal/billing/`, wiring API si hace falta y pruebas. Coordinación canónica `docs/ai/` a cargo de Sol durante su CLAIM.
 Propietario autorizó cambios acotados de Billing/Gateway. Se implementó proveedor firmado y compatibilidad/outbox en rama Billing propia; Gateway no necesitó cambios. Sin configuración de cantidades comerciales reales.
 
@@ -14,7 +14,7 @@ Propietario autorizó cambios acotados de Billing/Gateway. Se implementó provee
 - Capabilities, proveedor comercial sin defaults y escrituras cerradas hasta derechos efectivos. Con proveedor no integrado, listado local y capabilities UNAVAILABLE; no altas ilimitadas.
 - Cuotas transaccionales por workspace, restauración/downgrade/estados según contrato aprobado; preservar registros.
 - Ampliar compatibilidad del consumidor Billing sin alterar comportamiento de las cuotas clínicas. Tests con proveedor sintético del contrato; acreditar integración real por separado antes de habilitar operaciones.
-DDL necesario: migración 3 solo agrega epoch para invalidación compartida entre réplicas. Baseline/SQL 0002/catálogo clínico intactos y production=true preservado.
+DDL: migración 3 agrega epoch para invalidación compartida; corrección 4 restringe zonas no regionales con preflight/revalidación/rollback. Baseline y SQL 0002/0003 publicados intactos; catálogo clínico sin cambios y production=true preservado.
 
 ## Exclusiones
 Angular, cambios de autenticación Supabase, nuevos planes/cantidades, programación de horarios, reservas, staff, portal público, aislamiento clínico por sede, migraciones reales y despliegue. Sin merge/push/commits no autorizados.

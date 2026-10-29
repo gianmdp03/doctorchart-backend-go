@@ -1,5 +1,7 @@
 # M2-ARGON — frontend Angular de administración
 **IMPLEMENTED / CROSS_REVIEW_REQUIRES_CORRECTIONS.** Frontend ea4f4d7 entregado; [auditoría de Sol](../reviews/M2_ARGON_CROSS_REVIEW.md): tres P2 y una observación P3. Correcciones e integración pendientes de autorización; no reiniciar el ticket.
+
+Coordinación final: [instrucción concreta de timeZone](../reviews/M2_SOL_CORRECTIONS.md). Excluir consultorios del interceptor de contexto; conservarlo en flujos clínicos. Go no amplía el listado. Agregar pruebas del servicio con interceptores reales y confirmar GET contra backend. UTC explícito/regiones exactas, sin Etc/ ni capitalización incorrecta; usar el hash canónico v1. Sol no modifica Angular ni autoriza por este ticket su activación.
 Repo: `doctorchart-frontend`. Base observada: `14196974125e5769c5a95e309896397acad96e63`, main limpio. Rama propuesta: `codex/m2-clinics-frontend`.
 Responsable: Gemini Argon. Revisor cruzado: Sol. Contrato único: [M2-CLINICS-v1](../contracts/M2_CLINICS_API.md), congelado; hash en handoff. Snapshot apto permite operar con Billing caído; sin copia apta se bloquea.
 

@@ -1,4 +1,5 @@
 # M2-SOL — entrega auditable
+> Entrega original de 1dd09bc/80c171c y verificaciones posteriores hasta ea1c89d. El código DoctorChart tiene una corrección posterior de zonas en [M2_SOL_CORRECTIONS.md](M2_SOL_CORRECTIONS.md); sus nuevas decisiones de timeZone reemplazan la propuesta anterior de ampliar el listado. Conservar este manifiesto como evidencia histórica, no como hashes del código corregido.
 **29/10/2026 · IMPLEMENTED / READY_FOR_REVIEW. Argon aún no auditó M2-SOL; M3 no autorizado.**
 
 ## Bases, permisos y límites
@@ -134,7 +135,7 @@ La prueba HTTP con PostgreSQL reprodujo el fallo; la revisión frontend anterior
 - Matriz Angular: 22 valores registrados; ejecución de función real en Node, sin suite Angular/build/browser. Comparación de hashes/tablas/ejemplos PASS. No se reejecutó toda la suite, no se aplicaron correcciones, no se modificó el contrato público ni se habilitó el flag.
 - Cierre permitido ahora: commit exclusivamente documental de los seis archivos pendientes. Antes de integrar M2: corregir P1/P2 confirmados y hallazgos frontend anteriores, revalidar y obtener aprobación. Configurar cuotas reales por Billing antes de habilitar operaciones; frontend comercial tiene ticket pendiente para exponer max_clinics, sin cantidades inventadas.
 
-## Manifiesto de archivos de código/tests (bytes actuales)
+## Manifiesto de código/tests de la entrega original (1dd09bc / 80c171c)
 Estas huellas identifican los bytes de código/tests probados y verificados antes de los commits de consolidación, incluidos los archivos que eran nuevos. No cambiar checkout o finales de línea durante la auditoría.
 Auditar DoctorChart con `git diff 6d7b0d6 1dd09bc --` y Billing con `git diff bf65c04 80c171c --`; `git show --stat <commit>` muestra el scope cerrado. La documentación posterior no cambia aplicación. Get-FileHash -Algorithm SHA256 verifica los bytes actuales; Git puede normalizar finales de línea en blobs según sus atributos.
 

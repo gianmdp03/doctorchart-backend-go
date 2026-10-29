@@ -1,36 +1,28 @@
-# Handoff — M2-SOL implementado
-**29/10/2026 (Argentina). Revisión independiente y aceptación pendientes; M3 no autorizado.**
+# Handoff — correcciones finales M2-SOL
+**29/10/2026 (Argentina). Backend listo para revalidación; M2 aún no aprobado para integración. M3 no autorizado.**
 
-## Estado y autorización
-Propietario autorizó M2-SOL, rama específica y cambios acotados necesarios Billing/Gateway. Angular queda reservado a Argon. No worktrees, merge/push/despliegue ni migraciones reales.
-- M1 aprobado: 615286720f98768dfbc85bcbe35d315e41405e87, sin integrar.
-- Commit documental independiente previo a M2: **6d7b0d60b946b9451eea294b98c0724530edb792**, 19 archivos.
-- DoctorChart: codex/m2-clinics-backend, aplicación congelada en **1dd09bc2f5a94128150440c7c5524a44594f1358** (17 archivos). Base documental 6d7b0d6, descendiente del M1 aprobado.
-- Billing: codex/m2-doctorchart-entitlements, aplicación congelada en **80c171c86fcae15a7d52868c5960da340bb9d179** (11 archivos), base bf65c042cc7480cbf4603447becfeb14002dbde1; árbol limpio.
-- Gateway main 55197fa intacto. Frontend comenzó en main/1419697 y avanzó externamente durante esta tarea a codex/m2-clinics-frontend/ea4f4d7b217134cfb7e3f9ccd8902dcd4beae898, árbol limpio al cierre; Sol no escribió ni cambió ramas allí. Main backend d5a89e0, sin merge.
-El propietario autorizó expresamente consolidar ambos commits. Se verificaron los 26 hashes de código/tests de la entrega probada, scope staged explícito y diff --check. RELEASE de escritura de aplicación: Argon puede auditar esos commits exactos; cualquier corrección posterior requiere coordinación y nuevo hash. El cierre posterior es exclusivamente documental. Sin otro escritor simultáneo.
+## Git y propiedad
+- M1 APROBADO por Argon: 615286720f98768dfbc85bcbe35d315e41405e87; sin merge a main.
+- DoctorChart: codex/m2-clinics-backend; **corrección congelada 594402ed46536f145b6ebc29aa7badf8a87cc8bb**, nueve archivos. Base ea1c89d; entrega inicial 1dd09bc y documentación previa 6d7b0d6. Cierre de coordinación posterior exclusivamente documental.
+- Billing: codex/m2-doctorchart-entitlements, 80c171c86fcae15a7d52868c5960da340bb9d179, limpio/intacto; no necesitó correcciones.
+- Frontend: codex/m2-clinics-frontend, HEAD ea4f4d7b217134cfb7e3f9ccd8902dcd4beae898; al cierre aparecen cambios locales externos en interceptor/spec, formulario TS/HTML, mocks y modelos. Preservados, sin escrituras de Sol ni revalidación de esos diffs nuevos. Gateway main 55197fa intacto.
+- Main backend sigue en d5a89e0. Sin worktrees, merge, push, despliegue, configuración comercial ni migraciones reales.
+CLAIM exclusivo Sol para corrección backend desde árbol limpio; RELEASE de aplicación en 594402e para revalidación independiente. Ningún segundo escritor por Git.
 
-## Contrato congelado
-[M2-CLINICS-v1](contracts/M2_CLINICS_API.md), SHA256:
-`70e096102182fb5d0880997b6ff428e058d756b987c3d8c2238c8743f780e2fd`.
-DTO/endpoints sin modificaciones posteriores. Disponible a Argon por documentación/esta conversación; no se atribuye envío a una sesión externa.
-[Derechos efectivos](contracts/M2_EFFECTIVE_ENTITLEMENTS.md): cobertura administrada existente + catálogo Billing; firma HMAC, propietario/revisión/vigencia y lease máximo 60s limitado por cobertura. Snapshot apto permite operar durante caída remota; no defaults ni renovación desde caché.
-Callbacks/outbox existentes e invalidación compartida entre réplicas; no se promete revocación instantánea antes de entrega del callback. Evidencia, archivos, reproducción y hashes en [entrega auditable](reviews/M2_SOL_DELIVERY.md).
+## Contrato y resultado
+M2-CLINICS-v1 canónico: **70e096102182fb5d0880997b6ff428e058d756b987c3d8c2238c8743f780e2fd**, bytes del blob Git 9007d55. DTO/endpoints/errores congelados intactos. El SHA aa7ff31… identifica la propuesta v0.1, no otro contrato vigente.
+[Correcciones, diff y evidencia](reviews/M2_SOL_CORRECTIONS.md) reemplazan la propuesta anterior de ampliar el listado por timeZone.
+- UTC explícito y regiones válidas funcionan. Go y migración incremental 4 rechazan Etc/, incluidos offsets y aliases no regionales. Publicados schema.sql/0002/0003, AGENTS y algoritmo de catálogo intactos; 26 tablas y 21 FK.
+- Filas existentes incompatibles (también archivadas) bloquean upgrade con error de conciliación expresa. No se borran, convierten ni alteran: rollback preserva datos clínicos/sedes/secuencia, función/CHECK, historial y marcador anteriores.
+- Fallos SQL/catálogo/seed tardío revierten atómicamente. No hay DOWN automático después de confirmar 4; binario previo rechaza versión 4. No iniciar este binario sobre base real sin autorización específica.
+- Pacientes/historias siguen por médico, sin clinic_id ni aislamiento clínico por sede. Sin cambios Supabase, horarios, reservas o staff. /appointments reservado.
 
-## Resultado
-Listado/detalle/alta/edición/estados de consultorios, IANA Go, propiedad médica, versiones y cuotas transaccionales. No cambios clínicos ni pacientes por sede. Archivados conservan datos, sin cancelar turnos (todavía no implementados).
-Migración **3** agrega solo epoch de invalidación entre réplicas; baseline, migración 0002, catálogo clínico y AGENTS intactos. Vacío/1→3/2→3 convergen con conservación/rollback. Próximo arranque real aplicaría upgrade; **no autorizado ni ejecutado**.
-Billing agrega proveedor interno, max_clinics opcional y compatibilidad legacy; pagos/concesiones generan notificación durable. Gateway no necesitó cambios; Supabase auth intacta.
+## P1 pendiente de Argon
+El contexto timeZone tiene uso funcional clínico (días/meses, cálculos y documentos), pero consultorios no lo consume. **No ampliar API Go.** Argon debe excluir /clinics y sus rutas hijas del interceptor Angular, mantenerlo en clínica y probar ClinicsService con interceptores reales. Go sigue rechazando ese parámetro extra en listado. Instrucción detallada en correcciones y ticket M2_ARGON; Sol no modifica Angular ni declara el P1 cerrado.
+Persisten también los hallazgos propios de la [auditoría frontend](reviews/M2_ARGON_CROSS_REVIEW.md). Alinear validación exacta de nombres con Go/SQL y actualizar el hash declarado por Argon al canónico, sin cambios unilaterales.
 
-## Pruebas
-DoctorChart suite Windows/PG18.6 PASS y race completa Linux/PG17.11 PASS (404 casos/subcasos). Billing race completa PASS (495), más focal race tras ajuste final de compatibilidad. Baseline/shared Billing race y startup Windows/PG18.6 ejecutados explícitamente PASS sin SKIP. Corregidos tres conteos heredados 17→19 sin modificar esquema Billing.
-Interoperabilidad handlers reales Billing/DoctorChart PASS contra PostgreSQL/Supabase sintéticos locales. Build/vet/formato/diff check y govulncheck PASS (cero vulnerabilidades alcanzables; avisos de módulos no importados sin alterar dependencias).
-Omisiones externas y comandos exactos en entrega. Startup DoctorChart, bootstrap y nuevas suites de cuota/snapshot sí ejecutados. Fixtures propios PG17/18 y Linux race, label codex.task=doctorchart-m2; retirados al cerrar. Sin datos reales.
-
-## Límite y próximo paso
-Decisión comercial definitiva: solo BASIC, PRO y UNLIMITED. Configuración/resolución max_clinics comprobadas para los tres en PostgreSQL descartable, PASS sin SKIP; código congelado intacto. FREE_TRIAL no activado y ENTERPRISE fuera de oferta: demanda de ampliarlos NO BLOQUEANTE para M2. Se preservan referencias clínicas/auth legacy y alias ENTERPRISE→UNLIMITED sin nuevos flujos. Evidencia y dependencias en [entrega](reviews/M2_SOL_DELIVERY.md) y contrato técnico.
-No se asignaron cantidades reales max_clinics ni precios. Propietario debe configurar los tres planes por API administrativa antes de habilitar operaciones; el panel Billing aún no muestra ese campo. Sin clave/cobertura apta, mutaciones afectadas 503.
-Verificaciones UTC/API terminadas: UTC funciona en Go/SQL/Angular. P2 confirmado: Go/SQL aceptan Etc/GMT±N contra contrato; Angular los rechaza. P1 de integración: interceptor timeZone hace que listado Go responda 400; propuesta mínima tolerar contexto global, sin usarlo como timezone del consultorio. Desajustes secundarios Etc/UTC y capitalización documentados. Sin correcciones de código, con pruebas focales fallidas registradas en [entrega](reviews/M2_SOL_DELIVERY.md).
-Hashes explicados: propuesta v0.1 aa7ff31… (blob 84657c2) y v1 70e096102182fb5d0880997b6ff428e058d756b987c3d8c2238c8743f780e2fd (blob 9007d55, publicado en 961c77a). No son commits ni diferencias LF/CRLF; DTO/rutas/errores y seis ejemplos JSON iguales, política snapshot sí cambió por decisión aprobada. Canónico = bytes UTF-8/LF del blob v1. Contrato público intacto; frontend debe actualizar identificación documental al coordinar su corrección.
-M2 aún no listo para integración: resolver P1/P2 confirmados y hallazgos frontend previos, revalidar y obtener aceptación. Editor max_clinics de Bycode registrado como backlog comercial independiente; sin inventar cuotas. Consolidación de esta revisión exclusivamente documental sobre los seis archivos autorizados; sin nuevos commits de aplicación.
-Argon debe auditar M2-SOL sobre los dos commits congelados; aceptación del propietario pendiente. Frontend M2-ARGON entregado en ea4f4d7b217134cfb7e3f9ccd8902dcd4beae898 y auditado en solo lectura: [informe cruzado](reviews/M2_ARGON_CROSS_REVIEW.md), tres hallazgos P2 y una observación P3; requiere correcciones antes de integración. No se modificó Angular. Configuración real, correcciones, integración/publicación o migraciones reales requieren su autorización. **No comenzar M3.**
+## Pruebas y próximos pasos
+Go1.27.3: suite completa Windows/PG18.6 PASS (471 casos/subcasos) y suite completa Linux -race/PG17.11 PASS (471), con startup, seeds reales y nuevas regresiones ejecutados sin SKIP. Build/vet/gofmt/diff check PASS. Fallos iniciales de expectativa de historial y fixture Linux corregidos; resultados/omisiones en correcciones.
+Seis pruebas externas omitidas explícitamente: interoperabilidad Billing nueva, tres converter/storage live, estudio converter live y sync legacy. No E2E navegador/servicios reales; interoperabilidad previa no se presenta como reejecutada. Fixtures propios etiquetados y helpers retirados tras verificar identidad; fuentes readonly en Linux.
+Solo BASIC/PRO/UNLIMITED. FREE_TRIAL/ENTERPRISE no bloqueantes; compatibilidad heredada preservada, sin ampliarlos. max_clinics real sin configurar: no defaults; snapshot apto permite caída de Billing solo hasta vigencia real. Editor de cuota de Bycode frontend sigue en backlog independiente, sin cantidades inventadas.
+Siguiente: Argon revalida 594402e y corrige su frontend con autorización propia; prueba conjunta sin mocks y aceptación del propietario antes de integración/activación. No comenzar M3.
