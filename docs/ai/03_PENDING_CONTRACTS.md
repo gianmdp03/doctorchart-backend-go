@@ -1,16 +1,9 @@
-# Decisiones pendientes — alcance mínimo
-**M1 CERRADO:** Argon APROBADO sobre `6152867`; propietario autoriza cierre documental. M2 solo preparado.
+# Pendientes tras M2-SOL
+M1 cerrado/APROBADO en 6152867. M2-SOL implementado; revisión independiente y aceptación pendientes. M3 no autorizado.
 
-## Bloqueos reales para M2
-1. **Aprobar contrato público y tickets.** [M2-CLINICS-v0.1](contracts/M2_CLINICS_API.md) es propuesta, incluida semántica de estados/cupo, downgrade y bloqueo de escrituras ante caída Billing. No se inventan cantidades por plan.
-2. **Acordar fuente comercial efectiva por médico:** ruta/autenticación de consulta a Bycode/Billing, revisión, vigencia, habilitación de gestión y `max_clinics`; definir coherencia de revisión/revocación antes de escrituras reales. Los campos mínimos están en el único contrato, no se duplican aquí.
-3. **Compatibilidad del consumidor:** `internal/billing/rules.go` hoy rechaza cualquier clave distinta de `max_patients` y `max_records_per_patient`. Preparar soporte seguro sin romper cuotas clínicas; no publicar claves a clientes incompatibles ni alterar Bycode por inferencia.
-
-Tras aprobar contrato/tickets, UI puede avanzar con mocks y backend con proveedor sintético/estado cerrado. La falta del proveedor comercial bloquea habilitar operaciones reales, no exige fingir que la integración existe. Rutas/nav operativas seguirán apagadas; API bloquea todas las mutaciones sin derechos efectivos.
-Ramas propuestas pueden partir del M1 aprobado en backend y base frontend independiente; no es necesario hacer merge a main para desarrollar. Integración de M1 continúa pendiente de autorización.
-
-## Fases posteriores (fuera de M2)
-- Staff: contrato local de invitación/sesión/revocación/Gateway y permisos, conservando Supabase médico.
-- Horarios/reservas: reglas de intervalos, zonas, excepciones, exclusión por médico e identidad solicitante/atendido.
-- Público: `/appointments` confirmado sin alias; segmentos de médico/consultorio y publicación pendientes.
-- Sin traslado, duplicación ni pertenencia clínica por lugar. No exigir consultorio para clínica; metadato de lugar en consulta sería otra decisión futura.
+- **Bloqueo comercial acotado:** propietario debe configurar max_clinics explícitamente en Billing para cada tier real. No se inventan cantidades ni se copian cupos clínicos. Sin clave, trial sin catálogo apto o cobertura no verificable: capabilities UNAVAILABLE y mutaciones 503; lecturas locales seguras.
+- **Resuelto técnicamente:** [API M2-CLINICS-v1](contracts/M2_CLINICS_API.md) congelada, endpoint interno firmado de Billing y [snapshots](contracts/M2_EFFECTIVE_ENTITLEMENTS.md). Snapshot apto permite operar con Billing caído solo hasta su vencimiento original. Sin copia apta, bloqueo.
+- Catálogo legacy conserva sus dos claves; nuevos derechos llegan por propietario, con cuota opcional administrada. Cambios de cobertura/catalogo notifican por outbox/callback existente.
+- No se promete revocación instantánea: callback recibido invalida entre réplicas; evento todavía no recibido o modificación manual sin callback queda acotado a lease máximo de 60s, jamás más allá de cobertura.
+- Pendientes de autorización independiente: M2-ARGON/Angular, commits de aplicación, integración, merge/push/despliegue/configuración real. Revisar [entrega](reviews/M2_SOL_DELIVERY.md).
+- Staff, horarios, reservas y portal público requieren fases futuras; /appointments sin alias y sin segmentos adicionales definidos aquí. Pacientes/historias permanecen por médico.

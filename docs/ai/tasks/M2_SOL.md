@@ -1,12 +1,12 @@
 # M2-SOL — backend y capacidades de consultorios
-**READY_FOR_APPROVAL / NO IMPLEMENTAR TODAVÍA.**
-Repo: `doctorchart-backend-go`. Rama propuesta: `codex/m2-clinics-backend`, desde `6152867` o descendiente exclusivamente documental aprobado; no desde main sin M1.
-Responsable: Sol. Revisor cruzado: Gemini Argon. Contrato único: [M2-CLINICS-v0.1](../contracts/M2_CLINICS_API.md), aún propuesto.
+**IMPLEMENTED / READY_FOR_REVIEW. Autorizado por el propietario el 29/10/2026; M3 no autorizado.**
+Repo: `doctorchart-backend-go`. Rama: `codex/m2-clinics-backend`, desde `6152867` o descendiente exclusivamente documental aprobado; no desde main sin M1.
+Responsable: Sol. Revisor cruzado: Gemini Argon. Contrato único: [M2-CLINICS-v1](../contracts/M2_CLINICS_API.md), congelado; [derechos técnicos](../contracts/M2_EFFECTIVE_ENTITLEMENTS.md).
 
 ## Dependencias y propiedad
-M1 aprobado por Argon en `6152867`; contrato y ticket requieren aprobación antes de comenzar. CLAIM exclusivo del repo backend según [protocolo](../06_PROTOCOL.md); no worktrees.
+M1 aprobado por Argon en `6152867`; M2-SOL autorizado. Documentación previa commiteada en 6d7b0d6; aplicación congelada en DoctorChart 1dd09bc y Billing 80c171c por autorización expresa de consolidación. CLAIM de escritura de aplicación liberado para revisión según [protocolo](../06_PROTOCOL.md); no worktrees.
 Ámbito: nuevo módulo `internal/clinics/`, integración mínima en `cmd/api/main.go`, consumidor `internal/billing/`, wiring API si hace falta y pruebas. Coordinación canónica `docs/ai/` a cargo de Sol durante su CLAIM.
-Billing externo es dependencia: acordar ruta/autenticación, revisión/vigencia, feature y max_clinics efectivos por médico. Si exige cambiar Bycode, presentar ese alcance para aprobación y reclamar ese repo separadamente; no asumir autorización ni disponibilidad.
+Propietario autorizó cambios acotados de Billing/Gateway. Se implementó proveedor firmado y compatibilidad/outbox en rama Billing propia; Gateway no necesitó cambios. Sin configuración de cantidades comerciales reales.
 
 ## Alcance
 - DTO/handlers/store de listado, detalle, alta, edición y estado según contrato; propiedad exclusiva por médico con autenticación existente.
@@ -14,20 +14,22 @@ Billing externo es dependencia: acordar ruta/autenticación, revisión/vigencia,
 - Capabilities, proveedor comercial sin defaults y escrituras cerradas hasta derechos efectivos. Con proveedor no integrado, listado local y capabilities UNAVAILABLE; no altas ilimitadas.
 - Cuotas transaccionales por workspace, restauración/downgrade/estados según contrato aprobado; preservar registros.
 - Ampliar compatibilidad del consumidor Billing sin alterar comportamiento de las cuotas clínicas. Tests con proveedor sintético del contrato; acreditar integración real por separado antes de habilitar operaciones.
-No se prevé DDL adicional. Si surge necesidad real, elevar alcance y respetar production=true/baseline inmutable.
+DDL necesario: migración 3 solo agrega epoch para invalidación compartida entre réplicas. Baseline/SQL 0002/catálogo clínico intactos y production=true preservado.
 
 ## Exclusiones
-Angular, cambios Supabase/Gateway, nuevos planes/cantidades, programación de horarios, reservas, staff, portal público, aislamiento clínico por sede, migraciones reales y despliegue. Sin merge/push/commits no autorizados.
+Angular, cambios de autenticación Supabase, nuevos planes/cantidades, programación de horarios, reservas, staff, portal público, aislamiento clínico por sede, migraciones reales y despliegue. Sin merge/push/commits no autorizados.
 No modificar el repo frontend, ni siquiera su documentación, mientras Argon lo tenga reclamado.
 
 ## Pruebas y aceptación
-- [ ] Contrato/ticket aprobados y CLAIM backend registrado.
-- [ ] Tests HTTP validan DTO/códigos exactos, rol, propiedad cruzada 404, versiones y zona horaria; queries siempre por propietario.
-- [ ] PostgreSQL propio descartable autorizado: dos altas sobre último cupo admiten una; edición/estados concurrentes, restauración y downgrade; rollback sin efectos ante rechazo.
-- [ ] Billing ausente/caído/timeout/vencido/clave faltante: cero mutaciones, capabilities false y 503; denegación verificada 403; cuotas 0 y -1 solo desde fixtures explícitos.
-- [ ] Regresiones de cuotas clínicas, startup sin SKIP, bootstrap, clínica, build/vet/race pertinentes; registrar omitidos.
-- [ ] Contrato externo real no confirmado mantiene proveedor operativo apagado; reportar esa limitación, nunca declarar integración comercial completa con mocks.
+- [x] Contrato/ticket autorizados y CLAIM backend/Billing registrado.
+- [x] Tests HTTP validan DTO/códigos exactos, rol, propiedad cruzada 404, versiones y zona horaria; queries siempre por propietario.
+- [x] PostgreSQL propio descartable autorizado: dos altas sobre último cupo admiten una; edición/estados concurrentes, restauración y downgrade; rollback sin efectos ante rechazo.
+- [x] Billing caído con snapshot apto permite operar; sin copia apta/vigente/no invalidada cero escrituras/503; denegación 403. Cuotas 0/-1 solo explícitas.
+- [x] Regresiones de cuotas clínicas, startup sin SKIP, bootstrap, clínica, build/vet/race pertinentes; registrar omitidos.
+- [x] Handlers reales Billing/DoctorChart probados juntos con datos sintéticos; max_clinics real sin configurar bloquea sus mutaciones. No afirmar activación productiva.
 - [ ] Gemini Argon revisó diff congelado en solo lectura; propietario acepta entrega.
 
 ## Entrega
 SHA/base/rama o diff identificable, archivos, pruebas y resultados, proveedor real vs simulado, limitaciones y riesgos. Sol actualiza handoff/tablero backend con evidencia propia y el resumen entregado por Argon. El reviewer no aplica cambios al repo del autor; para ejecutar pruebas que escriban allí necesita RELEASE/CLAIM temporal.
+
+Evidencia, archivos y hashes en [entrega M2-SOL](../reviews/M2_SOL_DELIVERY.md). Sin M3, merge/push/despliegue o migraciones reales.

@@ -1,0 +1,26 @@
+# M2 — derechos efectivos DoctorChart (contrato técnico v1)
+**Cerrado antes de implementar, 29/10/2026.** Complementa [API congelada](M2_CLINICS_API.md); no crea suscripciones ni cantidades comerciales.
+
+## Fuente y transporte
+Billing expone GET `/internal/doctorchart/owners/{ownerId}/entitlements`, conexión interna directa (no ruta pública Gateway), header existente `X-Internal-Secret` con SERVICES_BILLING_SHARED_SECRET. Se verifica en tiempo constante, sin JWT de usuario; owner UUID tomado exclusivamente de identidad médica en DoctorChart.
+La cobertura procede de `Supabase.Coverage` / metadatos administrados existentes, no del tier provisto por el formulario/JWT antiguo. Catálogo `module_tier_limits` del tier real proporciona `max_clinics`; no defaults. Falta de clave/cobertura malformada/tier no configurado: 503 y mutaciones dependientes bloqueadas hasta configuración explícita en Billing.
+El límite puede ser 0 o -1 solo si se configura expresamente en Billing. No se agregan valores a seeds ni planes. Gestión está habilitada si cobertura activa vigente y cuota válida; sin cobertura devuelve denegación verificada. Identidad remota debe coincidir con owner solicitado.
+
+## Snapshot interno JSON (no modifica DTO público)
+Campos: `ownerId` UUID, `module:"DOCTORCHART"`, `revision` SHA256 de cobertura+catálogo relevante, `issuedAt`, `validUntil`, `coverageExpiresAt` RFC3339 o null sin cobertura, `clinicManagement` bool y `max_clinics` entero o null al denegar.
+Billing firma los bytes JSON mediante HMAC-SHA256, header `X-Entitlements-Signature` hexadecimal; misma clave interna existente, sin secretos nuevos ni exposición al navegador. DoctorChart valida firma, propietario/módulo, revisión, tiempo, tipos y límites antes de cachear. Cliente no sigue redirecciones; tamaño/timeout acotados.
+`validUntil = min(issuedAt+60s,coverageExpiresAt)` al autorizar. Denegación tiene lease máximo 60s. Duración técnica de verificación, no extensión comercial. Tiempos malformados, futuro inválido o expiración/lease incoherente fallan cerrados.
+
+## Caché e invalidación
+Snapshots verificados en memoria por propietario y por proceso, tamaño acotado; reinicio implica caché vacía. Snapshot válido puede autorizar aunque Billing caiga; no renovar desde copia ni usar valores iniciales. Refresh al vencer o al invalidar; no extender jamás más allá de cobertura.
+Reutilizar POST existente `/internal/webhooks/billing/limits-updated` y alias API autenticado por X-Internal-Secret. Cola Billing `billing_webhook_jobs` existente notifica cambios de catálogo y concesiones/pagos confirmados DoctorChart, dentro de sus transacciones. Cambios externos manuales de cobertura deben enviar el mismo callback; sin evento su observación queda acotada al lease, nunca instantánea.
+DoctorChart confirma invalidación compartida ANTES de recargar catálogo: tabla mínima `clinic_entitlement_epoch(id=1,generation)`, nueva migración incremental 3. Justificación: una caché puramente local no invalida otras réplicas ni evita fetchs en vuelo obsoletos.
+Cada snapshot guarda la generación leída antes del fetch; cachear/usar exige generación igual. Una mutación toma FOR SHARE en epoch antes del lock del workspace y mantiene el fence hasta commit; callback incrementa generación en PostgreSQL, espera mutaciones ya admitidas y desde su ACK ninguna réplica puede admitir un snapshot anterior. Fetch concurrente a invalidación no repuebla permiso viejo.
+Callbacks duplicados/desordenados invalidan de nuevo (seguro); no vuelven atrás revisiones. Recarga de catálogo fallida no revierte invalidación ni permite fallback viejo. Cola reintenta ante fallo.
+No afirma revocación distribuida instantánea: cambios no entregados se observan como máximo al vencer lease de 60s, salvo petición ya admitida. Vigencia se vuelve a verificar al admitir la transacción.
+
+## Legacy y decisiones comerciales
+GET /api/billing/limits/DOCTORCHART conserva solo las dos claves legacy, aunque catálogo admin contenga max_clinics. PUT legacy que omite max_clinics lo preserva transaccionalmente; PUT explícito admite el nuevo entero y genera callback durable. No alterar consumidores Pointly.
+DoctorChart mantiene cuotas clínicas globales sin cambiar su política actual. El nuevo consumidor no usa los fallbacks legacy para clinics.
+No hace falta modificar Gateway: el endpoint interno queda fuera de rutas públicas y se consulta directamente con secreto existente. Supabase auth médica intacta.
+Única condición comercial no resuelta por ingeniería: propietario debe configurar max_clinics para tiers reales antes de operaciones que dependan de la cuota. M2 implementa y prueba sin inventar esos números; mientras falten responde UNAVAILABLE y 503.

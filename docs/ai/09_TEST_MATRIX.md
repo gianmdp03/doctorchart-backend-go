@@ -42,4 +42,6 @@ Resultados, entornos y cinco pruebas externas omitidas: [correcciones](reviews/M
 
 ## Preparación M2
 La revalidación final de Argon aprobó M1; las cinco omisiones externas justificadas no bloquean su cierre. No se reejecutaron tests en la fase documental actual.
-Pruebas M2 todavía no ejecutadas: las definen los tickets [Sol](tasks/M2_SOL.md) y [Argon](tasks/M2_ARGON.md), ambos sobre el [mismo contrato](contracts/M2_CLINICS_API.md). Distinguir mocks de integración comercial real y coordinar cualquier ejecución que escriba en Git ajeno.
+Pruebas M2-SOL ejecutadas según [entrega](reviews/M2_SOL_DELIVERY.md); frontend todavía pendiente. Las definen los tickets [Sol](tasks/M2_SOL.md) y [Argon](tasks/M2_ARGON.md), ambos sobre el [mismo contrato](contracts/M2_CLINICS_API.md). Distinguir mocks de integración comercial real y coordinar cualquier ejecución que escriba en Git ajeno.
+
+M2-SOL: propiedad cruzada/versiones/IANA, último cupo concurrente, snapshot offline/expiración/fence/fetch invalidado, compatibilidad Billing legacy, interoperabilidad real entre handlers y migración 2→3 con rollback: PASS. Revisión independiente todavía pendiente.

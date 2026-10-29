@@ -1,5 +1,5 @@
 # Doctor Chart — inicio breve
-**Versión 0.3 · 29/10/2026 · M1 CERRADO / Argon APROBADO en 6152867; M2 solo preparado.**
+**Versión 0.3 · 29/10/2026 · M1 cerrado; M2-SOL implementado para revisión. M3 no autorizado.**
 
 ## Producto confirmado
 - Pacientes e historias clínicas pertenecen al médico. Un mismo paciente conserva su historia al atenderse en distintos consultorios.
@@ -15,6 +15,6 @@ El propietario descartó intencionalmente el trabajo anterior y preparó reposit
 M1 final `6152867`, aprobado por Argon y cierre documental autorizado por el propietario. Startup sin SKIP y upgrade con seeds reales PASS; cinco pruebas externas omitidas justificadamente, no bloqueantes. Rama `codex/m1-clinics-migrations` pendiente de integración controlada; sin cambios en producción.
 
 ## Próximo paso
-Aprobar [contrato M2](contracts/M2_CLINICS_API.md) y tickets [Sol](tasks/M2_SOL.md)/[Argon](tasks/M2_ARGON.md) antes de implementar. [Prompts](07_SESSION_STARTERS.md) y [handoff](05_HANDOFF.md) permiten reiniciar sin auditorías.
+Revisar [entrega M2-SOL](reviews/M2_SOL_DELIVERY.md): DoctorChart 1dd09bc y Billing 80c171c congelados para Argon. Frontend ea4f4d7 auditado por Sol: [tres P2 y una observación P3](reviews/M2_ARGON_CROSS_REVIEW.md), sin modificarlo. API M2-CLINICS-v1 congelada; correcciones, aceptación e integración pendientes. [Prompts](07_SESSION_STARTERS.md) y [handoff](05_HANDOFF.md) permiten reiniciar sin auditorías históricas.
 Desde M2: Sol backend/BD/Billing; Gemini Argon frontend Angular; revisión cruzada. **Un escritor por directorio Git, sin worktrees bajo ninguna circunstancia.** Ver [protocolo](06_PROTOCOL.md).
-M2 no iniciado; sin autorización de merge, push, despliegue o bases reales. Los `AGENTS.md` reales siguen vigentes; backend `production: true`.
+M2-SOL autorizado y entregado; Angular reservado a Argon. Sin merge, push, despliegue o bases reales. Snapshot efectivo apto permite operar con Billing caído; sin él no hay defaults. Configuración real de max_clinics pendiente. Los `AGENTS.md` reales siguen vigentes; backend `production: true`.

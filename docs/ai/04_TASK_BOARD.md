@@ -1,23 +1,18 @@
-# Tablero — M1 cerrado, M2 preparado
-**29/10/2026.** M1 APROBADO por Gemini Argon en `6152867`; cierre documental autorizado. Preparación no equivale a autorización de implementar M2.
+# Tablero — M2-SOL entregado para revisión
+**29/10/2026. M1 cerrado/APROBADO; M3 no autorizado.**
 
-| ID | Estado | Implementador / repo | Revisor | Entregable |
-|---|---|---|---|---|
-| R0 | DOCUMENTATION_COMMITTED | Coordinación / backend | Propietario | 26 documentos en d5a89e0 |
-| M1 | CLOSED / ARGON_APPROVED | Sol / backend | Gemini Argon | 6152867; startup sin SKIP, seeds reales PASS; rama pendiente de integración |
-| M2-SOL | READY_FOR_APPROVAL / NOT_STARTED | Sol / backend | Gemini Argon | [Ticket](tasks/M2_SOL.md): endpoints, propiedad, IANA, capacidades/cuotas Billing |
-| M2-ARGON | READY_FOR_APPROVAL / NOT_STARTED | Gemini Argon / frontend | Sol | [Ticket](tasks/M2_ARGON.md): UI de gestión y mocks del contrato |
-| B0 | REPORT_RECEIVED / antecedente | Sol / consumidor Billing | Revisión según alcance | Fuente comercial efectiva todavía por acordar |
-| T0 | BACKLOG / NO AUTORIZADA | Backend + frontend según tickets futuros | Cruzada | Autenticación staff |
-| T1–T4 | BACKLOG / NO AUTORIZADAS | División futura por repositorio | Cruzada | Horarios, reservas, panel y portal; fuera de M2 |
+| Tarea | Estado | Responsable / siguiente paso |
+|---|---|---|
+| M1 | CLOSED / ARGON_APPROVED, 6152867 | Rama pendiente de integración controlada |
+| Documentación M1/M2 | COMMITTED, 6d7b0d6 | Commit independiente previo a M2 |
+| M2-SOL | FROZEN / READY_FOR_ARGON_REVIEW | DoctorChart 1dd09bc; Billing 80c171c; [entrega y hashes completos](reviews/M2_SOL_DELIVERY.md); propietario acepta después de revisión |
+| M2-ARGON | CROSS_REVIEW_REQUIRES_CORRECTIONS | ea4f4d7, limpio; [tres hallazgos P2 y una observación P3](reviews/M2_ARGON_CROSS_REVIEW.md); sin cambios de Sol en frontend |
+| max_clinics real | OWNER_DECISION_REQUIRED | Configurar en Billing; sin clave mutaciones afectadas bloqueadas |
+| M3 / staff / horarios / reservas | NO AUTORIZADOS | Sin implementar |
 
-Contrato único [M2-CLINICS-v0.1](contracts/M2_CLINICS_API.md), todavía propuesto. Cada ticket requiere aprobación expresa; ambos podrán empezar simultáneamente una vez aprobado el contrato y autorizado su alcance.
+CLAIM por instrucción expresa del propietario, tras verificar estado limpio:
+- DoctorChart: Sol, codex/m2-clinics-backend, base 6d7b0d6.
+- Billing: Sol, codex/m2-doctorchart-entitlements, base bf65c04.
+- Gateway solo leído, main 55197fa; Angular no escrito por Sol. Frontend avanzó externamente a codex/m2-clinics-frontend/ea4f4d7; se preservó sin intervención.
 
-## Propiedad para la fase futura
-| Directorio Git | Escritor asignado | Rama propuesta | CLAIM de implementación |
-|---|---|---|---|
-| doctorchart-backend-go | Sol | codex/m2-clinics-backend, desde M1 aprobado | NO INICIADO |
-| doctorchart-frontend | Gemini Argon | codex/m2-clinics-frontend | NO INICIADO |
-
-No hay agentes de implementación iniciados. Un escritor por Git, incluidos docs y herramientas que escriban; jamás worktrees. Revisiones cruzadas de solo lectura sobre entrega congelada; pruebas del otro repo requieren RELEASE/CLAIM.
-M2 integra derechos efectivos y validación IANA Go; sin esos derechos no hay mutaciones comerciales. Sin merge a main, push, despliegue o bases reales.
+RELEASE de escritura de aplicación backend y Billing tras commits expresamente autorizados 1dd09bc / 80c171c. Implementación congelada para auditoría independiente; documentación de cierre separada. Frontend solo leído en ea4f4d7. Pruebas que escriban en checkout requieren CLAIM temporal y coordinación. No cambiar ramas ni descartar trabajo pendiente. Nunca worktrees, merge/push/despliegue o bases reales.

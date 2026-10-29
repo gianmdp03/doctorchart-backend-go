@@ -22,8 +22,13 @@ Fecha de producto y actualización documental: 29/10/2026. Estado = **CONFIRMADA
 
 ## Confirmaciones de cierre y coordinación
 - **DC-054 · CONFIRMADA:** Gemini Argon revalidó y APROBÓ M1 en `6152867`; propietario autoriza cierre documental. Rama pendiente de integración, sin merge ni producción.
-- **DC-055 · CONFIRMADA:** preparar contrato/tickets/prompts M2 es trabajo exclusivamente documental; implementar M2, desplegar, hacer merge/push o tocar bases reales aún no está autorizado.
+- **DC-055 · ACTUALIZADA:** propietario autorizó implementar M2-SOL y cambios acotados necesarios Billing/Gateway. Angular reservado a Argon; sin worktrees, merge/push/despliegue/bases reales ni M3.
 - **DC-056 · CONFIRMADA:** nunca dos agentes escriben simultáneamente el mismo directorio Git, incluyendo Git/docs/tests que generen archivos. No usar Git worktrees bajo ninguna circunstancia. Responsabilidad por repositorio y revisión cruzada: [protocolo](06_PROTOCOL.md).
+
+## Políticas confirmadas M2
+ACTIVE/INACTIVE consumen cupo; ARCHIVED no y conserva datos/historial. Archivo no cancela turnos. Restaurar/reactivar requiere validación comercial; pacientes y su cuota siguen globales por médico, sin clinic_id. /appointments permanece previsto.
+Billing caído permite snapshot efectivo por propietario vigente, verificable y no invalidado; sin snapshot apto bloquear nuevas operaciones comerciales, sin defaults ni extender cobertura. Sustituye bloqueo absoluto del borrador.
+Contrato público [M2-CLINICS-v1](contracts/M2_CLINICS_API.md) congelado; [derechos efectivos v1](contracts/M2_EFFECTIVE_ENTITLEMENTS.md) implementados. DC-047 resuelta técnicamente sin nuevas suscripciones; conteo/conservación de DC-048 aprobados. Cuotas reales no inventadas ni configuradas.
 
 ## Ingeniería autorizada para M1
 El propietario autorizó comenzar M1 con el alcance del ticket el 29/10/2026, incluidos commit documental independiente, rama específica, migraciones incrementales y pruebas automatizadas en PostgreSQL descartable. Sin despliegue, bases reales, cambios de pacientes, Angular, Gateway, Billing o Supabase; M2 requiere nueva aprobación.

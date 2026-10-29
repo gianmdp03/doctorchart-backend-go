@@ -1,43 +1,32 @@
-# Handoff — M1 cerrado y M2 listo para autorización
-**29/10/2026 (Argentina) · trabajo actual exclusivamente documental.**
+# Handoff — M2-SOL implementado
+**29/10/2026 (Argentina). Revisión independiente y aceptación pendientes; M3 no autorizado.**
 
-## Cierre M1
-El propietario comunicó revalidación final de Gemini Argon: **APROBADO sobre `615286720f98768dfbc85bcbe35d315e41405e87`** y autorizó cerrar documentalmente M1.
-- Startup `TestStartupCreatesSchemaAndServesHealth`: PASS ejecutado sin SKIP.
-- Upgrade `TestBaselineUpgradeWithRealSeedsPreservesAdminConfiguration`: PASS con `bootstrap.Run`, seeds reales y configuración administrada preservada.
-- Suite Windows/PostgreSQL 18.6 y race Linux/PostgreSQL 17.11: PASS. En race, 395 casos/subcasos aprobados y cinco pruebas externas omitidas, justificadas y no bloqueantes para M1.
-- Omitidos: tres tests live de converter en storage, `TestLiveStudyHTTPConverterAndPersistence` y `TestLimitsSyncDoctorChartFixture`; faltan sus fixtures externos, fuera del alcance M1. Nombres y evidencia en [registro](reviews/M1_CORRECTIONS.md).
-- Sin cambios en producción. No se repitieron auditorías, tests ni migraciones para este cierre documental.
+## Estado y autorización
+Propietario autorizó M2-SOL, rama específica y cambios acotados necesarios Billing/Gateway. Angular queda reservado a Argon. No worktrees, merge/push/despliegue ni migraciones reales.
+- M1 aprobado: 615286720f98768dfbc85bcbe35d315e41405e87, sin integrar.
+- Commit documental independiente previo a M2: **6d7b0d60b946b9451eea294b98c0724530edb792**, 19 archivos.
+- DoctorChart: codex/m2-clinics-backend, aplicación congelada en **1dd09bc2f5a94128150440c7c5524a44594f1358** (17 archivos). Base documental 6d7b0d6, descendiente del M1 aprobado.
+- Billing: codex/m2-doctorchart-entitlements, aplicación congelada en **80c171c86fcae15a7d52868c5960da340bb9d179** (11 archivos), base bf65c042cc7480cbf4603447becfeb14002dbde1; árbol limpio.
+- Gateway main 55197fa intacto. Frontend comenzó en main/1419697 y avanzó externamente durante esta tarea a codex/m2-clinics-frontend/ea4f4d7b217134cfb7e3f9ccd8902dcd4beae898, árbol limpio al cierre; Sol no escribió ni cambió ramas allí. Main backend d5a89e0, sin merge.
+El propietario autorizó expresamente consolidar ambos commits. Se verificaron los 26 hashes de código/tests de la entrega probada, scope staged explícito y diff --check. RELEASE de escritura de aplicación: Argon puede auditar esos commits exactos; cualquier corrección posterior requiere coordinación y nuevo hash. El cierre posterior es exclusivamente documental. Sin otro escritor simultáneo.
 
-## Git real
-| Repo | Rama / HEAD observado | Estado al iniciar preparación |
-|---|---|---|
-| doctorchart-backend-go | codex/m1-clinics-migrations / 615286720f98768dfbc85bcbe35d315e41405e87 | Limpio |
-| doctorchart-frontend | main / 14196974125e5769c5a95e309896397acad96e63 | Limpio, solo inspección de convenciones |
-Backend main permanece en `d5a89e05eebf70de1dca72ed0b01a74467b6b1a4`. **La rama M1 está pendiente de integración controlada**; no hubo merge, push o despliegue.
-Esta preparación deja únicamente cambios documentales sin stage/commit en `backend/docs/ai/`; HEAD de aplicación continúa siendo el M1 aprobado. No se cambian AGENTS ni código. Las ramas M2 todavía son propuestas, no fueron creadas.
+## Contrato congelado
+[M2-CLINICS-v1](contracts/M2_CLINICS_API.md), SHA256:
+`70e096102182fb5d0880997b6ff428e058d756b987c3d8c2238c8743f780e2fd`.
+DTO/endpoints sin modificaciones posteriores. Disponible a Argon por documentación/esta conversación; no se atribuye envío a una sesión externa.
+[Derechos efectivos](contracts/M2_EFFECTIVE_ENTITLEMENTS.md): cobertura administrada existente + catálogo Billing; firma HMAC, propietario/revisión/vigencia y lease máximo 60s limitado por cobertura. Snapshot apto permite operar durante caída remota; no defaults ni renovación desde caché.
+Callbacks/outbox existentes e invalidación compartida entre réplicas; no se promete revocación instantánea antes de entrega del callback. Evidencia, archivos, reproducción y hashes en [entrega auditable](reviews/M2_SOL_DELIVERY.md).
 
-## Entrega M2, sin implementación
-- Único [contrato API](contracts/M2_CLINICS_API.md), revisión propuesta `M2-CLINICS-v0.1`.
-- [M2-SOL](tasks/M2_SOL.md): backend Go, propiedad/IANA, consumidor Billing, autorización y cuotas.
-- [M2-ARGON](tasks/M2_ARGON.md): frontend Angular, UI/mocks y pruebas; no depende de que el backend termine.
-- [Protocolo](06_PROTOCOL.md): trabajo simultáneo por repos distintos; jamás worktrees; escritor exclusivo por directorio Git, revisión cruzada sobre SHA/diff congelado y ventanas RELEASE/CLAIM para ejecutar pruebas en repo ajeno.
-- [Dos prompts](07_SESSION_STARTERS.md): contexto mínimo por agente, con autorización todavía pendiente.
-Solo tres archivos nuevos (contrato y dos tickets); se reutilizan índice, prompts, handoff y registros existentes. El contrato no se duplica en frontend.
-La preparación se validó con enlaces Markdown, consistencia de estado y diff limitado a documentación; no representa implementación ni aceptación del contrato.
+## Resultado
+Listado/detalle/alta/edición/estados de consultorios, IANA Go, propiedad médica, versiones y cuotas transaccionales. No cambios clínicos ni pacientes por sede. Archivados conservan datos, sin cancelar turnos (todavía no implementados).
+Migración **3** agrega solo epoch de invalidación entre réplicas; baseline, migración 0002, catálogo clínico y AGENTS intactos. Vacío/1→3/2→3 convergen con conservación/rollback. Próximo arranque real aplicaría upgrade; **no autorizado ni ejecutado**.
+Billing agrega proveedor interno, max_clinics opcional y compatibilidad legacy; pagos/concesiones generan notificación durable. Gateway no necesitó cambios; Supabase auth intacta.
 
-## Aprobaciones pendientes y riesgos concretos
-1. Aprobar contrato/tickets y políticas propuestas de cupo, estados, downgrade y caída comercial.
-2. Acordar proveedor efectivo Bycode/Billing por médico (consulta autenticada, revisión/vigencia, habilitación y max_clinics). Sin él todas las mutaciones permanecen cerradas.
-3. Consumidor actual rechaza max_clinics; ampliar compatibilidad sin romper cuotas clínicas antes de publicar nuevas claves. Cambios externos necesarios se presentan para aprobación, no se asumen.
-Esto no impide preparar UI simulada o backend cerrado tras la aprobación de desarrollo. No declarar derechos reales con mocks ni permitir cupos ilimitados por ausencia/error de Billing.
+## Pruebas
+DoctorChart suite Windows/PG18.6 PASS y race completa Linux/PG17.11 PASS (404 casos/subcasos). Billing race completa PASS (495), más focal race tras ajuste final de compatibilidad. Baseline/shared Billing race y startup Windows/PG18.6 ejecutados explícitamente PASS sin SKIP. Corregidos tres conteos heredados 17→19 sin modificar esquema Billing.
+Interoperabilidad handlers reales Billing/DoctorChart PASS contra PostgreSQL/Supabase sintéticos locales. Build/vet/formato/diff check y govulncheck PASS (cero vulnerabilidades alcanzables; avisos de módulos no importados sin alterar dependencias).
+Omisiones externas y comandos exactos en entrega. Startup DoctorChart, bootstrap y nuevas suites de cuota/snapshot sí ejecutados. Fixtures propios PG17/18 y Linux race, label codex.task=doctorchart-m2; retirados al cerrar. Sin datos reales.
 
-## Reglas que permanecen
-Pacientes/historias por médico, sin `patients.clinic_id`, separación por sede o consultorio obligatorio. Consultorios solo lugares/horarios/turnos; M2 no implementa horarios ni reservas.
-Autenticación médica Supabase/Gateway intacta; secretarias locales en fase posterior. Billing es autoridad comercial sin cantidades por tier inventadas.
-Ruta pública futura `/appointments`, sin alias; segmentos aún por aprobar. Rutas de gestión `/clinics` son propuestas M2.
-Backend production=true, baseline inmutable y políticas reales AGENTS vigentes. La recuperación/despliegue de M1 mantiene el contrato documentado en db/README; no se ejecutó.
-
-## Próxima acción autorizable
-El propietario puede aprobar el contrato y habilitar ambos tickets simultáneamente, indicando si alguna dependencia comercial queda limitada a simulación. Después se registran CLAIM, ramas y snapshot del contrato aprobado; **no iniciar antes**.
-Integración M1, commits adicionales, merge, push, bases reales y despliegues requieren autorización específica. La coordinación documental del backend será de Sol mientras lo tenga reclamado; Argon entrega evidencia desde frontend sin editar el otro Git.
+## Límite y próximo paso
+No se asignaron cantidades reales max_clinics. Propietario debe configurarlas por tier: sin clave/cobertura apta, mutaciones afectadas 503; no bloqueó implementar partes independientes.
+Argon debe auditar M2-SOL sobre los dos commits congelados; aceptación del propietario pendiente. Frontend M2-ARGON entregado en ea4f4d7b217134cfb7e3f9ccd8902dcd4beae898 y auditado en solo lectura: [informe cruzado](reviews/M2_ARGON_CROSS_REVIEW.md), tres hallazgos P2 y una observación P3; requiere correcciones antes de integración. No se modificó Angular. Configuración real, correcciones, integración/publicación o migraciones reales requieren su autorización. **No comenzar M3.**

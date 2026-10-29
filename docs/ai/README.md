@@ -1,5 +1,5 @@
 # Índice de coordinación — Doctor Chart v0.3
-Instalación documental autorizada en `d5a89e0` (26 archivos). M1 cerrado con revalidación Argon APROBADO en `6152867`; rama pendiente de integración controlada. M2 solo preparado documentalmente. No modifica ni sustituye `AGENTS.md`.
+Instalación documental autorizada en `d5a89e0` (26 archivos). M1 cerrado con revalidación Argon APROBADO en `6152867`; rama pendiente de integración controlada. M2-SOL implementado para revisión, Angular reservado a Argon y M3 no autorizado. No modifica ni sustituye `AGENTS.md`.
 
 Para una conversación nueva basta comenzar con [inicio breve](00_START_HERE.md), [decisiones](02_DECISIONS.md) y [handoff](05_HANDOFF.md); después leer el ticket activo. No releer auditorías históricas automáticamente.
 
@@ -26,8 +26,11 @@ Para una conversación nueva basta comenzar con [inicio breve](00_START_HERE.md)
 - [tasks/T0_STAFF_BOUNDARY.md](tasks/T0_STAFF_BOUNDARY.md) — backlog.
 - [tasks/A0_ARCHITECTURE_CONSOLIDATION.md](tasks/A0_ARCHITECTURE_CONSOLIDATION.md) — cancelado, solo trazabilidad.
 
-### M2 preparado (sin autorización de implementar)
-- [contracts/M2_CLINICS_API.md](contracts/M2_CLINICS_API.md) — único contrato API propuesto.
+### M2-SOL entregado
+- [contracts/M2_CLINICS_API.md](contracts/M2_CLINICS_API.md) — API v1 congelada (hash en handoff).
+- [contracts/M2_EFFECTIVE_ENTITLEMENTS.md](contracts/M2_EFFECTIVE_ENTITLEMENTS.md) — fuente comercial, firma, snapshot e invalidación.
+- [reviews/M2_SOL_DELIVERY.md](reviews/M2_SOL_DELIVERY.md) — pruebas y hashes para revisar diffs.
+- [reviews/M2_ARGON_CROSS_REVIEW.md](reviews/M2_ARGON_CROSS_REVIEW.md) — revisión de ea4f4d7 en solo lectura; correcciones pendientes.
 - [tasks/M2_SOL.md](tasks/M2_SOL.md) — backend y capacidades.
 - [tasks/M2_ARGON.md](tasks/M2_ARGON.md) — frontend y mocks.
 - [07_SESSION_STARTERS.md](07_SESSION_STARTERS.md) — dos prompts, sin duplicar contrato.

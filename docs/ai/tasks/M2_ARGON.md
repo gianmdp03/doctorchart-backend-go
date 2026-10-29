@@ -1,10 +1,10 @@
 # M2-ARGON — frontend Angular de administración
-**READY_FOR_APPROVAL / NO IMPLEMENTAR TODAVÍA.**
+**IMPLEMENTED / CROSS_REVIEW_REQUIRES_CORRECTIONS.** Frontend ea4f4d7 entregado; [auditoría de Sol](../reviews/M2_ARGON_CROSS_REVIEW.md): tres P2 y una observación P3. Correcciones e integración pendientes de autorización; no reiniciar el ticket.
 Repo: `doctorchart-frontend`. Base observada: `14196974125e5769c5a95e309896397acad96e63`, main limpio. Rama propuesta: `codex/m2-clinics-frontend`.
-Responsable: Gemini Argon. Revisor cruzado: Sol. Contrato único: [M2-CLINICS-v0.1](../contracts/M2_CLINICS_API.md), aún propuesto.
+Responsable: Gemini Argon. Revisor cruzado: Sol. Contrato único: [M2-CLINICS-v1](../contracts/M2_CLINICS_API.md), congelado; hash en handoff. Snapshot apto permite operar con Billing caído; sin copia apta se bloquea.
 
 ## Dependencias y propiedad
-Requiere aprobar contrato/ticket, no terminar el backend. Puede implementar contra mocks del contrato congelado. CLAIM exclusivo frontend según [protocolo](../06_PROTOCOL.md); sin worktrees ni escritura en backend.
+Requiere autorización propia del ticket M2-ARGON, no inferirla de M2-SOL. Contrato ya congelado; frontend no fue modificado por Sol. Puede implementar contra mocks del contrato congelado. CLAIM exclusivo frontend según [protocolo](../06_PROTOCOL.md); sin worktrees ni escritura en backend.
 Leer contrato real en el repo hermano `doctorchart-backend-go/docs/ai/` en solo lectura; no mantener una copia divergente.
 Ámbito propuesto: `src/app/features/clinics/` (componentes, servicio/modelos y tests), integración mínima en `src/app/app.routes.ts`, navegación de `WorkspaceStore` y configuración de flag existente; hosting/noindex solo si la nueva ruta lo exige.
 Entrega propia en `frontend/docs/ai/M2_ARGON_DELIVERY.md` o mensaje al coordinador: evidencia única de su tarea, sin duplicar el contrato ni editar handoff/backend mientras Sol escribe allí.
