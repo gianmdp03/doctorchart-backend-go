@@ -34,8 +34,12 @@
 
 M1 verifica filas/referencias de medios; no reejecuta la integración del converter externo ni un despliegue. El flujo del mismo paciente entre agendas sigue pendiente de las fases de turnos.
 
-## Correcciones posteriores a Argon
+## Correcciones posteriores a Argon — APROBADAS en 6152867
 - [x] Startup real habilitado con `DOCTORCHART_STARTUP_TEST_DATABASE_URL` y `doctorchart_startup_test`; 25 tablas, seeds y health/ping ante caída/recuperación PostgreSQL; PASS sin SKIP.
 - [x] Baseline 1 con seeds reales → `bootstrap.Run` → 2 y reinicio; configuraciones administradas preservadas, una migración y cero lugares inventados.
 - [ ] M2: validación IANA en Go además del CHECK SQL, pendiente de fase autorizada.
 Resultados, entornos y cinco pruebas externas omitidas: [correcciones](reviews/M1_CORRECTIONS.md).
+
+## Preparación M2
+La revalidación final de Argon aprobó M1; las cinco omisiones externas justificadas no bloquean su cierre. No se reejecutaron tests en la fase documental actual.
+Pruebas M2 todavía no ejecutadas: las definen los tickets [Sol](tasks/M2_SOL.md) y [Argon](tasks/M2_ARGON.md), ambos sobre el [mismo contrato](contracts/M2_CLINICS_API.md). Distinguir mocks de integración comercial real y coordinar cualquier ejecución que escriba en Git ajeno.

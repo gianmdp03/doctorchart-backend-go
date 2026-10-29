@@ -1,10 +1,10 @@
 # M1 — correcciones posteriores a Gemini Argon
-**29/10/2026 · CORRECTIONS_COMPLETE / READY_FOR_APPROVAL.**
-Revalidación Argon y aceptación final del propietario pendientes. M2 no iniciado.
+**29/10/2026 · CLOSED / ARGON_APPROVED sobre 615286720f98768dfbc85bcbe35d315e41405e87.**
+El propietario comunicó revalidación final APROBADO y autorizó cierre documental. Se conserva abajo la evidencia de corrección, sin reejecutar auditoría. Cinco omisiones externas justificadas y no bloqueantes. Rama pendiente de integración controlada; M2 solo preparado.
 
 ## Auditoría y autorización
 Fuente: resumen de auditoría independiente comunicado por el propietario en esta conversación: **REQUIERE CORRECCIONES; 0 críticos, 1 obligatorio, 2 observaciones menores**. No se recibió un archivo adicional del informe.
-Se autorizó corregir exclusivamente M1 y ejecutar ensayos descartables. Base de corrección `32d03681e44b79d742da3e25c4cfbd122f343a81`, rama `codex/m1-clinics-migrations`. Un único commit específico contiene correcciones y coordinación; identificar su SHA con `git log -1`.
+Se autorizó corregir exclusivamente M1 y ejecutar ensayos descartables. Base de corrección `32d03681e44b79d742da3e25c4cfbd122f343a81`, rama `codex/m1-clinics-migrations`. El commit específico de corrección y coordinación es `615286720f98768dfbc85bcbe35d315e41405e87`.
 
 ## Hallazgos atendidos
 | Hallazgo | Resolución |
@@ -43,4 +43,4 @@ Paquetes sin archivos de test no cuentan como tests omitidos. No se reejecutó g
 ## Revisión y cierre
 Comparar `git diff 32d0368 HEAD`; cambios de código limitados a tests. Para verificar integridad, `git diff 32d0368 HEAD -- AGENTS.md db/schema.sql db/catalog.go db/init.go db/migrations.go db/migrations/0002_clinics.sql cmd/api/main.go internal/bootstrap/bootstrap.go` debe estar vacío.
 Los documentos actualizan el estado y registran evidencia, sin aprobar fases posteriores.
-**M1 listo para aprobación del propietario.** No afirmar que Argon revalidó este commit. No hubo merge a main, push, worktrees, migraciones reales ni despliegues. La reorganización paralela de Sol/Argon queda para después de aceptar M1, según orden del propietario.
+**M1 cerrado documentalmente: Argon APROBADO sobre 6152867.** No hubo merge a main, push, worktrees, migraciones reales ni despliegues. Propietario autorizó preparar el reparto paralelo Sol backend/Argon frontend para M2; su implementación todavía no está autorizada. Ver [protocolo vigente](../06_PROTOCOL.md).

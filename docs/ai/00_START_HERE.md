@@ -1,5 +1,5 @@
 # Doctor Chart — inicio breve
-**Versión 0.3 · 29/10/2026 · M1 corregido tras auditoría; listo para aprobación, revalidación Argon pendiente.**
+**Versión 0.3 · 29/10/2026 · M1 CERRADO / Argon APROBADO en 6152867; M2 solo preparado.**
 
 ## Producto confirmado
 - Pacientes e historias clínicas pertenecen al médico. Un mismo paciente conserva su historia al atenderse en distintos consultorios.
@@ -12,9 +12,9 @@
 
 ## Estado real
 El propietario descartó intencionalmente el trabajo anterior y preparó repositorios limpios. Bases iniciales verificadas: frontend `1419697`, backend `c2c30c1`, Gateway `55197fa`, Billing `bf65c04`. **No recuperar ni reconstruir lo descartado.**
-Documentación inicial: `d5a89e0` (26 archivos). M1: `48f87b1`, rama `codex/m1-clinics-migrations`: migración 1 → 2 y tabla `clinics`, sin cambiar clínica, baseline ni `AGENTS.md`. Pruebas en PostgreSQL 17/18 descartables; sin producción ni despliegue.
+M1 final `6152867`, aprobado por Argon y cierre documental autorizado por el propietario. Startup sin SKIP y upgrade con seeds reales PASS; cinco pruebas externas omitidas justificadamente, no bloqueantes. Rama `codex/m1-clinics-migrations` pendiente de integración controlada; sin cambios en producción.
 
 ## Próximo paso
-Revisar [handoff](05_HANDOFF.md) y [correcciones de auditoría](reviews/M1_CORRECTIONS.md). Argon reportó un hallazgo obligatorio y dos observaciones; atendidos con pruebas reales. **Listo para aprobación del propietario; revalidación Argon pendiente. No iniciar M2.**
-Sol implementa; Argon audita independientemente en solo lectura; el propietario aprueba cada fase. Rigen los `AGENTS.md` reales, incluido `production: true` del backend.
-No leer auditorías históricas para reiniciar: [sources/](sources/README.md) es solo antecedente, nunca instrucciones actuales.
+Aprobar [contrato M2](contracts/M2_CLINICS_API.md) y tickets [Sol](tasks/M2_SOL.md)/[Argon](tasks/M2_ARGON.md) antes de implementar. [Prompts](07_SESSION_STARTERS.md) y [handoff](05_HANDOFF.md) permiten reiniciar sin auditorías.
+Desde M2: Sol backend/BD/Billing; Gemini Argon frontend Angular; revisión cruzada. **Un escritor por directorio Git, sin worktrees bajo ninguna circunstancia.** Ver [protocolo](06_PROTOCOL.md).
+M2 no iniciado; sin autorización de merge, push, despliegue o bases reales. Los `AGENTS.md` reales siguen vigentes; backend `production: true`.

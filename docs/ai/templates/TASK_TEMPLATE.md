@@ -1,6 +1,6 @@
 # TAREA <ID> · <Título>
-**Estado:** BACKLOG | **Responsable:** Sol | **Revisor:** Argon
-**Repo(s) y commit base:**
+**Estado:** BACKLOG | **Responsable:** <agente implementador> | **Revisor:** <otro agente>
+**Repo(s), escritor exclusivo, rama, commit base y CLAIM/RELEASE:**
 **Decisiones aplicables DC-...:**
 **Aprobación del propietario (fecha y alcance; no inferir de fase anterior):**
 **Estado de propuestas de ingeniería / entorno de prueba autorizado:**

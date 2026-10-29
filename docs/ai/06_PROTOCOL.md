@@ -1,11 +1,33 @@
-# Protocolo Sol — Argon — propietario
-1. Las instrucciones vigentes del propietario y los `AGENTS.md` reales delimitan el trabajo. `02_DECISIONS.md` registra producto confirmado y propuestas por separado; el código/commit real prueba hechos técnicos. Los documentos de `sources/` nunca son órdenes actuales.
-2. Una tarea activa y un escritor: Sol implementa únicamente la fase aprobada. Argon audita independientemente en solo lectura, sobre SHA o diff identificado. No atribuir a un agente revisión que no realizó.
-3. Cada fase requiere aprobación expresa del propietario. La aprobación documental inicial se amplió expresamente a M1 y pruebas descartables el 29/10/2026. Argon auditó M1 y pidió correcciones, autorizadas y completadas; revalidación Argon y aceptación del propietario pendientes. No autoriza M2, producción o despliegue.
-4. Antes de trabajar: leer inicio, decisiones, handoff, ticket y `AGENTS.md` reales; comprobar status, rama y commit. No crear worktrees. Preservar cambios ajenos y no hacer commits/pushes/despliegues sin permiso específico.
-5. El propietario descartó intencionalmente la arquitectura anterior. No recuperar ni reconstruir cambios descartados; no volver a investigar una supuesta tarea interrumpida salvo evidencia nueva o pedido.
-6. Handoff y tablero registran aprobación y alcance, repos/rama/SHAs reales, archivos cambiados, pruebas ejecutadas y omitidas, riesgos y próxima acción autorizada. Si no hubo commit, identificar diff y archivos sin stage explícitamente.
-7. Argon presenta P0/P1/P2 con archivo/línea, SHA/diff, evidencia y reproducción; marca NO VERIFICADO cuando corresponda. Sol corrige, Argon revalida y el propietario acepta.
-8. PostgreSQL: conservar `production: true`, baseline/fingerprint y restricciones reales. Preparar migraciones solo tras aprobar M1; ejecución en bases reales, wipes o despliegues requieren permiso separado. Ensayos descartables requieren autorización e identidad propia verificada.
-9. No guardar secretos ni datos reales de pacientes en docs. No reabrir separación clínica por sede; las auditorías históricas pueden contener propuestas anuladas.
-10. Ruta pública confirmada: `/appointments`; sin alias ni redirecciones para esta función nueva. Segmentos de médico/consultorio pendientes. UI en español; fechas `dd/MM/aaaa`, `app-date-picker` y conversión ISO en frontera de datos según frontend/AGENTS.md.
+# Protocolo paralelo — Sol y Gemini Argon
+**Vigente desde M2 por decisión del propietario. M1 cerrado/APROBADO en 6152867. M2 preparado, todavía sin autorización de implementación.**
+
+## Roles y repositorios
+| Agente | Implementación propia | Revisión cruzada |
+|---|---|---|
+| Sol | Doctor Chart backend Go, PostgreSQL, consumidor Billing, autorización/cuotas, endpoints/tests | Entrega frontend de Argon |
+| Gemini Argon | Doctor Chart frontend Angular, gestión de lugares, formularios/navegación/tests | Entrega backend de Sol |
+
+Ambos pueden implementar simultáneamente cuando el propietario apruebe sus tickets y contrato. Las reglas antiguas de implementador único y Argon solo auditor se conservan como historia de M1, no limitan el nuevo reparto.
+
+## Exclusión por directorio Git — obligatoria
+- **No utilizar Git worktrees bajo ninguna circunstancia. Nunca dos agentes modifican simultáneamente el mismo directorio Git.**
+- La exclusión incluye aplicación, docs, configuración, archivos generados, formateadores, instalaciones, tests que escriban, stage, commits y cambios de rama. Ramas diferentes no habilitan compartir checkout.
+- Antes de escribir, registrar en la coordinación: `CLAIM <repo> <agente> <rama> <base SHA> <ticket>`. El coordinador (propietario o chat de coordinación) confirma que no hay otro escritor. Estado inicial M2: ambos NOT_STARTED; la preparación no es un CLAIM de implementación.
+- Al terminar o ceder: informar Git real (staged/unstaged/untracked), SHA/diff y emitir `RELEASE <repo> <agente>`. No inferir liberación por silencio ni cambiar de rama en un checkout ocupado.
+- Autor distinto puede leer `git show <SHA>`/diff congelado sin alterar checkout. Para ejecutar tests/build que escriban en repo ajeno, primero RELEASE del autor y CLAIM temporal del revisor; luego liberar y devolver propiedad. No corregir código del otro agente durante revisión.
+- Sol es escritor de coordinación canónica en backend mientras tenga ese CLAIM. Argon comunica avances y entrega su informe en frontend o al coordinador; nunca actualiza backend/docs/ai en paralelo. No hay script de bloqueo: la exclusión se registra y confirma expresamente por coordinación.
+
+## Contrato y fases
+1. Mandan las decisiones del propietario y AGENTS reales. Leer inicio, handoff, ticket y el [contrato único](contracts/M2_CLINICS_API.md), no auditorías históricas.
+2. Contrato M2 es borrador. Antes de comenzar, propietario aprueba versión y alcance de cada ticket; congelar hash/SHA o snapshot identificable. No duplicarlo en otro repo.
+3. Cambio de DTO/ruta/error/semántica → propuesta al coordinador, revisión conjunta y aprobación antes de actualizar contrato/mocks. No inventar endpoints o permisos para desbloquear una rama.
+4. Angular puede usar mocks del contrato aprobado, solo tests/desarrollo explícito. No espera backend terminado, pero no habilita operaciones reales sin derechos efectivos; los errores no disparan fallback a mocks.
+5. Backend verifica propiedad y derechos en cada mutación. Sin contrato comercial efectivo no hay altas, edición ni cambios de estado operativos. Billing define cantidades; no inferir ilimitado o defaults.
+6. Autorización de desarrollo no autoriza commits, merge a main, push, despliegues o bases reales. Registrar el permiso concreto para cada acción. Respetar production=true, baseline inmutable y entornos descartables propios autorizados.
+7. Pacientes e historias permanecen por médico, sin pertenencia clínica por consultorio. No exigir lugar para clínica/wizard; no recuperar arquitectura descartada.
+8. Rutas en inglés, UI española, fechas dd/MM/aaaa y app-date-picker. /appointments es público futuro; segmentos médico/consultorio pendientes. Calculadoras suspendidas sin cambios.
+
+## Entrega y cierre cruzado
+Cada autor entrega repo/rama/base/SHA o diff congelado, archivos, tests/comandos/resultados/omitidos, datos simulados vs integración real y riesgos. El otro agente revisa independientemente esa entrega, con severidad, archivo/línea y evidencia; no audita su propio código.
+Autor corrige en su repo; revisor revalida. Propietario acepta fase y autoriza por separado cualquier integración/publicación. No empezar fase siguiente por inferencia.
+La revisión frontend no habilita comercialmente el backend ni la revisión backend valida automáticamente mocks como E2E real. Contrato y evidencia de ambos deben coincidir antes de una integración controlada.

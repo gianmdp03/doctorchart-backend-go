@@ -1,5 +1,5 @@
 # M1 — Migración versionada y lugares de atención
-**Estado:** CORRECTIONS_COMPLETE / READY_FOR_APPROVAL; revalidación Argon y aceptación final pendientes.
+**Estado:** CLOSED / ARGON_APPROVED; cierre documental autorizado por el propietario.
 **Implementador principal:** Sol. **Auditor independiente:** Argon, solo lectura.
 **Repo/rama/base:** `doctorchart-backend-go`, `codex/m1-clinics-migrations`, `d5a89e05eebf70de1dca72ed0b01a74467b6b1a4` (documentación independiente sobre c2c30c1).
 **Aprobación del propietario:** 29/10/2026, implementar este alcance y ensayos PostgreSQL descartables; primero commit documental y rama específica. Sin despliegue, bases reales o M2.
@@ -14,13 +14,13 @@ Preparar la primera evolución incremental verificable desde baseline 1 y crear 
 - Usar workspace como referencia al propietario, sin duplicar una segunda autoridad de pertenencia. Nunca enlazar pacientes a lugares.
 - Sin API ni altas para usuarios en M1: la administración de lugares se habilita después del contrato de cuotas Billing (M2).
 
-Se implementó el alcance autorizado. Nombres/longitudes y restricciones definitivos están en `db/migrations/0002_clinics.sql`; detalles de contrato en `db/README.md`. Revisión y aceptación final todavía pendientes.
+Se implementó el alcance autorizado. Nombres/longitudes y restricciones definitivos están en `db/migrations/0002_clinics.sql`; detalles de contrato en `db/README.md`. Revalidación final de Argon APROBADO sobre 6152867 y cierre documental autorizado por el propietario; rama pendiente de integración controlada.
 
 ## Política y compatibilidad
 `AGENTS.md` del backend es obligatorio. La excepción histórica sobre nombres de estudios no autoriza reescribir baseline para este ticket.
 Conservar pgx, READ COMMITTED, contexto 30s, lock_timeout 10s, statement_timeout 20s y advisory lock transaccional (17209, 3). Esquema, seeds necesarios y marcador quedan atómicos antes de HTTP/jobs.
 No adoptar ni reparar estados desconocidos; validar catálogo anterior antes de migrar y catálogo esperado después, sin recalcular hashes para aceptar drift.
-El binario actual rechaza versiones distintas de 1: documentar compatibilidad de despliegue/recuperación antes de cualquier aplicación real. No prometer rollback del binario antiguo sobre esquema nuevo.
+El binario anterior a M1 rechaza versiones distintas de 1: documentar compatibilidad de despliegue/recuperación antes de cualquier aplicación real. No prometer rollback del binario antiguo sobre esquema nuevo.
 
 ## Archivos esperados
 - `db/init.go`, `db/catalog.go` solo si hace falta y `db/init_test.go`.
@@ -54,8 +54,9 @@ Sin ejecución contra bases reales, wipes, commits, pushes o despliegues sin aut
 - [x] Baseline y AGENTS intactos; clínica sin nueva pertenencia por lugar.
 - [x] Argon auditó la entrega inicial: 0 críticos, 1 obligatorio, 2 observaciones menores, según informe comunicado por el propietario.
 - [x] Corregido el hallazgo de startup, ejecutado sin SKIP; agregada transición con seeds reales y registrada validación Go para M2.
-- [ ] Argon revalidó el commit de correcciones.
-- [ ] Sol resolvió hallazgos bloqueantes; propietario aceptó la fase.
+- [x] Argon revalidó y APROBÓ 615286720f98768dfbc85bcbe35d315e41405e87.
+- [x] Sol resolvió hallazgos; propietario autorizó cierre documental de M1.
 - Implementación: `48f87b1d929e8496aecf203284cc4ca4d0c95820` (7 archivos), sin PR/push/merge.
 - Pruebas: PASS en Windows/PG18.6 y Linux con race/PG17.11, build/vet/formato; ver [brief Argon](../reviews/M1_ARGON_BRIEF.md).
-- Revisión inicial Gemini Argon: REQUIERE CORRECCIONES, ya atendidas; revalidación pendiente. [Resultados](../reviews/M1_CORRECTIONS.md). M1 listo para aprobación; no iniciar M2.
+- Commit final M1: `615286720f98768dfbc85bcbe35d315e41405e87`. Argon: **APROBADO**. Startup sin SKIP y upgrade con seeds reales PASS; cinco omisiones externas justificadas no bloqueantes. [Evidencia](../reviews/M1_CORRECTIONS.md).
+- Rama pendiente de integración controlada; sin merge, push, despliegue ni producción. M2 solo preparado, implementación no autorizada.
