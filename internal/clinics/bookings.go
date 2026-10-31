@@ -26,17 +26,18 @@ type Booking struct {
 	End          time.Time `json:"end"`
 	Status       string    `json:"status"`
 	Version      string    `json:"version"`
+	AttendeeName string    `json:"attendeeName"`
 	ContactName  string    `json:"contactName"`
 	ContactPhone string    `json:"contactPhone"`
 	CreatedAt    time.Time `json:"createdAt"`
 	UpdatedAt    time.Time `json:"updatedAt"`
 }
 
-const bookingColumns = "b.id::text,b.clinic_id::text,b.patient_id::text,b.start_at,b.end_at,b.status,b.version::text,b.contact_name,b.contact_phone,b.created_at,b.updated_at"
+const bookingColumns = "b.id::text,b.clinic_id::text,b.patient_id::text,b.start_at,b.end_at,b.status,b.version::text,COALESCE(b.attendee_name,b.contact_name),b.contact_name,b.contact_phone,b.created_at,b.updated_at"
 
 func scanBooking(row scanner) (Booking, error) {
 	var b Booking
-	err := row.Scan(&b.ID, &b.ClinicID, &b.PatientID, &b.Start, &b.End, &b.Status, &b.Version, &b.ContactName, &b.ContactPhone, &b.CreatedAt, &b.UpdatedAt)
+	err := row.Scan(&b.ID, &b.ClinicID, &b.PatientID, &b.Start, &b.End, &b.Status, &b.Version, &b.AttendeeName, &b.ContactName, &b.ContactPhone, &b.CreatedAt, &b.UpdatedAt)
 	b.Start, b.End, b.CreatedAt, b.UpdatedAt = b.Start.UTC(), b.End.UTC(), b.CreatedAt.UTC(), b.UpdatedAt.UTC()
 	return b, err
 }
@@ -194,6 +195,7 @@ type bookingRequest struct {
 	ClinicID        string  `json:"clinicId"`
 	Start           string  `json:"start"`
 	PatientID       *string `json:"patientId"`
+	AttendeeName    *string `json:"attendeeName"`
 	ContactName     string  `json:"contactName"`
 	ContactPhone    string  `json:"contactPhone"`
 	Status          string  `json:"status"`
@@ -214,7 +216,7 @@ func decodeBooking(w http.ResponseWriter, r *http.Request, op string) (bookingRe
 	allowed := []string{"expectedVersion", "status"}
 	required := []string{"expectedVersion", "status"}
 	if op == "create" {
-		allowed = []string{"clinicId", "start", "patientId", "contactName", "contactPhone"}
+		allowed = []string{"clinicId", "start", "patientId", "contactName", "contactPhone", "attendeeName"}
 		required = []string{"clinicId", "start", "contactName"}
 	}
 	if op == "reschedule" {
@@ -259,6 +261,13 @@ func decodeBooking(w http.ResponseWriter, r *http.Request, op string) (bookingRe
 		}
 	}
 	if op == "create" {
+		if request.AttendeeName != nil {
+			value := strings.TrimSpace(*request.AttendeeName)
+			if len([]rune(value)) < 1 || len([]rune(value)) > 160 {
+				return request, "", "", field("attendeeName", "INVALID_LENGTH")
+			}
+			request.AttendeeName = &value
+		}
 		request.ContactName = strings.TrimSpace(request.ContactName)
 		request.ContactPhone = strings.TrimSpace(request.ContactPhone)
 		if len([]rune(request.ContactName)) < 1 || len([]rune(request.ContactName)) > 160 {
@@ -456,7 +465,7 @@ func (s *Service) mutateBooking(w http.ResponseWriter, r *http.Request, user, op
 		}
 		if op == "create" {
 			status = 201
-			result, err = scanBooking(tx.QueryRow(ctx, "INSERT INTO bookings AS b(workspace_id,clinic_id,patient_id,start_at,end_at,contact_name,contact_phone) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING "+bookingColumns, workspace, clinic.ID, request.PatientID, start, end, request.ContactName, request.ContactPhone))
+			result, err = scanBooking(tx.QueryRow(ctx, "INSERT INTO bookings AS b(workspace_id,clinic_id,patient_id,start_at,end_at,contact_name,contact_phone,attendee_name) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING "+bookingColumns, workspace, clinic.ID, request.PatientID, start, end, request.ContactName, request.ContactPhone, request.AttendeeName))
 		} else {
 			kind = "RESCHEDULED"
 			result, err = scanBooking(tx.QueryRow(ctx, "UPDATE bookings b SET clinic_id=$1,start_at=$2,end_at=$3,version=version+1,updated_at=clock_timestamp() WHERE id=$4 RETURNING "+bookingColumns, clinic.ID, start, end, previous.ID))

@@ -105,7 +105,7 @@ func TestScheduleUpgradeFromM2RollbackPreservationAndCatalog(t *testing.T) {
 				t.Fatal("restart altered stored agenda", agendaVersion, err)
 			}
 			var version, count int
-			if err = conn.QueryRow(t.Context(), "SELECT baseline_version,(SELECT count(*) FROM app_schema_migrations WHERE version=5) FROM app_schema_state").Scan(&version, &count); err != nil || version != 6 || count != 1 {
+			if err = conn.QueryRow(t.Context(), "SELECT baseline_version,(SELECT count(*) FROM app_schema_migrations WHERE version=5) FROM app_schema_state").Scan(&version, &count); err != nil || version != 7 || count != 1 {
 				t.Fatal(version, count, err)
 			}
 			fresh := fixture(t)

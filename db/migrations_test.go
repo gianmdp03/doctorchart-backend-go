@@ -161,7 +161,7 @@ func TestMigrationConvergesAndPreservesClinicalData(t *testing.T) {
 	if readString(t, fresh, catalogSQL, []string{}) != newCatalog {
 		t.Fatal("empty installation and conservative upgrade diverged")
 	}
-	if readString(t, upgraded, "SELECT baseline_version::text FROM app_schema_state") != "6" {
+	if readString(t, upgraded, "SELECT baseline_version::text FROM app_schema_state") != "7" {
 		t.Fatal("old binaries would not reject the upgraded schema version")
 	}
 }
@@ -203,7 +203,7 @@ func TestM2UpgradeFromPublishedSchemaTwoPreservesDataAndRollsBack(t *testing.T) 
 	if !reflect.DeepEqual(before, dataSnapshot(t, pool)) {
 		t.Fatal("2->3 modified clinical data")
 	}
-	if digest(readString(t, pool, catalogSQL, []string{})) != pins.bookings {
+	if digest(readString(t, pool, catalogSQL, []string{})) != pins.attendee {
 		t.Fatal("2->3 catalog diverged")
 	}
 }
@@ -254,11 +254,11 @@ func TestMigrationRollbackAndRetry(t *testing.T) {
 func TestMigrationRejectsTamperedHistoryAndDrift(t *testing.T) {
 	for _, mutation := range []string{
 		"DELETE FROM app_schema_migrations",
-		"UPDATE app_schema_migrations SET version=7 WHERE version=3",
+		"UPDATE app_schema_migrations SET version=8 WHERE version=3",
 		"UPDATE app_schema_migrations SET sql_sha256=repeat('0',64)",
 		"UPDATE app_schema_migrations SET previous_catalog_sha256=repeat('0',64)",
 		"UPDATE app_schema_migrations SET catalog_sha256=repeat('0',64)",
-		"INSERT INTO app_schema_migrations SELECT 7,sql_sha256,previous_catalog_sha256,catalog_sha256,now() FROM app_schema_migrations WHERE version=2",
+		"INSERT INTO app_schema_migrations SELECT 8,sql_sha256,previous_catalog_sha256,catalog_sha256,now() FROM app_schema_migrations WHERE version=2",
 		"DROP INDEX clinics_workspace_status_idx",
 		"ALTER TABLE clinics DROP CONSTRAINT clinics_workspace_id_fkey",
 		"UPDATE app_schema_state SET baseline_version=1",
@@ -359,7 +359,7 @@ func TestMigrationConcurrentUpgradeAndCancellation(t *testing.T) {
 			t.Error(err)
 		}
 	}
-	if readString(t, pool, "SELECT count(*)::text FROM app_schema_migrations") != "5" {
+	if readString(t, pool, "SELECT count(*)::text FROM app_schema_migrations") != "6" {
 		t.Fatal("migration applied more than once")
 	}
 }

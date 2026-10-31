@@ -87,7 +87,7 @@ func TestBookingMigrationFromM3PreservesDataAndRollsBack(t *testing.T) {
 			if !reflect.DeepEqual(before, bookingMigrationSnapshot(t, pool)) {
 				t.Fatal("upgrade modified M3 data")
 			}
-			if readString(t, pool, "SELECT baseline_version::text FROM app_schema_state") != "6" || readString(t, pool, "SELECT count(*)::text FROM app_schema_migrations WHERE version=6") != "1" {
+			if readString(t, pool, "SELECT baseline_version::text FROM app_schema_state") != "7" || readString(t, pool, "SELECT count(*)::text FROM app_schema_migrations WHERE version=6") != "1" {
 				t.Fatal("missing booking migration metadata")
 			}
 			fresh := fixture(t)
