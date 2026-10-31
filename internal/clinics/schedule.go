@@ -309,6 +309,9 @@ func (s *Service) putSchedule(w http.ResponseWriter, r *http.Request, user strin
 	return nil
 }
 func (s *Service) availability(w http.ResponseWriter, r *http.Request, user string) error {
+	return s.availabilityFor(w, r, user, nil)
+}
+func (s *Service) availabilityFor(w http.ResponseWriter, r *http.Request, user string, public *publicAdmission) error {
 	clinic, err := s.scheduleClinic(r, user)
 	if err != nil {
 		return err
@@ -348,6 +351,24 @@ func (s *Service) availability(w http.ResponseWriter, r *http.Request, user stri
 	if err != nil {
 		return err
 	}
+	if public != nil {
+		current, e := s.readPublicDoctor(ctx, tx, public.doctorID)
+		if e != nil {
+			return e
+		}
+		if !current.published {
+			return publicMissing()
+		}
+		found := false
+		for _, c := range current.Clinics {
+			if c.ID == public.clinicID {
+				found = true
+			}
+		}
+		if !found {
+			return publicMissing()
+		}
+	}
 	agenda, err := readAgenda(ctx, tx, clinic.ID)
 	if err != nil {
 		return err
@@ -381,6 +402,10 @@ func (s *Service) availability(w http.ResponseWriter, r *http.Request, user stri
 			}
 		}
 		result = append(result, AvailabilityDay{Date: date.Format("2006-01-02"), Slots: removeOccupiedSlots(slots, occupied)})
+	}
+	if public != nil {
+		api.WriteJSON(w, 200, map[string]any{"timezone": clinic.Timezone, "days": result})
+		return nil
 	}
 	api.WriteJSON(w, 200, map[string]any{"clinicId": clinic.ID, "timezone": clinic.Timezone, "scheduleVersion": agenda.Version, "generatedAt": now, "days": result})
 	return nil

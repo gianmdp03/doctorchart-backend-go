@@ -22,6 +22,7 @@ import (
 var ErrEntitlementsUnavailable = errors.New("effective entitlements unavailable")
 
 type Snapshot struct {
+	OnlineBooking     *bool      `json:"onlineBooking,omitempty"`
 	OwnerID           string     `json:"ownerId"`
 	Module            string     `json:"module"`
 	Revision          string     `json:"revision"`
@@ -36,6 +37,7 @@ type Snapshot struct {
 // Memory holds only signed, bounded leases. PostgreSQL fences invalidation
 // across instances and requests already in flight. Restart means empty cache.
 type Entitlements struct {
+	v2           bool
 	pool         *pgxpool.Pool
 	base, secret string
 	client       *http.Client
@@ -55,6 +57,9 @@ func (s Snapshot) valid(owner string, now time.Time) bool {
 		return false
 	}
 	if _, err := hex.DecodeString(s.Revision); err != nil {
+		return false
+	}
+	if s.OnlineBooking != nil && *s.OnlineBooking && !s.ClinicManagement {
 		return false
 	}
 	if s.ClinicManagement {
@@ -79,7 +84,11 @@ func (e *Entitlements) Resolve(ctx context.Context, owner string) (Snapshot, err
 	if e.secret == "" {
 		return Snapshot{}, ErrEntitlementsUnavailable
 	}
-	req, err := http.NewRequestWithContext(ctx, "GET", e.base+"/internal/doctorchart/owners/"+url.PathEscape(owner)+"/entitlements", nil)
+	endpoint := "/entitlements"
+	if e.v2 {
+		endpoint = "/entitlements-v2"
+	}
+	req, err := http.NewRequestWithContext(ctx, "GET", e.base+"/internal/doctorchart/owners/"+url.PathEscape(owner)+endpoint, nil)
 	if err != nil {
 		return Snapshot{}, ErrEntitlementsUnavailable
 	}
@@ -104,7 +113,11 @@ func (e *Entitlements) Resolve(ctx context.Context, owner string) (Snapshot, err
 	}
 	var snapshot Snapshot
 	var required map[string]json.RawMessage
-	if json.Unmarshal(body, &required) != nil || len(required) != 8 {
+	expectedFields := 8
+	if e.v2 {
+		expectedFields = 9
+	}
+	if json.Unmarshal(body, &required) != nil || len(required) != expectedFields {
 		return Snapshot{}, ErrEntitlementsUnavailable
 	}
 	for _, key := range []string{"ownerId", "module", "revision", "issuedAt", "validUntil", "coverageExpiresAt", "clinicManagement", "max_clinics"} {
@@ -118,6 +131,9 @@ func (e *Entitlements) Resolve(ctx context.Context, owner string) (Snapshot, err
 		return Snapshot{}, ErrEntitlementsUnavailable
 	}
 	if err := decoder.Decode(new(any)); err != io.EOF {
+		return Snapshot{}, ErrEntitlementsUnavailable
+	}
+	if e.v2 && snapshot.OnlineBooking == nil {
 		return Snapshot{}, ErrEntitlementsUnavailable
 	}
 	if !snapshot.valid(owner, e.now()) {
@@ -160,4 +176,11 @@ func (e *Entitlements) Invalidate(ctx context.Context) error {
 		return ErrEntitlementsUnavailable
 	}
 	return nil
+}
+
+// PublicBookings uses a separate signed v2 lease cache; v1 remains strict/legacy compatible.
+func (e *Entitlements) PublicBookings() *Entitlements {
+	next := NewEntitlements(e.pool, e.base, e.secret)
+	next.v2 = true
+	return next
 }

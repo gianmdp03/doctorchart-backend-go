@@ -15,14 +15,15 @@ import (
 )
 
 type Config struct {
-	Port             string
-	DatabaseURL      string
-	GatewaySecret    string
-	BillingSecret    string
-	BillingURL       string
-	SchedulesEnabled bool
-	BookingsEnabled  bool
-	Storage          storage.Config
+	Port                  string
+	DatabaseURL           string
+	GatewaySecret         string
+	BillingSecret         string
+	BillingURL            string
+	SchedulesEnabled      bool
+	BookingsEnabled       bool
+	PublicBookingsEnabled bool
+	Storage               storage.Config
 }
 
 func Load() (Config, error) {
@@ -77,6 +78,14 @@ func Load() (Config, error) {
 	c.BookingsEnabled = bookingFlag == "true"
 	if c.BookingsEnabled && !c.SchedulesEnabled {
 		return c, errors.New("BOOKINGS_ENABLED requiere SCHEDULES_ENABLED.")
+	}
+	publicFlag := get("features.public-bookings.enabled", "PUBLIC_BOOKINGS_ENABLED", "false")
+	if publicFlag != "true" && publicFlag != "false" {
+		return c, errors.New("PUBLIC_BOOKINGS_ENABLED debe ser true o false")
+	}
+	c.PublicBookingsEnabled = publicFlag == "true"
+	if c.PublicBookingsEnabled && !c.BookingsEnabled {
+		return c, errors.New("PUBLIC_BOOKINGS_ENABLED requiere BOOKINGS_ENABLED")
 	}
 	c.Storage = storage.Config{Type: values["app.storage.type"], Directory: values["app.storage.studies-dir"], Endpoint: values["app.storage.s3.endpoint"], Bucket: values["app.storage.s3.bucket"], AccessKey: values["app.storage.s3.access-key"], SecretKey: values["app.storage.s3.secret-key"], Region: values["app.storage.s3.region"]}
 	transformValue := values["app.storage.allow-study-image-transformation"]

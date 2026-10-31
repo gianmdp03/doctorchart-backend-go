@@ -11,19 +11,20 @@ import (
 // Ordered transitions: baseline 1 -> clinics 2 -> fence 3 -> timezone policy 4.
 // The immutable baseline SQL checksum remains in app_schema_state.sql_sha256;
 // its historical baseline_version column now identifies the installed version.
-const currentVersion = 7
+const currentVersion = 8
 
 // Canonical catalogs built independently from the published SQL artifacts.
 // PostgreSQL 18 exposes additional NOT NULL constraints, so its contract differs.
 // Never regenerate a pin from an existing database to accept drift.
 type catalogPins struct {
-	baseline     string
-	clinics      string
-	entitlements string
-	timezones    string
-	schedules    string
-	bookings     string
-	attendee     string
+	baseline       string
+	clinics        string
+	entitlements   string
+	timezones      string
+	schedules      string
+	bookings       string
+	attendee       string
+	publicBookings string
 }
 
 func expectedCatalogs(ctx context.Context, tx pgx.Tx) (catalogPins, error) {
@@ -38,23 +39,25 @@ func catalogsForMajor(major int) (catalogPins, error) {
 	switch major {
 	case 17:
 		return catalogPins{
-			baseline:     "6f58df736f5a4398ee20dc0e5abad8c8913eb7bea7ecc060bb8e1971d14843cc",
-			clinics:      "0e02988f698cab459288ef2f65ac99d7a9809e459e2e6eb588ae52dd8a8b5bf2",
-			entitlements: "f639a7acae86d355848376c1e677d9cb55b39a35847d23a2887d09e2d676c7e6",
-			timezones:    "85cbcbb463c81876f40babf1d156444bb64793e41388c511bd5c661159b362d6",
-			schedules:    "bd320db87155ffabccdc544e1aa5358d36f522cc5708c37613717cf253dd8e08",
-			attendee:     "c2956e5b19d3d605b89bc94916cd5e9e6c061faa4ee4b776aa94e71e3279f06c",
-			bookings:     "9e6c01047fe66b6f5db8735d0c141f5da98433c31ab3fb631f110709bce013aa",
+			baseline:       "6f58df736f5a4398ee20dc0e5abad8c8913eb7bea7ecc060bb8e1971d14843cc",
+			clinics:        "0e02988f698cab459288ef2f65ac99d7a9809e459e2e6eb588ae52dd8a8b5bf2",
+			entitlements:   "f639a7acae86d355848376c1e677d9cb55b39a35847d23a2887d09e2d676c7e6",
+			timezones:      "85cbcbb463c81876f40babf1d156444bb64793e41388c511bd5c661159b362d6",
+			schedules:      "bd320db87155ffabccdc544e1aa5358d36f522cc5708c37613717cf253dd8e08",
+			publicBookings: "1c8a843fd50a7fbeb64890397d6a22a4853ba30cc8f85e10f285c69eb3bbc973",
+			attendee:       "c2956e5b19d3d605b89bc94916cd5e9e6c061faa4ee4b776aa94e71e3279f06c",
+			bookings:       "9e6c01047fe66b6f5db8735d0c141f5da98433c31ab3fb631f110709bce013aa",
 		}, nil
 	case 18:
 		return catalogPins{
-			baseline:     "e992a8133a1af9f510914e5958165a32e7f1cfbddf5b920ec4ae15fdab4f3d2f",
-			clinics:      "113e25c68d85cad493b13ac90a07195c9a0be25e75bdfee911f0eb1dc767e34a",
-			entitlements: "38079048779b6a01fdd13110d2f154f20159511408fef9d18a88376f77b1eb3b",
-			timezones:    "1eb0e7bb7b9e3f10aa39c0eaa0101727f304d834ecd5ce9fdbbf77764e73ae7f",
-			schedules:    "791155c6db3d29619ae6be407e12fd929249dfc2fd6dddbe130358513be5592a",
-			attendee:     "39069383dc0633dc8dedb3980de63057f98ad576cab1525e396f1b6ac7a7ce5b",
-			bookings:     "a5df22e0e9a90537ed33a4db1c5da8bf68751e733d209af342f14058ba56023b",
+			baseline:       "e992a8133a1af9f510914e5958165a32e7f1cfbddf5b920ec4ae15fdab4f3d2f",
+			clinics:        "113e25c68d85cad493b13ac90a07195c9a0be25e75bdfee911f0eb1dc767e34a",
+			entitlements:   "38079048779b6a01fdd13110d2f154f20159511408fef9d18a88376f77b1eb3b",
+			timezones:      "1eb0e7bb7b9e3f10aa39c0eaa0101727f304d834ecd5ce9fdbbf77764e73ae7f",
+			schedules:      "791155c6db3d29619ae6be407e12fd929249dfc2fd6dddbe130358513be5592a",
+			publicBookings: "85ab5ab6bc2fea17c5b06ee8328c4bb838bbb8e82e9f875b14b844a94770aeaf",
+			attendee:       "39069383dc0633dc8dedb3980de63057f98ad576cab1525e396f1b6ac7a7ce5b",
+			bookings:       "a5df22e0e9a90537ed33a4db1c5da8bf68751e733d209af342f14058ba56023b",
 		}, nil
 	default:
 		return catalogPins{}, fmt.Errorf("unsupported PostgreSQL major version %d; no schema changes performed", major)
@@ -103,6 +106,9 @@ func validateMigration(ctx context.Context, tx pgx.Tx, pins catalogPins, version
 		}
 		if v == 7 {
 			script, prev, target = attendeeMigration, pins.bookings, pins.attendee
+		}
+		if v == 8 {
+			script, prev, target = publicBookingMigration, pins.attendee, pins.publicBookings
 		}
 		if v != expectedVersion || v > version || hash != digest(script) || before != prev || after != target {
 			return fmt.Errorf("%s migration version/checksum/catalog mismatch", Backend)
@@ -198,5 +204,19 @@ func migrateAttendee(ctx context.Context, tx pgx.Tx, pins catalogPins) error {
 		return err
 	}
 	_, err := tx.Exec(ctx, "INSERT INTO public.app_schema_migrations(version,sql_sha256,previous_catalog_sha256,catalog_sha256) VALUES(7,$1,$2,$3)", digest(attendeeMigration), pins.bookings, pins.attendee)
+	return err
+}
+
+//go:embed migrations/0008_public_appointments.sql
+var publicBookingMigration string
+
+func migratePublicBookings(ctx context.Context, tx pgx.Tx, pins catalogPins) error {
+	if _, err := tx.Exec(ctx, publicBookingMigration); err != nil {
+		return fmt.Errorf("apply public booking migration 8: %w", err)
+	}
+	if err := validateCatalog(ctx, tx, pins.publicBookings); err != nil {
+		return err
+	}
+	_, err := tx.Exec(ctx, "INSERT INTO public.app_schema_migrations(version,sql_sha256,previous_catalog_sha256,catalog_sha256) VALUES(8,$1,$2,$3)", digest(publicBookingMigration), pins.attendee, pins.publicBookings)
 	return err
 }

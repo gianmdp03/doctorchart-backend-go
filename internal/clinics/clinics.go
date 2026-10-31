@@ -33,6 +33,9 @@ type Clinic struct {
 }
 
 type Service struct {
+	publicEnabled    bool
+	publicSecret     string
+	publicRights     *billing.Entitlements
 	pool             *pgxpool.Pool
 	rights           *billing.Entitlements
 	schedulesEnabled bool
@@ -51,6 +54,15 @@ func NewWithSchedules(pool *pgxpool.Pool, rights *billing.Entitlements, enabled 
 // NewWithBookings enables both M3 and M4 only for an explicitly opted-in server.
 func NewWithBookings(pool *pgxpool.Pool, rights *billing.Entitlements, schedules, bookings bool) *Service {
 	return &Service{pool: pool, rights: rights, schedulesEnabled: schedules, bookingsEnabled: bookings}
+}
+
+func (s *Service) WithPublicBookings(enabled bool, secret string) *Service {
+	s.publicEnabled = enabled && s.bookingsEnabled && s.schedulesEnabled
+	s.publicSecret = secret
+	if s.publicEnabled {
+		s.publicRights = s.rights.PublicBookings()
+	}
+	return s
 }
 
 const columns = "id::text,name,country,province,city,address,timezone,status,version::text,created_at,updated_at"
@@ -115,6 +127,9 @@ func (s *Service) Routes(mux *http.ServeMux) {
 				api.WriteError(w, err)
 			}
 		}
+	}
+	if s.publicEnabled {
+		s.publicRoutes(mux, wrap)
 	}
 	if s.bookingsEnabled && s.schedulesEnabled {
 		s.bookingRoutes(mux, wrap)

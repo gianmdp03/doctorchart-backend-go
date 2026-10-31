@@ -323,6 +323,9 @@ func (s *Service) mutateBooking(w http.ResponseWriter, r *http.Request, user, op
 			return err
 		}
 	}
+	return s.applyBooking(w, r, user, op, previous, request, key, hash, nil)
+}
+func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op string, previous Booking, request bookingRequest, key, hash string, public *publicAdmission) error {
 	workspace, err := s.workspace(r.Context(), user)
 	if err != nil {
 		return err
@@ -332,8 +335,7 @@ func (s *Service) mutateBooking(w http.ResponseWriter, r *http.Request, user, op
 		return err
 	}
 	if status != 0 {
-		api.WriteJSON(w, status, response)
-		return nil
+		return s.writeBookingResult(w, r, public, status, response)
 	}
 	snapshot, err := s.rights.Resolve(r.Context(), user)
 	if err != nil {
@@ -363,11 +365,15 @@ func (s *Service) mutateBooking(w http.ResponseWriter, r *http.Request, user, op
 		return err
 	}
 	if status != 0 {
-		api.WriteJSON(w, status, response)
-		return nil
+		return s.writeBookingResult(w, r, public, status, response)
 	}
 	if err = s.rights.Fence(ctx, tx, snapshot); err != nil {
 		return unavailable()
+	}
+	if public != nil {
+		if err = public.check(ctx, tx, s, workspace); err != nil {
+			return err
+		}
 	}
 	if !snapshot.ClinicManagement {
 		return api.Failure(403, "CLINIC_MANAGEMENT_DISABLED", "Tu cobertura no habilita la gestión de reservas.")
@@ -474,11 +480,20 @@ func (s *Service) mutateBooking(w http.ResponseWriter, r *http.Request, user, op
 	if err != nil {
 		return bookingDBError(err)
 	}
+	if public != nil {
+		if err = public.record(ctx, tx, result); err != nil {
+			return err
+		}
+	}
 	response, err = json.Marshal(result)
 	if err != nil {
 		return err
 	}
 	if op == "create" || result.Version != previous.Version {
+		actor := user
+		if public != nil {
+			actor = "PUBLIC_BOOKING"
+		}
 		var before any
 		if op != "create" {
 			raw, e := json.Marshal(previous)
@@ -487,7 +502,7 @@ func (s *Service) mutateBooking(w http.ResponseWriter, r *http.Request, user, op
 			}
 			before = json.RawMessage(raw)
 		}
-		if _, err = tx.Exec(ctx, "INSERT INTO booking_events(booking_id,version,kind,actor_id,before_document,after_document) VALUES($1,$2,$3,$4,$5,$6)", result.ID, result.Version, kind, user, before, response); err != nil {
+		if _, err = tx.Exec(ctx, "INSERT INTO booking_events(booking_id,version,kind,actor_id,before_document,after_document) VALUES($1,$2,$3,$4,$5,$6)", result.ID, result.Version, kind, actor, before, response); err != nil {
 			return err
 		}
 	}
@@ -497,6 +512,5 @@ func (s *Service) mutateBooking(w http.ResponseWriter, r *http.Request, user, op
 	if err = tx.Commit(ctx); err != nil {
 		return bookingDBError(err)
 	}
-	api.WriteJSON(w, status, result)
-	return nil
+	return s.writeBookingResult(w, r, public, status, response)
 }

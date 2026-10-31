@@ -60,6 +60,7 @@ type fixture struct {
 	handler http.Handler
 	rights  *billing.Entitlements
 	mode    atomic.Int32
+	online  atomic.Bool
 	limit   atomic.Int64
 	calls   atomic.Int32
 }
@@ -116,8 +117,16 @@ func newFixture(t *testing.T) *fixture {
 		coverage := now.Add(time.Hour)
 		max := f.limit.Load()
 		value := billing.Snapshot{OwnerID: strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/internal/doctorchart/owners/"), "/entitlements"), Module: "DOCTORCHART", Revision: strings.Repeat("a", 64), IssuedAt: now, ValidUntil: until, CoverageExpiresAt: &coverage, ClinicManagement: true, MaxClinics: &max}
+		if strings.HasSuffix(r.URL.Path, "/entitlements-v2") {
+			flag := f.online.Load()
+			value.OwnerID = strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/internal/doctorchart/owners/"), "/entitlements-v2")
+			value.OnlineBooking = &flag
+		}
 		if mode == 2 {
 			value.ClinicManagement = false
+			if value.OnlineBooking != nil {
+				*value.OnlineBooking = false
+			}
 			value.MaxClinics = nil
 		}
 		if mode == 3 {

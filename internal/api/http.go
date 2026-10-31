@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -103,6 +104,10 @@ func Gateway(secret string, next http.Handler) http.Handler {
 			securityError(Failure(403, "FORBIDDEN", "Acceso denegado."))
 			return
 		}
+		if PublicAppointments(r.Method, r.URL.Path) {
+			next.ServeHTTP(w, r)
+			return
+		}
 		user := r.Header.Get("X-User-Id")
 		if JavaBlank(user) {
 			securityError(Failure(401, "UNAUTHENTICATED", "Se requiere autenticación."))
@@ -189,4 +194,17 @@ func Decode(w http.ResponseWriter, r *http.Request) (map[string]any, error) {
 		return nil, Invalid("La solicitud contiene datos inválidos.")
 	}
 	return value, nil
+}
+
+var publicUUID = regexp.MustCompile("^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
+
+func PublicAppointments(method, p string) bool {
+	if !strings.HasPrefix(p, "/api/doctorchart/public/appointments/") {
+		return false
+	}
+	parts := strings.Split(strings.TrimPrefix(p, "/api/doctorchart/public/appointments"), "/")
+	if method == "GET" {
+		return len(parts) == 2 && parts[1] == "doctors" || len(parts) == 3 && parts[1] == "doctors" && publicUUID.MatchString(parts[2]) || len(parts) == 6 && parts[1] == "doctors" && publicUUID.MatchString(parts[2]) && parts[3] == "clinics" && publicUUID.MatchString(parts[4]) && parts[5] == "availability"
+	}
+	return method == "POST" && (len(parts) == 2 && parts[1] == "challenge" || len(parts) == 4 && parts[1] == "doctors" && publicUUID.MatchString(parts[2]) && parts[3] == "bookings")
 }
