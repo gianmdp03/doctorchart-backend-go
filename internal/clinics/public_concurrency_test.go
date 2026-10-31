@@ -3,8 +3,22 @@ package clinics
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/syntah/doctorchart-backend-go/internal/api"
+	"net/http"
 	"testing"
 )
+
+func TestPublicBookingUsesOneEffectiveLeaseForFeatureAndQuota(t *testing.T) {
+	f, _, start, p := publicFixture(t)
+	body := publicBody(t, f, p, start)
+	// The still-valid private v1 lease can differ from a newly resolved public v2 lease.
+	// Public admission must use its own complete signed authority, never mix them.
+	f.limit.Store(0)
+	mux := http.NewServeMux()
+	NewWithBookings(f.pool, f.rights, true, true).WithPublicBookings(true, "gateway-fixture").Routes(mux)
+	f.handler = api.Gateway("gateway-fixture", api.Dispatch(mux))
+	assertCode(t, pubRequest(f, "POST", "/public/appointments/doctors/"+p.PublicID+"/bookings", newOpaqueID(), body), 403, "ONLINE_BOOKING_DISABLED")
+}
 
 func TestPublicTwoVisitorsAndSameReceiptConcurrent(t *testing.T) {
 	for _, same := range []bool{false, true} {

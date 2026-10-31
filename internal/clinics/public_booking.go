@@ -8,6 +8,7 @@ import (
 	"errors"
 	"github.com/jackc/pgx/v5"
 	"github.com/syntah/doctorchart-backend-go/internal/api"
+	"github.com/syntah/doctorchart-backend-go/internal/billing"
 	"golang.org/x/text/language"
 	"net/http"
 	"net/mail"
@@ -96,14 +97,7 @@ func validatePublicRequest(p *PublicBookingRequest) error {
 	}
 	return nil
 }
-func (a *publicAdmission) check(ctx context.Context, tx pgx.Tx, s *Service, workspace int64) error {
-	snap, err := s.publicRights.Resolve(ctx, a.doctor.owner)
-	if err != nil {
-		return unavailable()
-	}
-	if err = s.publicRights.Fence(ctx, tx, snap); err != nil {
-		return unavailable()
-	}
+func (a *publicAdmission) check(ctx context.Context, tx pgx.Tx, s *Service, workspace int64, snap billing.Snapshot) error {
 	if snap.OnlineBooking == nil || !*snap.OnlineBooking || !snap.ClinicManagement {
 		return publicDenied()
 	}

@@ -337,7 +337,11 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 	if status != 0 {
 		return s.writeBookingResult(w, r, public, status, response)
 	}
-	snapshot, err := s.rights.Resolve(r.Context(), user)
+	rights := s.rights
+	if public != nil {
+		rights = s.publicRights
+	}
+	snapshot, err := rights.Resolve(r.Context(), user)
 	if err != nil {
 		return unavailable()
 	}
@@ -354,7 +358,7 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 	if _, err = tx.Exec(ctx, "SET LOCAL lock_timeout='5s'; SET LOCAL statement_timeout='10s'"); err != nil {
 		return err
 	}
-	if err = s.rights.Fence(ctx, tx, snapshot); err != nil {
+	if err = rights.Fence(ctx, tx, snapshot); err != nil {
 		return unavailable()
 	}
 	if err = tx.QueryRow(ctx, "SELECT id FROM doctor_workspaces WHERE id=$1 AND user_id=$2 FOR UPDATE", workspace, user).Scan(&workspace); err != nil {
@@ -367,11 +371,11 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 	if status != 0 {
 		return s.writeBookingResult(w, r, public, status, response)
 	}
-	if err = s.rights.Fence(ctx, tx, snapshot); err != nil {
+	if err = rights.Fence(ctx, tx, snapshot); err != nil {
 		return unavailable()
 	}
 	if public != nil {
-		if err = public.check(ctx, tx, s, workspace); err != nil {
+		if err = public.check(ctx, tx, s, workspace, snapshot); err != nil {
 			return err
 		}
 	}
@@ -387,6 +391,9 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 	}
 	// Cancelling or closing an existing booking must remain possible during a downgrade.
 	if op != "status" && *snapshot.MaxClinics != -1 && count > *snapshot.MaxClinics {
+		if public != nil {
+			return publicDenied()
+		}
 		return api.Failure(409, "CLINIC_LIMIT_REACHED", "Regularizá el cupo de consultorios antes de crear o reprogramar reservas.")
 	}
 	if op != "create" {
