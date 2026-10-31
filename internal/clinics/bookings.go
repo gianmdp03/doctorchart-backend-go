@@ -531,6 +531,11 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 			}
 			before = json.RawMessage(raw)
 		}
+		if s.notices != nil {
+			if err = s.notices.BookingChanged(ctx, tx, result.ID, result.Version, kind); err != nil {
+				return err
+			}
+		}
 		if _, err = tx.Exec(ctx, "INSERT INTO booking_events(booking_id,version,kind,actor_id,before_document,after_document) VALUES($1,$2,$3,$4,$5,$6)", result.ID, result.Version, kind, actor, before, response); err != nil {
 			return err
 		}

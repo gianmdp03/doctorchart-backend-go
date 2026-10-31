@@ -81,7 +81,7 @@ SELECT nextval('patients_id_seq');
 
 func dataSnapshot(t *testing.T, pool *sql.DB) map[string]string {
 	t.Helper()
-	rows, err := pool.Query("SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename NOT IN ('app_schema_state','app_schema_migrations','clinics','clinic_entitlement_epoch','clinic_schedules','bookings','booking_events','booking_idempotency','booking_publications','clinic_publications','booking_public_details','public_booking_rate_windows','staff_accounts','staff_access','staff_access_clinics','staff_invitations','staff_sessions','staff_rate_windows','staff_security_events') ORDER BY tablename")
+	rows, err := pool.Query("SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename NOT IN ('app_schema_state','app_schema_migrations','clinics','clinic_entitlement_epoch','clinic_schedules','bookings','booking_events','booking_idempotency','booking_publications','clinic_publications','booking_public_details','public_booking_rate_windows','staff_accounts','staff_access','staff_access_clinics','staff_invitations','staff_sessions','staff_rate_windows','staff_security_events','booking_confirmation_access','staff_email_recovery','notification_outbox') ORDER BY tablename")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -161,7 +161,7 @@ func TestMigrationConvergesAndPreservesClinicalData(t *testing.T) {
 	if readString(t, fresh, catalogSQL, []string{}) != newCatalog {
 		t.Fatal("empty installation and conservative upgrade diverged")
 	}
-	if readString(t, upgraded, "SELECT baseline_version::text FROM app_schema_state") != "9" {
+	if readString(t, upgraded, "SELECT baseline_version::text FROM app_schema_state") != "10" {
 		t.Fatal("old binaries would not reject the upgraded schema version")
 	}
 }
@@ -203,7 +203,7 @@ func TestM2UpgradeFromPublishedSchemaTwoPreservesDataAndRollsBack(t *testing.T) 
 	if !reflect.DeepEqual(before, dataSnapshot(t, pool)) {
 		t.Fatal("2->3 modified clinical data")
 	}
-	if digest(readString(t, pool, catalogSQL, []string{})) != pins.secretaries {
+	if digest(readString(t, pool, catalogSQL, []string{})) != pins.notifications {
 		t.Fatal("2->3 catalog diverged")
 	}
 }
@@ -359,7 +359,7 @@ func TestMigrationConcurrentUpgradeAndCancellation(t *testing.T) {
 			t.Error(err)
 		}
 	}
-	if readString(t, pool, "SELECT count(*)::text FROM app_schema_migrations") != "8" {
+	if readString(t, pool, "SELECT count(*)::text FROM app_schema_migrations") != "9" {
 		t.Fatal("migration applied more than once")
 	}
 }

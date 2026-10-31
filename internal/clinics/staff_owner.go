@@ -233,6 +233,11 @@ func (s *Service) staffOwnerWrite(w http.ResponseWriter, r *http.Request, user, 
 	if err != nil {
 		return err
 	}
+	if op == "invite" && s.notices != nil {
+		if err = s.notices.Invitation(r.Context(), tx, id, req.Email, code, expiry); err != nil {
+			return err
+		}
+	}
 	if err = staffAudit(r.Context(), tx, "", id, "OWNER_"+strings.ToUpper(op)); err != nil {
 		return err
 	}

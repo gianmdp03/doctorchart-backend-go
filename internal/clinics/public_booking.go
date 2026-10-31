@@ -177,7 +177,18 @@ func (s *Service) writeBookingResult(w http.ResponseWriter, r *http.Request, a *
 	if err := s.pool.QueryRow(r.Context(), "SELECT reference::text,doctor_name,clinic_name,address,timezone FROM booking_public_details WHERE booking_id=$1", b.ID).Scan(&reference, &name, &clinic, &address, &timezone); err != nil {
 		return err
 	}
-	api.WriteJSON(w, status, map[string]any{"reference": reference, "status": b.Status, "start": b.Start, "end": b.End, "doctorName": name, "clinicName": clinic, "address": address, "timezone": timezone, "contactName": b.ContactName, "attendeeName": b.AttendeeName})
+	document := map[string]any{"reference": reference, "status": b.Status, "start": b.Start, "end": b.End, "doctorName": name, "clinicName": clinic, "address": address, "timezone": timezone, "contactName": b.ContactName, "attendeeName": b.AttendeeName}
+	if s.notices != nil {
+		code, expires, err := s.notices.Code(r.Context(), b.ID)
+		if err != nil {
+			return err
+		}
+		if code != "" {
+			document["accessCode"] = code
+			document["accessExpiresAt"] = expires
+		}
+	}
+	api.WriteJSON(w, status, document)
 	return nil
 }
 func (s *Service) publicCreate(w http.ResponseWriter, r *http.Request) error {

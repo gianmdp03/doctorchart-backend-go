@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/syntah/doctorchart-backend-go/internal/api"
 	"github.com/syntah/doctorchart-backend-go/internal/billing"
+	"github.com/syntah/doctorchart-backend-go/internal/notifications"
 )
 
 type Clinic struct {
@@ -33,6 +34,7 @@ type Clinic struct {
 }
 
 type Service struct {
+	notices          *notifications.Service
 	staffEnabled     bool
 	staffOrigin      string
 	staffRights      *billing.Entitlements
@@ -130,6 +132,9 @@ func (s *Service) Routes(mux *http.ServeMux) {
 				api.WriteError(w, err)
 			}
 		}
+	}
+	if s.notices != nil {
+		s.notificationRoutes(mux, wrap)
 	}
 	if s.staffEnabled {
 		s.staffAuthRoutes(mux)

@@ -206,7 +206,7 @@ func PublicAppointments(method, p string) bool {
 	if method == "GET" {
 		return len(parts) == 2 && parts[1] == "doctors" || len(parts) == 3 && parts[1] == "doctors" && publicUUID.MatchString(parts[2]) || len(parts) == 6 && parts[1] == "doctors" && publicUUID.MatchString(parts[2]) && parts[3] == "clinics" && publicUUID.MatchString(parts[4]) && parts[5] == "availability"
 	}
-	return method == "POST" && (len(parts) == 2 && parts[1] == "challenge" || len(parts) == 4 && parts[1] == "doctors" && publicUUID.MatchString(parts[2]) && parts[3] == "bookings")
+	return method == "POST" && (len(parts) == 2 && (parts[1] == "challenge" || parts[1] == "confirmation") || len(parts) == 4 && parts[1] == "doctors" && publicUUID.MatchString(parts[2]) && parts[3] == "bookings")
 }
 
 // StaffRoute is a transport allowlist, not authentication. DoctorChart checks
@@ -223,7 +223,7 @@ func StaffRoute(method, p string) bool {
 		}
 		if method == "POST" {
 			switch parts[0] {
-			case "login", "activate", "recover", "logout", "password":
+			case "login", "activate", "recover", "logout", "password", "recovery-email", "recover-email":
 				return true
 			}
 		}

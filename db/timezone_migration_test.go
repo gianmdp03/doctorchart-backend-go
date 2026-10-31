@@ -77,7 +77,7 @@ func TestTimezoneUpgradePreservesDataAndMatchesFreshInstall(t *testing.T) {
 			t.Fatal("upgrade/restart changed existing rows")
 		}
 	}
-	if readString(t, pool, "SELECT baseline_version::text FROM app_schema_state") != "9" || readString(t, pool, "SELECT count(*)::text FROM app_schema_migrations") != "8" {
+	if readString(t, pool, "SELECT baseline_version::text FROM app_schema_state") != "10" || readString(t, pool, "SELECT count(*)::text FROM app_schema_migrations") != "9" {
 		t.Fatal("missing v4 history")
 	}
 	fresh := fixture(t)

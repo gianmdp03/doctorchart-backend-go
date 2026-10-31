@@ -9,12 +9,15 @@ import (
 	"strconv"
 	"strings"
 
+	"encoding/base64"
 	"github.com/joho/godotenv"
 	"github.com/syntah/doctorchart-backend-go/internal/api"
+	"github.com/syntah/doctorchart-backend-go/internal/notifications"
 	"github.com/syntah/doctorchart-backend-go/internal/storage"
 )
 
 type Config struct {
+	Notifications         notifications.Config
 	Port                  string
 	DatabaseURL           string
 	GatewaySecret         string
@@ -99,6 +102,32 @@ func Load() (Config, error) {
 		origin, e := url.Parse(c.StaffOrigin)
 		if !c.BookingsEnabled || e != nil || origin.Scheme != "https" || origin.Host == "" || origin.User != nil || origin.Path != "" || origin.RawQuery != "" || origin.Fragment != "" {
 			return c, errors.New("STAFF_ENABLED requiere BOOKINGS_ENABLED y STAFF_ORIGIN HTTPS exacto sin path")
+		}
+	}
+	notifyFlag := get("features.notifications.enabled", "NOTIFICATIONS_ENABLED", "false")
+	if notifyFlag != "true" && notifyFlag != "false" {
+		return c, errors.New("NOTIFICATIONS_ENABLED debe ser true o false")
+	}
+	if notifyFlag == "true" {
+		port, e := strconv.Atoi(get("notifications.smtp.port", "NOTIFICATIONS_SMTP_PORT", "587"))
+		if e != nil {
+			return c, errors.New("Puerto SMTP inválido")
+		}
+		lead, e := strconv.Atoi(get("notifications.reminder-minutes", "NOTIFICATIONS_REMINDER_MINUTES", "1440"))
+		if e != nil || lead < 1 || lead > 10080 {
+			return c, errors.New("Recordatorio inválido")
+		}
+		c.Notifications = notifications.Config{PublicOrigin: get("notifications.public-origin", "NOTIFICATIONS_PUBLIC_ORIGIN", ""), Enabled: true, Key: get("notifications.key", "NOTIFICATIONS_KEY", ""), Host: get("notifications.smtp.host", "NOTIFICATIONS_SMTP_HOST", ""), Port: port, From: get("notifications.smtp.from", "NOTIFICATIONS_SMTP_FROM", ""), Username: get("notifications.smtp.username", "NOTIFICATIONS_SMTP_USERNAME", ""), Password: get("notifications.smtp.password", "NOTIFICATIONS_SMTP_PASSWORD", ""), TLSMode: get("notifications.smtp.tls", "NOTIFICATIONS_SMTP_TLS", "starttls"), ReminderMinutes: lead}
+		raw, e := base64.StdEncoding.DecodeString(c.Notifications.Key)
+		if !c.BookingsEnabled || e != nil || len(raw) != 32 {
+			return c, errors.New("NOTIFICATIONS_ENABLED requiere BOOKINGS_ENABLED y NOTIFICATIONS_KEY de32bytes base64")
+		}
+		origin, e := url.Parse(c.Notifications.PublicOrigin)
+		if e != nil || origin.Scheme != "https" || origin.Host == "" || origin.User != nil || origin.Path != "" || origin.RawQuery != "" || origin.ForceQuery || origin.Fragment != "" {
+			return c, errors.New("NOTIFICATIONS_PUBLIC_ORIGIN debe ser un origen HTTPS exacto")
+		}
+		if _, e = notifications.NewSMTP(c.Notifications); e != nil {
+			return c, e
 		}
 	}
 	c.Storage = storage.Config{Type: values["app.storage.type"], Directory: values["app.storage.studies-dir"], Endpoint: values["app.storage.s3.endpoint"], Bucket: values["app.storage.s3.bucket"], AccessKey: values["app.storage.s3.access-key"], SecretKey: values["app.storage.s3.secret-key"], Region: values["app.storage.s3.region"]}

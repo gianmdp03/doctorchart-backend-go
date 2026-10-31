@@ -204,6 +204,10 @@ func (s *Service) staffAuthRoutes(mux *http.ServeMux) {
 		return nil
 	}))
 	mux.HandleFunc("POST "+staffBase+"/password", wrap(s.staffChangePassword))
+	if s.notices != nil {
+		mux.HandleFunc("POST "+staffBase+"/recovery-email", wrap(s.staffRecoveryEmail))
+		mux.HandleFunc("POST "+staffBase+"/recover-email", wrap(s.staffRecoverEmail))
+	}
 	s.staffDelegatedRoutes(mux, wrap)
 }
 
@@ -395,6 +399,11 @@ func (s *Service) staffRecover(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	recovery := staffToken()
+	if s.notices != nil {
+		if _, err = tx.Exec(r.Context(), "UPDATE staff_email_recovery SET consumed_at=COALESCE(consumed_at,clock_timestamp()) WHERE account_id=$1", id); err != nil {
+			return err
+		}
+	}
 	if _, err = tx.Exec(r.Context(), "UPDATE staff_accounts SET password_hash=$1,recovery_hash=$2 WHERE id=$3", string(hash), staffHash(recovery), id); err != nil {
 		return err
 	}
@@ -450,6 +459,11 @@ func (s *Service) staffChangePassword(w http.ResponseWriter, r *http.Request) er
 	}
 	if !valid {
 		return staffUnauth()
+	}
+	if s.notices != nil {
+		if _, err = tx.Exec(r.Context(), "UPDATE staff_email_recovery SET consumed_at=COALESCE(consumed_at,clock_timestamp()) WHERE account_id=$1", session.ID); err != nil {
+			return err
+		}
 	}
 	if _, err = tx.Exec(r.Context(), "UPDATE staff_accounts SET password_hash=$1 WHERE id=$2", string(hash), session.ID); err != nil {
 		return err
