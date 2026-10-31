@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/syntah/doctorchart-backend-go/internal/api"
 	"testing"
 )
 
@@ -70,5 +71,67 @@ func TestClinicalSummaryPersistenceOwnershipAndConflicts(t *testing.T) {
 	result, err = s.ClinicalSummary(ctx, "integrity-owner", p.ID)
 	if err != nil || result.PatientVersion != edited.Version || len(result.Profile.Entries) != 1 {
 		t.Fatalf("invalid write changed record: %+v %v", result, err)
+	}
+}
+
+func TestSummaryDerivesHistoryFromPatientAndEncounters(t *testing.T) {
+	services, _ := integrityFixture(t, 100, 100)
+	s := services[0]
+	ctx := context.Background()
+	owner := api.Identity{UserID: "integrity-owner", Plan: "BASIC"}
+	request := integrityPatientRequest()
+	values := request["values"].(map[string]any)
+	values["sys_allergyStatus"] = "PRESENT"
+	values["sys_allergies"] = "Penicilina"
+	values["sys_medicationStatus"] = "NONE"
+	patient, err := s.CreatePatient(ctx, owner, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := integrityEncounterRequest(patient.ID, "FIRST_VISIT")
+	answers := first["values"].(map[string]any)
+	answers["sys_conditionStatus"] = "PRESENT"
+	answers["sys_conditions"] = "Asma"
+	answers["sys_historySource"] = "CONFIRMED"
+	encounter, err := s.CreateEncounter(ctx, owner, first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := s.ClinicalSummary(ctx, owner.UserID, patient.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.History["ALLERGY"].Source != "PATIENT" || result.History["PROBLEM"].SourceID != encounter.ID || result.History["PROBLEM"].Items[0] != "Asma" || result.History["MEDICATION"].Status != "NONE" {
+		t.Fatal(result.History)
+	}
+	originalDate := result.History["ALLERGY"].Date
+	if _, err := s.CreateEncounter(ctx, owner, integrityEncounterRequest(patient.ID, "FOLLOW_UP")); err != nil {
+		t.Fatal(err)
+	}
+	result, err = s.ClinicalSummary(ctx, owner.UserID, patient.ID)
+	if err != nil || result.History["PROBLEM"].SourceID != encounter.ID {
+		t.Fatalf("unreviewed consultation erased history: %+v %v", result, err)
+	}
+	var savedValues map[string]any
+	if err := json.Unmarshal(patient.Values, &savedValues); err != nil {
+		t.Fatal(err)
+	}
+	savedValues["sys_phone"] = "1155555555"
+	if _, err := s.UpdatePatient(ctx, owner.UserID, patient.ID, map[string]any{"expectedVersion": json.Number(fmt.Sprint(patient.Version)), "values": savedValues}); err != nil {
+		t.Fatal(err)
+	}
+	result, err = s.ClinicalSummary(ctx, owner.UserID, patient.ID)
+	if err != nil || result.History["ALLERGY"].Date != originalDate {
+		t.Fatal("demographic update changed clinical provenance", err)
+	}
+	negative := integrityEncounterRequest(patient.ID, "FOLLOW_UP")
+	negative["values"].(map[string]any)["sys_allergyStatus"] = "NONE"
+	reviewed, err := s.CreateEncounter(ctx, owner, negative)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err = s.ClinicalSummary(ctx, owner.UserID, patient.ID)
+	if err != nil || result.History["ALLERGY"].Status != "NONE" || result.History["ALLERGY"].SourceID != reviewed.ID {
+		t.Fatal("negative review did not override earlier data", err)
 	}
 }

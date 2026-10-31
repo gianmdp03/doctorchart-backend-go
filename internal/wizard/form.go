@@ -67,6 +67,7 @@ func date(value any) (time.Time, bool) {
 }
 
 func (v *Validator) Evaluate(form, values, context map[string]any) (Evaluation, error) {
+	form = WithClinicalHistory(form)
 	result := Evaluation{Projections: map[string]any{}, Results: map[string]FormulaResult{}, Values: map[string]any{}}
 	wrapped := map[string]any{"schemaVersion": json.Number("1"), "patientForm": form, "encounterForm": map[string]any{"categories": []any{}}, "modulesConfig": map[string]any{"MEDICATION_CATALOG": false, "AI_ASSISTANT": false, "GROWTH_CHARTS": false}}
 	// Saved encounter forms do not contain the system profile. Validate them against a minimal core.
@@ -94,7 +95,7 @@ func (v *Validator) Evaluate(form, values, context map[string]any) (Evaluation, 
 			order = append(order, key)
 		}
 	}
-	violations := []api.FieldError{}
+	violations := clinicalHistoryErrors(values)
 	issue := func(key, code string) {
 		violations = append(violations, api.FieldError{Path: valuePath(key), Code: code})
 	}

@@ -129,6 +129,10 @@ func (v *Validator) Validate(definition map[string]any) error {
 			}
 			categoryKeys[key] = true
 			profile := section == "patientForm" && key == "sys_patient_profile"
+			health := key == "sys_clinical_history"
+			if health && !validClinicalHistory(category) {
+				issue(path, "INVALID_SYSTEM_CLINICAL_HISTORY")
+			}
 			if profile {
 				foundProfile = true
 				if !flag(category["enabled"]) {
@@ -137,7 +141,7 @@ func (v *Validator) Validate(definition map[string]any) error {
 				if !flag(category["system"]) {
 					issue(path+"/system", "INVALID_SYSTEM_CATEGORY")
 				}
-			} else if flag(category["system"]) || key == "sys_patient_profile" {
+			} else if !health && (flag(category["system"]) || key == "sys_patient_profile") {
 				issue(path+"/system", "INVALID_SYSTEM_CATEGORY")
 			}
 			for f, rawField := range list(category["fields"]) {
@@ -191,7 +195,7 @@ func (v *Validator) Validate(definition map[string]any) error {
 							issue(fieldPath+"/required", "MISSING_PATIENT_CORE")
 						}
 					}
-				} else if flag(data["system"]) || contains(mandatory, key) {
+				} else if !health && (flag(data["system"]) || contains(mandatory, key) || strings.HasPrefix(key, "sys_allerg") || strings.HasPrefix(key, "sys_condition") || strings.HasPrefix(key, "sys_medication") || key == "sys_historySource") {
 					issue(fieldPath+"/system", "INVALID_SYSTEM_FIELD")
 				}
 			}
@@ -290,6 +294,16 @@ func (v *Validator) Transition(previous, next map[string]any) error {
 	violations := []api.FieldError{}
 	for _, section := range []string{"patientForm", "encounterForm"} {
 		old := map[string]map[string]any{}
+		hadHistory, hasHistory := false, false
+		for _, category := range list(object(previous[section])["categories"]) {
+			hadHistory = hadHistory || object(category)["key"] == "sys_clinical_history"
+		}
+		for _, category := range list(object(next[section])["categories"]) {
+			hasHistory = hasHistory || object(category)["key"] == "sys_clinical_history"
+		}
+		if hadHistory && !hasHistory {
+			violations = append(violations, api.FieldError{Path: "/" + section, Code: "MISSING_SYSTEM_CLINICAL_HISTORY"})
+		}
 		for _, category := range list(object(previous[section])["categories"]) {
 			for _, rawField := range list(object(category)["fields"]) {
 				data := object(rawField)

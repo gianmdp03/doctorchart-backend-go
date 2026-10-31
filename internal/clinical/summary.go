@@ -6,10 +6,12 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/syntah/doctorchart-backend-go/internal/api"
+	"github.com/syntah/doctorchart-backend-go/internal/wizard"
 )
 
 type SummaryEncounter struct {
@@ -22,14 +24,16 @@ type SummaryEncounter struct {
 }
 
 type ClinicalSummary struct {
-	PatientID         int64               `json:"patientId"`
-	PatientVersion    int64               `json:"patientVersion"`
-	AsOf              string              `json:"asOfDate"`
-	Profile           ClinicalProfile     `json:"profile"`
-	Historical        []ClinicalEntry     `json:"historical"`
-	LastEncounter     *SummaryEncounter   `json:"lastEncounter"`
-	Vaccinations      *Schedule           `json:"vaccinations"`
-	RecentMedications []SummaryMedication `json:"recentMedications"`
+	Diagnoses         []SummaryEncounter              `json:"recordedDiagnoses"`
+	History           map[string]ClinicalHistoryGroup `json:"history"`
+	PatientID         int64                           `json:"patientId"`
+	PatientVersion    int64                           `json:"patientVersion"`
+	AsOf              string                          `json:"asOfDate"`
+	Profile           ClinicalProfile                 `json:"profile"`
+	Historical        []ClinicalEntry                 `json:"historical"`
+	LastEncounter     *SummaryEncounter               `json:"lastEncounter"`
+	Vaccinations      *Schedule                       `json:"vaccinations"`
+	RecentMedications []SummaryMedication             `json:"recentMedications"`
 }
 
 type SummaryMedication struct {
@@ -56,6 +60,49 @@ func (s *Service) ClinicalSummary(ctx context.Context, user string, id int64) (C
 			return err
 		}
 		result = ClinicalSummary{PatientID: id, PatientVersion: p.Version, AsOf: time.Now().In(s.viewZone(ctx)).Format("2006-01-02"), Profile: profile, Historical: historical, RecentMedications: []SummaryMedication{}}
+		result.Diagnoses = []SummaryEncounter{}
+		values, err := wizard.Decode(p.Values)
+		if err != nil {
+			return err
+		}
+		dates, err := decodeHistoryDates(p.Personal)
+		if err != nil {
+			return err
+		}
+		result.History = recordHistory(values, "PATIENT", p.ID, dates)
+		rows, err := tx.Query(ctx, `SELECT id,encounter_date,form_values,primary_diagnosis_description FROM clinical_encounters WHERE patient_id=$1 ORDER BY encounter_date DESC,id DESC`, id)
+		if err != nil {
+			return err
+		}
+		seenDiagnoses := map[string]bool{}
+		for rows.Next() {
+			var encounterID int64
+			var instant time.Time
+			var raw []byte
+			var diagnosis *string
+			if err := rows.Scan(&encounterID, &instant, &raw, &diagnosis); err != nil {
+				rows.Close()
+				return err
+			}
+			answers, err := wizard.Decode(raw)
+			if err != nil {
+				rows.Close()
+				return err
+			}
+			stamp := instant.UTC().Format(time.RFC3339Nano)
+			if diagnosis != nil && len(result.Diagnoses) < 5 {
+				key := strings.ToLower(strings.TrimSpace(*diagnosis))
+				if key != "" && !seenDiagnoses[key] {
+					seenDiagnoses[key] = true
+					result.Diagnoses = append(result.Diagnoses, SummaryEncounter{ID: encounterID, Date: instant.In(s.viewZone(ctx)).Format("2006-01-02"), Diagnosis: diagnosis})
+				}
+			}
+			mergeRecordHistory(result.History, recordHistory(answers, "ENCOUNTER", encounterID, map[string]string{"ALLERGY": stamp, "PROBLEM": stamp, "MEDICATION": stamp}))
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return err
+		}
 		var encounter SummaryEncounter
 		var date time.Time
 		err = tx.QueryRow(ctx, `SELECT id,encounter_date,chief_complaint,primary_diagnosis_description,follow_up_instructions,follow_up_date::text FROM clinical_encounters WHERE patient_id=$1 ORDER BY encounter_date DESC,id DESC LIMIT 1`, id).Scan(&encounter.ID, &date, &encounter.Complaint, &encounter.Diagnosis, &encounter.FollowUp, &encounter.FollowUpDate)

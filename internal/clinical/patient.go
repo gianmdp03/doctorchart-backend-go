@@ -100,7 +100,7 @@ func normalizePatientHistory(p *Patient) error {
 	}{
 		{&p.Insurance, []string{"providerName", "planName", "affiliateNumber"}},
 		{&p.Guardian, []string{"fatherFullName", "motherFullName", "siblingsCount", "primaryGuardian", "primaryContactPhone", "hasSiblings", "siblingOrder", "livingArrangement"}},
-		{&p.Personal, []string{"chronicOrPreviousDiseases", "hospitalizationsOrSurgeries", "allergies", "habitualMedication", "birthMeasurements", "clinicalProfile"}},
+		{&p.Personal, []string{"chronicOrPreviousDiseases", "hospitalizationsOrSurgeries", "allergies", "habitualMedication", "birthMeasurements", "clinicalProfile", "clinicalHistoryDates"}},
 		{&p.Family, []string{"paternalDiseases", "maternalDiseases", "siblingDiseases"}},
 	} {
 		if len(*field.raw) == 0 || string(*field.raw) == "null" {
@@ -261,6 +261,26 @@ func applyPatient(p *Patient, evaluation wizard.Evaluation) error {
 		return err
 	}
 	p.Family, err = json.Marshal(family)
+	if err != nil {
+		return err
+	}
+	previous, err := wizard.Decode(p.Values)
+	if err != nil {
+		return err
+	}
+	personal, err := wizard.Decode(p.Personal)
+	if err != nil {
+		return err
+	}
+	if personal == nil {
+		personal = map[string]any{}
+	}
+	dates, err := decodeHistoryDates(p.Personal)
+	if err != nil {
+		return err
+	}
+	personal["clinicalHistoryDates"] = patientHistoryDates(previous, evaluation.Values, dates, time.Now().UTC().Format(time.RFC3339Nano))
+	p.Personal, err = json.Marshal(personal)
 	if err != nil {
 		return err
 	}
@@ -455,6 +475,7 @@ func (s *Service) CreatePatient(ctx context.Context, identity api.Identity, requ
 			return err
 		}
 		p := Patient{owner: identity.UserID, WorkspaceVersion: setup.Version, Allergies: json.RawMessage(`[]`), Chronic: json.RawMessage(`[]`)}
+		form = wizard.WithClinicalHistory(form)
 		p.Snapshot, err = json.Marshal(form)
 		if err != nil {
 			return err
@@ -466,7 +487,7 @@ func (s *Service) CreatePatient(ctx context.Context, identity api.Identity, requ
 		if err := applyPatient(&p, evaluation); err != nil {
 			return err
 		}
-		err = tx.QueryRow(ctx, `INSERT INTO patients(user_id,workspace_version,full_name,birth_date,national_id,gender,blood_type,phone,email,address,guardian_info,family_history,insurance_info,form_values,formula_results,form_definition_snapshot,formula_context,allergies,chronic_conditions,version,updated_at) VALUES($1,$2,$3,$4::date,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,0,clock_timestamp()) RETURNING id,version`, p.owner, p.WorkspaceVersion, p.FullName, p.BirthDate, p.NationalID, p.Gender, p.BloodType, p.Phone, p.Email, p.Address, p.Guardian, p.Family, p.Insurance, p.Values, p.Results, p.Snapshot, p.Context, p.Allergies, p.Chronic).Scan(&p.ID, &p.Version)
+		err = tx.QueryRow(ctx, `INSERT INTO patients(user_id,workspace_version,full_name,birth_date,national_id,gender,blood_type,phone,email,address,guardian_info,family_history,insurance_info,form_values,formula_results,form_definition_snapshot,formula_context,allergies,chronic_conditions,personal_history,version,updated_at) VALUES($1,$2,$3,$4::date,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,0,clock_timestamp()) RETURNING id,version`, p.owner, p.WorkspaceVersion, p.FullName, p.BirthDate, p.NationalID, p.Gender, p.BloodType, p.Phone, p.Email, p.Address, p.Guardian, p.Family, p.Insurance, p.Values, p.Results, p.Snapshot, p.Context, p.Allergies, p.Chronic, p.Personal).Scan(&p.ID, &p.Version)
 		if err != nil {
 			return err
 		}
@@ -525,11 +546,21 @@ func (s *Service) UpdatePatient(ctx context.Context, userID string, id int64, re
 			return err
 		}
 		savedZone := context["zone"]
+		previousValues, err := wizard.Decode(p.Values)
+		if err != nil {
+			return err
+		}
+		wizard.RetainUnreviewedHistory(previousValues, values)
 		reference, ok := context["referenceDate"].(string)
 		if !ok {
 			return fmt.Errorf("patient saved context has no reference date")
 		}
 		form, err := wizard.Decode(p.Snapshot)
+		if err != nil {
+			return err
+		}
+		form = wizard.WithClinicalHistory(form)
+		p.Snapshot, err = json.Marshal(form)
 		if err != nil {
 			return err
 		}
@@ -553,7 +584,7 @@ func (s *Service) UpdatePatient(ctx context.Context, userID string, id int64, re
 		if err := applyPatient(&p, evaluation); err != nil {
 			return err
 		}
-		err = tx.QueryRow(ctx, `UPDATE patients SET full_name=$2,birth_date=$3::date,national_id=$4,gender=$5,blood_type=$6,phone=$7,email=$8,address=$9,guardian_info=$10,family_history=$11,insurance_info=$12,form_values=$13,formula_results=$14,formula_context=$15,personal_history=$17,allergies=$18,chronic_conditions=$19,version=version+1,updated_at=greatest(clock_timestamp(),updated_at+interval '1 microsecond') WHERE id=$1 AND version=$16 RETURNING version`, id, p.FullName, p.BirthDate, p.NationalID, p.Gender, p.BloodType, p.Phone, p.Email, p.Address, p.Guardian, p.Family, p.Insurance, p.Values, p.Results, p.Context, *expected, p.Personal, p.Allergies, p.Chronic).Scan(&p.Version)
+		err = tx.QueryRow(ctx, `UPDATE patients SET full_name=$2,birth_date=$3::date,national_id=$4,gender=$5,blood_type=$6,phone=$7,email=$8,address=$9,guardian_info=$10,family_history=$11,insurance_info=$12,form_values=$13,formula_results=$14,formula_context=$15,personal_history=$17,allergies=$18,chronic_conditions=$19,form_definition_snapshot=$20,version=version+1,updated_at=greatest(clock_timestamp(),updated_at+interval '1 microsecond') WHERE id=$1 AND version=$16 RETURNING version`, id, p.FullName, p.BirthDate, p.NationalID, p.Gender, p.BloodType, p.Phone, p.Email, p.Address, p.Guardian, p.Family, p.Insurance, p.Values, p.Results, p.Context, *expected, p.Personal, p.Allergies, p.Chronic, p.Snapshot).Scan(&p.Version)
 		if err != nil {
 			return err
 		}

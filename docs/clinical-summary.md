@@ -1,71 +1,96 @@
-# Resumen clínico y registro de alergias
+# Resumen y antecedentes clínicos
 
-La primera pestaña de la ficha se llama **Resumen clínico**. Reúne alergias,
-problemas activos, medicación vigente, pendientes, última consulta y vacunación.
-Los datos filiatorios y su edición siguen disponibles debajo del resumen.
-No se usa IA ni se considera vigente un diagnóstico o un medicamento por el
-solo hecho de aparecer en una consulta o receta histórica.
+El resumen es una vista de lectura alimentada por los datos del paciente y sus
+consultas. No tiene un formulario paralelo de alergias, enfermedades ni medicación.
 
-## Datos y contratos
+## Bloque común a todas las especialidades
 
-- `GET /api/doctorchart/patients/{id}/clinical-summary`: perfil clínico con sus
-  registros originales, antecedentes previos sin fecha, última consulta y su
-  seguimiento, calendario por edad y hasta ocho medicamentos de recetas
-  recientes, identificados expresamente como de uso actual a confirmar.
-- `PUT /api/doctorchart/patients/{id}/clinical-profile`: requiere `expectedVersion`
-  y una operación `ADD`, `CONFIRM`, `RESOLVE` o `NO_KNOWN_ALLERGIES`.
-  `ADD` recibe `kind` (`ALLERGY`, `PROBLEM`, `MEDICATION`, `PENDING`), `text`,
-  `details`, `date` ISO y `certainty` (`REPORTED` o `CONFIRMED`). `CONFIRM` y
-  `RESOLVE` reciben `entryId`. La respuesta es el paciente actualizado.
-- Ambos endpoints verifican propiedad. Las escrituras requieren `EDIT_PATIENT`,
-  bloquean la fila del paciente y verifican su versión. Las vacunas y recetas
-  respetan la disponibilidad de sus módulos en la especialidad.
+`sys_clinical_history` (Antecedentes clínicos) pertenece al sistema y aparece en
+los formularios de paciente y consulta. Su categoría, campos, etiquetas y opciones
+no pueden modificarse, desactivarse ni eliminarse. El editor permite consultar
+su estructura y explica su función. El servidor valida la definición canónica.
 
-El perfil se guarda como datos de negocio en
-`patients.personal_history.clinicalProfile`, usando el documento JSONB existente.
-No cambia ningún objeto PostgreSQL, baseline, checksum, catálogo ni mecanismo de
-inicialización. Las ediciones filiatorias preservan este documento. No hay
-migración ni reconstrucción de bases que ejecutar para esta funcionalidad.
+Campos estables:
 
-Cada entrada conserva ID, tipo, texto, detalle, fecha clínica, origen informado o
-confirmado, fecha de registro y autor. Confirmar vigencia agrega `verifiedAt` sin
-reemplazar la fecha clínica original. Cerrar agrega `resolvedAt` y conserva el
-registro; no implica automáticamente ausencia de alergias. La ausencia conocida
-requiere una confirmación explícita y se rechaza si existen alergias activas o
-antecedentes de alergias aún registrados. Agregar una alergia invalida la
-confirmación previa de ausencia. Los antecedentes previos no reciben fechas
-inventadas ni se promueven automáticamente a problemas o tratamientos activos.
+- `sys_allergyStatus` y `sys_allergies`: alergias y reacciones conocidas.
+- `sys_conditionStatus` y `sys_conditions`: enfermedades o problemas actuales.
+- `sys_medicationStatus` y `sys_medications`: medicación habitual, con dosis y
+  frecuencia cuando se conozcan.
+- `sys_historySource`: `REPORTED` (paciente o familia) o `CONFIRMED` (corroborado
+  por el profesional). En ausencia de selección no se presume confirmación.
 
-El resumen sólo toma el seguimiento de la última consulta, incluso si ésta
-elimina el seguimiento anterior. El estado vacunal reutiliza el calendario y las
-aplicaciones existentes; una dosis sin aplicación registrada exige revisar el
-carnet. No se incorporan recomendaciones nuevas ni se infieren aplicaciones.
+Cada sección distingue `UNKNOWN`, `NONE` y `PRESENT`. Un positivo requiere detalle;
+no se admite detalle positivo junto a una respuesta negativa. Un registro por
+línea, con límite de 4000 caracteres por sección. Dejar una consulta sin información
+revisada no borra lo registrado anteriormente. Las respuestas viajan en los
+endpoints habituales de creación/edición, dentro de `values`.
 
-Los enlaces abren la consulta, la receta o la dosis exacta, o el registro clínico
-original dentro de la ficha. Las fechas visibles usan `dd/MM/aaaa` y el selector
-compartido. Cambiar de paciente o de usuario cancela lecturas y descarta borradores
-de ese contexto; un conflicto de versión conserva el borrador para revisar.
+Al crear al paciente ya se pueden registrar los tres grupos. La consulta muestra
+los antecedentes disponibles como referencia y permite revisarlos con un clic,
+sin reescribirlos. No se copian silenciosamente a consultas posteriores ni se
+convierten en una nueva confirmación sin una acción del profesional.
+
+## Resumen y procedencia
+
+`GET /api/doctorchart/patients/{id}/clinical-summary` devuelve `history`, con el
+estado más reciente por grupo entre paciente y consultas. Cada grupo tiene sus
+ítems, origen informado/corroborado, fecha y referencia exacta de origen
+(`PATIENT` o `ENCOUNTER`, `sourceId`). Una consulta que sólo actualiza enfermedades
+no desplaza los datos anteriores de alergias y medicación. Una revisión negativa
+más reciente reemplaza el positivo en el resumen, conservando la consulta original.
+
+Las fechas de revisión del formulario del paciente se guardan en el documento
+existente `personal_history.clinicalHistoryDates`. Una edición de teléfono u otro
+dato filiatorio no altera esas fechas. Las consultas usan su fecha clínica. Los
+antecedentes sin fecha permanecen identificados como tales.
+
+Se muestran además hasta cinco diagnósticos distintos registrados en consultas,
+con enlace y fecha, expresamente como de vigencia a revisar. Un diagnóstico
+histórico no se convierte automáticamente en un problema activo. Tampoco se
+interpreta texto narrativo mediante IA. Las recetas previas aparecen como de uso
+actual a confirmar, no como medicación habitual por el solo hecho de ser emitidas.
+El seguimiento usa únicamente la última consulta. Las vacunas reutilizan el
+calendario por edad y las aplicaciones existentes; una dosis sin aplicación
+registrada requiere revisar el carnet.
+
+## Compatibilidad y PostgreSQL
+
+No cambia ninguna tabla, columna, índice, constraint, baseline, checksum ni
+fingerprint. No hay migraciones ni reconstrucciones que ejecutar.
+
+Las configuraciones anteriores se complementan en memoria con el bloque común al
+leerlas. No se reescriben masivamente las configuraciones de los médicos ni se
+alteran los seeds administrados. Los snapshots clínicos existentes se leen sin
+reescribirlos. Al guardar una edición explícita se conserva el formulario original
+y se incorpora el bloque común si faltaba. Los clientes anteriores que omiten
+secciones clínicas en una edición no borran esas respuestas.
+
+Los registros y el endpoint de perfil de la implementación anterior se mantienen
+por compatibilidad y conservación de datos. La interfaz ya no usa ese endpoint
+para cargar antecedentes; sus registros previos se conservan como fuentes de
+lectura. Todas las lecturas/escrituras mantienen propiedad, permisos y versiones
+optimistas. No se ejecutaron escrituras sobre bases existentes, commits, pushes
+ni despliegues durante esta implementación.
 
 ## Verificación
 
-- Frontend: `npx ng test --watch=false` (703 pruebas aprobadas) y compilación
-  optimizada de producción con configuración pública sintética aprobada.
-- Vista representativa renderizada por Angular: revisión en Chrome a 1440 px y
-  390 px, en temas claro y oscuro, sin desbordamiento horizontal. Artefactos locales en
+- Frontend: suite completa, 79 archivos y 710 pruebas aprobadas.
+- Compilación optimizada de producción con configuración pública sintética.
+- Revisión visual del resumen y formulario en Chrome, a 1440 y 390 px, temas
+  claro/oscuro y sin desbordamiento horizontal. Artefactos locales en
   `doctorchart-frontend/.angular/clinical-summary/`.
-- Go 1.27.3: pruebas y vet del modelo de perfil aprobados:
-  `go test internal/clinical/clinical_profile.go internal/clinical/clinical_profile_test.go`
-  y el mismo comando con `go vet`.
-- Prueba PostgreSQL preparada en `summary_integration_test.go`, usando únicamente
-  el fixture descartable con opt-in existente. No se ejecutó sobre ninguna base.
-- La puerta completa de Go está bloqueada por la dependencia preexistente
-  `../bycode-image-email-service-go/pkg/media`, ausente en este checkout. El
-  detector de carreras requiere CGO, no disponible en este entorno. La ejecución
-  amplia también mostró un fallo de temporización ajeno a esta funcionalidad en
-  `TestRulesRefreshCancelsInflightFetch`. No se modificaron dependencias ni se
-  sustituyeron paquetes para ocultar estos resultados; no se verificó una
-  integración completa con PostgreSQL.
+- Go 1.27.3: pruebas y vet de wizard/workspace; pruebas y vet del agregado de
+  antecedentes aprobados, con `go test internal/clinical/record_history.go
+  internal/clinical/record_history_test.go` y el comando equivalente de vet.
+- Pruebas PostgreSQL preparadas en `summary_integration_test.go` para creación
+  con antecedentes, combinación por grupo, revisión negativa, propiedad,
+  conflictos y preservación. No se ejecutaron sobre una base en este entorno.
+- La puerta completa Go sigue bloqueada por la dependencia local preexistente
+  `../bycode-image-email-service-go/pkg/media`, ausente. El entorno tampoco dispone
+  de CGO para el detector de carreras ni de govulncheck. La suite amplia vuelve a
+  detectar el fallo ajeno `TestRulesRefreshCancelsInflightFetch`. Registro local:
+  `.migration/clinical-history/go-quality.log`.
 
-Restaurada la dependencia compartida, ejecutar la puerta de Go de la skill y la
-prueba de integración contra un recurso descartable autorizado antes de publicar.
-No se realizaron commits, pushes ni despliegues.
+Restaurada la dependencia compartida, ejecutar la puerta de Go de la skill y las
+pruebas de integración contra un recurso PostgreSQL descartable autorizado antes
+de publicar. La integración completa con PostgreSQL todavía no está verificada.

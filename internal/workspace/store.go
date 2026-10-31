@@ -105,6 +105,12 @@ func defaultWizard(ctx context.Context, tx pgx.Tx, id int64) (Default, error) {
 	if errors.Is(err, pgx.ErrNoRows) {
 		return d, api.Failure(404, "SPECIALTY_NOT_FOUND", "La especialidad no está disponible.")
 	}
+	if err == nil {
+		d.Draft, err = wizard.WithSystemHistory(d.Draft)
+	}
+	if err == nil {
+		d.Published, err = wizard.WithSystemHistory(d.Published)
+	}
 	return d, err
 }
 func readWorkspace(ctx context.Context, tx pgx.Tx, userID string) (*workspace, error) {
@@ -125,6 +131,14 @@ func readWorkspace(ctx context.Context, tx pgx.Tx, userID string) (*workspace, e
 	w.Experience = s.experience()
 	w.Preferences.Version = w.Setup.Version
 	w.UserID = userID
+	w.Definition, err = wizard.WithSystemHistory(w.Definition)
+	if err != nil {
+		return nil, err
+	}
+	w.Draft, err = wizard.WithSystemHistory(w.Draft)
+	if err != nil {
+		return nil, err
+	}
 	return &w, nil
 }
 func requireWorkspace(w *workspace) error {

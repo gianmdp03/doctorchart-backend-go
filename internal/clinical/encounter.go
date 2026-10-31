@@ -256,6 +256,7 @@ func (s *Service) CreateEncounter(ctx context.Context, identity api.Identity, re
 			return err
 		}
 		e := Encounter{EncounterSummary: EncounterSummary{PatientID: p.ID, PatientName: p.FullName, Date: date.Format(time.RFC3339Nano), SpecialtyID: setup.Specialty.ID, Specialty: setup.Specialty, Type: kind, Prescriptions: json.RawMessage("[]"), WorkspaceVersion: setup.Version}, Secondary: json.RawMessage("[]"), Orders: json.RawMessage("[]"), instant: date, owner: identity.UserID}
+		form = wizard.WithClinicalHistory(form)
 		e.Snapshot, err = json.Marshal(form)
 		if err != nil {
 			return err
@@ -336,6 +337,16 @@ func (s *Service) UpdateEncounter(ctx context.Context, userID string, id int64, 
 		if err != nil {
 			return err
 		}
+		form = wizard.WithClinicalHistory(form)
+		e.Snapshot, err = json.Marshal(form)
+		if err != nil {
+			return err
+		}
+		previousValues, err := wizard.Decode(e.Values)
+		if err != nil {
+			return err
+		}
+		wizard.RetainUnreviewedHistory(previousValues, values)
 		evaluation, err := s.forms.Evaluate(form, values, context)
 		if err != nil {
 			return err
@@ -349,7 +360,7 @@ func (s *Service) UpdateEncounter(ctx context.Context, userID string, id int64, 
 		if err != nil {
 			return err
 		}
-		err = tx.QueryRow(ctx, `UPDATE clinical_encounters SET encounter_date=$2,consultation_type=$3,chief_complaint=$4,history_of_present_illness=$5,physical_examination=$6,primary_diagnosis_description=$7,treatment_plan=$8,follow_up_instructions=$9,follow_up_date=$10::date,weight_kg=$11,height_cm=$12,head_circumference_cm=$13,form_values=$14,formula_results=$15,formula_context=$16,version=version+1,updated_at=greatest(clock_timestamp(),updated_at+interval '1 microsecond') WHERE id=$1 AND version=$17 RETURNING version`, id, date, kind, e.Complaint, e.History, e.Physical, e.Diagnosis, e.Treatment, e.FollowUp, e.FollowUpDate, e.Measurements.Weight, e.Measurements.Height, e.Measurements.Head, e.Values, e.Results, e.Context, *expected).Scan(&e.Version)
+		err = tx.QueryRow(ctx, `UPDATE clinical_encounters SET encounter_date=$2,consultation_type=$3,chief_complaint=$4,history_of_present_illness=$5,physical_examination=$6,primary_diagnosis_description=$7,treatment_plan=$8,follow_up_instructions=$9,follow_up_date=$10::date,weight_kg=$11,height_cm=$12,head_circumference_cm=$13,form_values=$14,formula_results=$15,formula_context=$16,form_definition_snapshot=$18,version=version+1,updated_at=greatest(clock_timestamp(),updated_at+interval '1 microsecond') WHERE id=$1 AND version=$17 RETURNING version`, id, date, kind, e.Complaint, e.History, e.Physical, e.Diagnosis, e.Treatment, e.FollowUp, e.FollowUpDate, e.Measurements.Weight, e.Measurements.Height, e.Measurements.Head, e.Values, e.Results, e.Context, *expected, e.Snapshot).Scan(&e.Version)
 		result = e
 		return err
 	})
