@@ -1,6 +1,10 @@
 # Roadmap — lugares administrativos, clínica por médico
 **M1 CERRADO / ARGON APROBADO en 6152867. M2-SOL implementado para revisión, Angular reservado a Argon; M3 no autorizado.**
 
+# Estado actual — M4
+M1/M2 aprobados; M3 aceptado (ff5053b backend, d0b7a45 Angular). M4 motor de reservas implementado sobre M3, con pruebas PostgreSQL y autenticación real de ensayo; [entrega y límites](M4_DELIVERY.md). Sin integración a main/producción. M5 calendario/UI, portal público, staff y notificaciones requieren autorizaciones posteriores.
+
+## Antecedente M2 — estados históricos
 | Fase | Resultado / estado | Dependencia para avanzar |
 |---|---|---|
 | R0 | Documentación base en d5a89e0 | Completada |

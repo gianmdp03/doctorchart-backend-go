@@ -1,3 +1,7 @@
+# Estado vigente M4 — 30/10/2026
+M1/M2 APROBADOS, M3 aceptado por el propietario (ff5053b/d0b7a45). M4 motor backend implementado en codex/m4-bookings: contrato 58acbda, aplicación 5de8106 + 9b42adf. Ver [entrega M4](M4_DELIVERY.md) para pruebas y cierre. M5 NO AUTORIZADO. Main y producción intactos, módulos desactivados normalmente.
+
+## Antecedentes M3/M2 — no instrucciones actuales
 # Estado vigente 30/10/2026
 M1 APROBADO; M2 APROBADO e integración funcional PASS.
 M3 IMPLEMENTADO / VALIDADO, pendiente aceptación del propietario, rama codex/m3-availability en clones aislados. Ver M3_IMPLEMENTATION_HANDOFF.md. M4 NO AUTORIZADO.

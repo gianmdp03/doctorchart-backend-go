@@ -61,6 +61,22 @@ No ejecutar dos suites simultáneas contra las mismas bases con nombres fijos. G
 
 La prueba de arranque debe mostrar `--- PASS: TestStartupCreatesSchemaAndServesHealth`; un `SKIP` por ausencia de `DOCTORCHART_STARTUP_TEST_DATABASE_URL` no valida esta integración. `TestBaselineUpgradeWithRealSeedsPreservesAdminConfiguration` usa `bootstrap.Run` y los seeds reales sobre baseline 1, verifica transición hasta 4, conservación de configuraciones administradas y reinicio idempotente.
 
+## M4: esquema 6 y pruebas de reservas
+
+Migración `0006_bookings.sql` posterior a M3/esquema 5; no modifica baseline ni migraciones publicadas. Instalación vacía y upgrade conservador llegan a 30 tablas/28 FK y el mismo catálogo. Exclusión GiST por workspace e intervalo `[start,end)` para estados distintos de CANCELLED, sin extensión nueva. FK clínica opcional RESTRICT: no se eliminan silenciosamente vínculos a pacientes.
+
+Con las DSN descartables anteriores (nunca una base real):
+```sh
+go test -p 1 ./... -count=1
+go test -race ./internal/clinics -run '^TestBookings' -count=1
+go test ./db -run '^TestBookingMigration' -count=1
+go vet ./...
+go build ./...
+```
+La suite de migración comprueba M3→6, SQL fallido/drift/seed tardío, rollback integral, reintento, datos clínicos y agendas conservados, catálogo fresh/upgrade, reinicio con reserva/evento/recibo y rechazo de checksum alterado. El rollback es transaccional ante fallo, no un DOWN destructivo después de confirmar reservas.
+
+Antes de una aplicación real futura se requiere respaldo/restauración probada y aprobación independiente. Un binario M3 rechaza esquema 6: no usarlo como rollback tras confirmar 0006. Conservar las reservas nuevas exige un binario compatible o recuperación autorizada; no rebajar marcador ni borrar tablas. Este documento no autoriza migraciones o despliegues reales.
+
 ## Política horaria de consultorios y upgrade 3 → 4
 
 UTC explícito y nombres regionales IANA exactos; Go carga tzdata y SQL consulta pg_timezone_names. Se excluyen offsets, abreviaturas sin región, Local, posix/, right/ y todo Etc/ (incluye Etc/GMT±N y aliases Etc/UTC/Etc/GMT; usar UTC explícito al crear una sede). La política es del campo timezone del consultorio, no cambia el contexto clínico global timeZone.
