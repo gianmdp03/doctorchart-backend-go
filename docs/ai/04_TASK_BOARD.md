@@ -1,3 +1,7 @@
+# Estado vigente M5 — 30/10/2026
+M4 aceptado en 7fe9bd6; M5 COMPLETADO / VALIDADO EN ENSAYO, pendiente aceptación. Backend codex/m5-calendar (c63f5f3 + aserción 25a8c6f); Angular codex/m5-calendar (3f09d8d + 0de8490). [Pruebas, evidencia y límites](M5_DELIVERY.md). Main/producción intactos, flags normales false, M6 NO AUTORIZADO.
+
+## Antecedente M4
 # Estado vigente M4 — 30/10/2026
 M1/M2 APROBADOS, M3 aceptado por el propietario (ff5053b/d0b7a45). M4 motor backend implementado en codex/m4-bookings: contrato 58acbda, aplicación 5de8106 + 9b42adf. Ver [entrega M4](M4_DELIVERY.md) para pruebas y cierre. M5 NO AUTORIZADO. Main y producción intactos, módulos desactivados normalmente.
 

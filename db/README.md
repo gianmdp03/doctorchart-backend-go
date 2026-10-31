@@ -61,6 +61,12 @@ No ejecutar dos suites simultáneas contra las mismas bases con nombres fijos. G
 
 La prueba de arranque debe mostrar `--- PASS: TestStartupCreatesSchemaAndServesHealth`; un `SKIP` por ausencia de `DOCTORCHART_STARTUP_TEST_DATABASE_URL` no valida esta integración. `TestBaselineUpgradeWithRealSeedsPreservesAdminConfiguration` usa `bootstrap.Run` y los seeds reales sobre baseline 1, verifica transición hasta 4, conservación de configuraciones administradas y reinicio idempotente.
 
+## M5: esquema 7, persona atendida administrativa
+
+0007 agrega attendee_name nullable con CHECK e inmutabilidad, sin backfill ni cambios clínicos. El lector usa COALESCE(attendee_name,contact_name) para reservas previas. Eventos y recibos anteriores no se reescriben. Instalación vacía y upgrade M4→7 convergen; `go test ./db -run '^TestAttendeeMigration' -count=1` comprueba conservación, fallo tardío, rollback/reintento y reinicio. Ejecución aprobada sobre PostgreSQL 17/18 descartables, además de suite completa. Baseline/0002..0006 permanecen intactos; catálogos fijados desde SQL independiente, registrados en entrega M5.
+
+Sin DOWN destructivo: una vez confirmado esquema 7, M4 rechaza ese marcador. Antes de una aplicación real futura exigir respaldo/restauración verificada y permiso separado; recuperación mediante binario compatible o restauración autorizada que preserve las escrituras nuevas. No rebajar marcador, reescribir checksums ni eliminar reservas/pacientes para volver atrás.
+
 ## M4: esquema 6 y pruebas de reservas
 
 Migración `0006_bookings.sql` posterior a M3/esquema 5; no modifica baseline ni migraciones publicadas. Instalación vacía y upgrade conservador llegan a 30 tablas/28 FK y el mismo catálogo. Exclusión GiST por workspace e intervalo `[start,end)` para estados distintos de CANCELLED, sin extensión nueva. FK clínica opcional RESTRICT: no se eliminan silenciosamente vínculos a pacientes.
