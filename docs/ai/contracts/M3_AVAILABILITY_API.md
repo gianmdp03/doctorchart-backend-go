@@ -1,5 +1,5 @@
 # M3-AVAILABILITY-v1 — contrato de implementación
-30/10/2026. Alcance autorizado: configuración y simulación de disponibilidad; sin reservas, pacientes nuevos ni M4. Complementa M2-CLINICS-v1, que permanece intacto.
+30/10/2026. Contrato congelado M3-AVAILABILITY-v1. Alcance autorizado: configuración y simulación de disponibilidad; sin reservas, pacientes nuevos ni M4. Complementa M2-CLINICS-v1, que permanece intacto.
 
 ## Recursos y rutas
 Prefijo existente /api/doctorchart. Identidad exclusivamente del Gateway; propietario del workspace. IDs y versiones strings decimales BIGINT canónicos.
@@ -17,8 +17,8 @@ Límites técnicos (no cuotas comerciales): slotMinutes 5..480; minNoticeMinutes
 Solo consultorios ACTIVE producen disponibilidad; INACTIVE/ARCHIVED devuelven días vacíos con motivo visible. Se conserva la configuración al cambiar estado.
 Anticipación y horizonte se computan en tiempo absoluto desde el reloj servidor; solo slots completos dentro de una franja y de esa ventana. No se almacenan slots.
 Saltos DST: horas locales inexistentes no generan slots. Horas repetidas pueden generar dos instantes distintos, identificados por UTC/offset al mostrarlos; nunca deduplicar únicamente por texto de hora. Un turno no atraviesa un salto de offset.
-Las agendas del mismo propietario se validan juntas, bajo el lock del workspace de M2. La validación incluye agendas inactivas conservadas para evitar reactivaciones incompatibles; archivadas no participan hasta restauración. Todo cambio de zona/estado de consultorio que altere esa compatibilidad se valida en la misma transacción.
-La consulta vuelve a comprobar intersecciones UTC en las fechas solicitadas: nunca publica disponibilidad incompatible por cambios futuros de tzdata. Validación de configuración y su período de comprobación deben informarse explícitamente al devolver un conflicto.
+Las agendas del mismo propietario se validan juntas, bajo el lock del workspace de M2. La comprobación de guardado cubre desde ayer UTC hasta 367 días después de hoy UTC, incluido el horizonte técnico máximo y los bordes entre zonas. La validación incluye agendas inactivas conservadas para evitar reactivaciones incompatibles; archivadas no participan hasta restauración. Todo cambio de zona/estado de consultorio que altere esa compatibilidad se valida en la misma transacción.
+La consulta vuelve a comprobar intersecciones UTC en las fechas solicitadas: nunca publica disponibilidad incompatible por cambios futuros de tzdata. Los conflictos informan el período comprobado; las consultas añaden dos fechas locales de margen a cada lado para contemplar el cruce de la línea internacional de fecha. No se ofrece garantía sobre reglas futuras modificadas por otra versión de tzdata: cada consulta las revalida.
 
 ## Permisos, concurrencia y errores
 Lecturas respetan aislamiento y acceso médico existentes; recurso ajeno/inexistente → 404 CLINIC_NOT_FOUND antes de revelar agenda/derechos. Escrituras reutilizan derechos efectivos M2 (sin nuevas cuotas), fence de invalidación, estado archivado y bloqueo por downgrade; ninguna concesión por defecto al caer Billing.
@@ -27,5 +27,5 @@ Errores mantienen api.Error {code,message,errors:[{path,code}]}: 400 INVALID_REQ
 
 ## Evolución e interfaz
 Nueva migración 0005 incremental con catálogo independiente PG17/18; baseline y migraciones 0002..0004 inmutables. Sin cambios clínicos. Instalación limpia, upgrade 4→5, rollback transaccional y rechazo de drift comprobados antes de dar por terminada la migración.
-Angular: ruta en inglés /clinics/{id}/schedule, selección explícita de consultorio, editor semanal, excepciones y disponibilidad día/semana; HTTP real. Flag SCHEDULES_ENABLED=false, CLINICS_ENABLED permanece false. App normal no expone el módulo ni cambia Cloudflare.
+Angular: ruta en inglés /clinics/{id}/schedule, selección explícita de consultorio, editor semanal, excepciones y disponibilidad día/semana; HTTP real. Flag Angular SCHEDULES_ENABLED=false, CLINICS_ENABLED permanece false. Backend SCHEDULES_ENABLED=false por defecto: las rutas M3 ni siquiera se registran sin opt-in explícito de ensayo. App normal no expone el módulo ni cambia Cloudflare.
 

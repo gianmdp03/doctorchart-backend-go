@@ -11,7 +11,7 @@ import (
 // Ordered transitions: baseline 1 -> clinics 2 -> fence 3 -> timezone policy 4.
 // The immutable baseline SQL checksum remains in app_schema_state.sql_sha256;
 // its historical baseline_version column now identifies the installed version.
-const currentVersion = 4
+const currentVersion = 5
 
 // Canonical catalogs built independently from the published SQL artifacts.
 // PostgreSQL 18 exposes additional NOT NULL constraints, so its contract differs.
@@ -21,6 +21,7 @@ type catalogPins struct {
 	clinics      string
 	entitlements string
 	timezones    string
+	schedules    string
 }
 
 func expectedCatalogs(ctx context.Context, tx pgx.Tx) (catalogPins, error) {
@@ -39,6 +40,7 @@ func catalogsForMajor(major int) (catalogPins, error) {
 			clinics:      "0e02988f698cab459288ef2f65ac99d7a9809e459e2e6eb588ae52dd8a8b5bf2",
 			entitlements: "f639a7acae86d355848376c1e677d9cb55b39a35847d23a2887d09e2d676c7e6",
 			timezones:    "85cbcbb463c81876f40babf1d156444bb64793e41388c511bd5c661159b362d6",
+			schedules:    "bd320db87155ffabccdc544e1aa5358d36f522cc5708c37613717cf253dd8e08",
 		}, nil
 	case 18:
 		return catalogPins{
@@ -46,6 +48,7 @@ func catalogsForMajor(major int) (catalogPins, error) {
 			clinics:      "113e25c68d85cad493b13ac90a07195c9a0be25e75bdfee911f0eb1dc767e34a",
 			entitlements: "38079048779b6a01fdd13110d2f154f20159511408fef9d18a88376f77b1eb3b",
 			timezones:    "1eb0e7bb7b9e3f10aa39c0eaa0101727f304d834ecd5ce9fdbbf77764e73ae7f",
+			schedules:    "791155c6db3d29619ae6be407e12fd929249dfc2fd6dddbe130358513be5592a",
 		}, nil
 	default:
 		return catalogPins{}, fmt.Errorf("unsupported PostgreSQL major version %d; no schema changes performed", major)
@@ -85,6 +88,9 @@ func validateMigration(ctx context.Context, tx pgx.Tx, pins catalogPins, version
 		}
 		if v == 4 {
 			script, prev, target = timezoneMigration, pins.entitlements, pins.timezones
+		}
+		if v == 5 {
+			script, prev, target = scheduleMigration, pins.timezones, pins.schedules
 		}
 		if v != expectedVersion || v > version || hash != digest(script) || before != prev || after != target {
 			return fmt.Errorf("%s migration version/checksum/catalog mismatch", Backend)
@@ -138,5 +144,19 @@ func migrateTimezones(ctx context.Context, tx pgx.Tx, pins catalogPins) error {
 		return err
 	}
 	_, err := tx.Exec(ctx, "INSERT INTO public.app_schema_migrations(version,sql_sha256,previous_catalog_sha256,catalog_sha256) VALUES(4,$1,$2,$3)", digest(timezoneMigration), pins.entitlements, pins.timezones)
+	return err
+}
+
+//go:embed migrations/0005_clinic_schedules.sql
+var scheduleMigration string
+
+func migrateSchedules(ctx context.Context, tx pgx.Tx, pins catalogPins) error {
+	if _, err := tx.Exec(ctx, scheduleMigration); err != nil {
+		return fmt.Errorf("apply schedule migration 5: %w", err)
+	}
+	if err := validateCatalog(ctx, tx, pins.schedules); err != nil {
+		return err
+	}
+	_, err := tx.Exec(ctx, "INSERT INTO public.app_schema_migrations(version,sql_sha256,previous_catalog_sha256,catalog_sha256) VALUES(5,$1,$2,$3)", digest(scheduleMigration), pins.timezones, pins.schedules)
 	return err
 }

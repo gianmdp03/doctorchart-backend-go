@@ -41,7 +41,7 @@ type AvailabilityDay struct {
 
 func civilDate(raw string) (time.Time, error) {
 	d, err := time.Parse("2006-01-02", raw)
-	if err != nil || d.Format("2006-01-02") != raw {
+	if err != nil || d.Format("2006-01-02") != raw || d.Year() < 1 {
 		return time.Time{}, fmt.Errorf("fecha inválida")
 	}
 	return d, nil
@@ -57,6 +57,9 @@ func wallMinute(raw string, end bool) (int, error) {
 	return t.Hour()*60 + t.Minute(), nil
 }
 func validateRanges(ranges []ScheduleRange) error {
+	if ranges == nil {
+		return fmt.Errorf("las franjas deben ser una lista explícita")
+	}
 	if len(ranges) > 16 {
 		return fmt.Errorf("máximo técnico de 16 franjas por día")
 	}
@@ -143,7 +146,7 @@ func (c ScheduleConfig) rangesOn(date time.Time) []ScheduleRange {
 // Civil minute enumeration handles skipped dates, missing times and both
 // occurrences of a repeated time without relying on time.Date's ambiguous choice.
 func civilMinutes(ctx context.Context, date time.Time, loc *time.Location, visit func(time.Time, int)) error {
-	key := date.Format("2006-01-02")
+	year, month, day := date.Date()
 	start := date.Add(-26 * time.Hour)
 	end := date.Add(50 * time.Hour)
 	for instant := start; instant.Before(end); instant = instant.Add(time.Minute) {
@@ -153,7 +156,8 @@ func civilMinutes(ctx context.Context, date time.Time, loc *time.Location, visit
 			}
 		}
 		local := instant.In(loc)
-		if local.Format("2006-01-02") == key {
+		y, m, d := local.Date()
+		if y == year && m == month && d == day {
 			visit(instant, local.Hour()*60+local.Minute())
 		}
 	}

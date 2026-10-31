@@ -15,12 +15,13 @@ import (
 )
 
 type Config struct {
-	Port          string
-	DatabaseURL   string
-	GatewaySecret string
-	BillingSecret string
-	BillingURL    string
-	Storage       storage.Config
+	Port             string
+	DatabaseURL      string
+	GatewaySecret    string
+	BillingSecret    string
+	BillingURL       string
+	SchedulesEnabled bool
+	Storage          storage.Config
 }
 
 func Load() (Config, error) {
@@ -63,6 +64,11 @@ func Load() (Config, error) {
 		values[item[0]] = get(item[0], item[1], item[2])
 	}
 	c := Config{Port: values["server.port"], GatewaySecret: values["app.security.gateway-secret"], BillingSecret: values["services.billing.shared-secret"], BillingURL: values["services.billing.url"]}
+	scheduleFlag := get("features.schedules.enabled", "SCHEDULES_ENABLED", "false")
+	if scheduleFlag != "true" && scheduleFlag != "false" {
+		return c, errors.New("Configuración inválida: SCHEDULES_ENABLED debe ser true o false.")
+	}
+	c.SchedulesEnabled = scheduleFlag == "true"
 	c.Storage = storage.Config{Type: values["app.storage.type"], Directory: values["app.storage.studies-dir"], Endpoint: values["app.storage.s3.endpoint"], Bucket: values["app.storage.s3.bucket"], AccessKey: values["app.storage.s3.access-key"], SecretKey: values["app.storage.s3.secret-key"], Region: values["app.storage.s3.region"]}
 	transformValue := values["app.storage.allow-study-image-transformation"]
 	if transformValue != "true" && transformValue != "false" {
