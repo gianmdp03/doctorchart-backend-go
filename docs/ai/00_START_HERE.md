@@ -1,20 +1,12 @@
-# Doctor Chart — inicio breve
-**Versión 0.3 · 29/10/2026 · M1 cerrado; M2-SOL implementado para revisión. M3 no autorizado.**
+# Doctor Chart — M3 implementado y validado
+30/10/2026. Un único agente implementa backend, PostgreSQL y Angular; Argon ya no participa. M1 y M2 aprobados, incluida integración real. M4 no autorizado.
 
-## Producto confirmado
-- Pacientes e historias clínicas pertenecen al médico. Un mismo paciente conserva su historia al atenderse en distintos consultorios.
-- Consultorios = lugares de atención para ubicaciones, horarios y turnos. No agregar `patients.clinic_id`, `clinic_patients`, copias ni filtros clínicos por sede.
-- Se puede usar la clínica y completar el wizard sin crear un consultorio. Un lugar es necesario solo para configurar agenda/reservas.
-- Médicos conservan Supabase/Gateway. Secretarias tendrán autenticación local en Doctor Chart y acceso administrativo, sin historia clínica.
-- Bycode/Billing administra planes y límites; Doctor Chart los aplica sin inventar cantidades por tier.
-- Ruta pública confirmada: `/appointments`, sin alias ni redirecciones de compatibilidad para esta funcionalidad nueva. Segmentos de médico y consultorio: propuestas hasta aprobar el contrato de rutas.
-- Agendas por lugar, sin reservas simultáneas incompatibles para el mismo médico. Reservar no crea paciente ni historia.
+Trabajo en clones normales C:/Users/gcast/Documents/GitHub/doctorchart-m3/{doctorchart-backend-go,doctorchart-frontend}, rama codex/m3-availability desde turnos aprobado. Los checkouts habituales permanecen en main sin cambios; sin worktrees, pushes, merges a main o despliegues.
 
-## Estado real
-El propietario descartó intencionalmente el trabajo anterior y preparó repositorios limpios. Bases iniciales verificadas: frontend `1419697`, backend `c2c30c1`, Gateway `55197fa`, Billing `bf65c04`. **No recuperar ni reconstruir lo descartado.**
-M1 final `6152867`, aprobado por Argon y cierre documental autorizado por el propietario. Startup sin SKIP y upgrade con seeds reales PASS; cinco pruebas externas omitidas justificadamente, no bloqueantes. Rama `codex/m1-clinics-migrations` pendiente de integración controlada; sin cambios en producción.
+M3: horarios semanales por consultorio, varias franjas, duración, anticipación/horizonte, excepciones y disponibilidad dinámica día/semana. Contrato: [M3-AVAILABILITY-v1](contracts/M3_AVAILABILITY_API.md). Migración 0005 incremental; baseline y 0002..0004 intactos.
 
-## Próximo paso
-Revisar [correcciones M2-SOL](reviews/M2_SOL_CORRECTIONS.md): DoctorChart 594402e (esquema 4) y Billing 80c171c para Argon. Frontend ea4f4d7 conserva hallazgos de revisión; debe excluir timeZone de consultorios, preservándolo para clínica. UTC/regiones funcionan; Etc/ se rechaza sin convertir datos existentes. API v1 congelada; aceptación e integración pendientes. [Prompts](07_SESSION_STARTERS.md) y [handoff](05_HANDOFF.md) permiten reiniciar sin auditorías históricas.
-Desde M2: Sol backend/BD/Billing; Gemini Argon frontend Angular; revisión cruzada. **Un escritor por directorio Git, sin worktrees bajo ninguna circunstancia.** Ver [protocolo](06_PROTOCOL.md).
-M2-SOL autorizado y entregado; Angular reservado a Argon. Sin merge, push, despliegue o bases reales. Snapshot efectivo apto permite operar con Billing caído; sin él no hay defaults. Configuración real de max_clinics pendiente. Los `AGENTS.md` reales siguen vigentes; backend `production: true`.
+Pacientes e historias pertenecen al médico, sin patients.clinic_id. Solo BASIC/PRO/UNLIMITED; no nuevas cuotas ni valores comerciales reales. Se reutilizan derechos efectivos M2. Sin reservas ni pacientes automáticos; /appointments permanece previsto.
+
+SCHEDULES_ENABLED=false en Angular y por defecto en Go; CLINICS_ENABLED=false. Activación, integración de ramas y bases reales requieren autorización separada. No modificar Cloudflare.
+
+Continuar por [handoff M3](M3_IMPLEMENTATION_HANDOFF.md); no seguir instrucciones históricas de asignación a Argon ni iniciar otra auditoría completa.

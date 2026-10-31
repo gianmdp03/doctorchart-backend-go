@@ -1,3 +1,8 @@
+# Estado vigente 30/10/2026
+M1 APROBADO; M2 APROBADO e integración funcional PASS.
+M3 IMPLEMENTADO / VALIDADO, pendiente aceptación del propietario, rama codex/m3-availability en clones aislados. Ver M3_IMPLEMENTATION_HANDOFF.md. M4 NO AUTORIZADO.
+Las filas anteriores a esta actualización, conservadas abajo, son antecedentes de M2 y no instrucciones de reparto vigente.
+
 # Tablero — M2-SOL entregado para revisión
 **29/10/2026. M1 cerrado/APROBADO; M3 no autorizado.**
 
