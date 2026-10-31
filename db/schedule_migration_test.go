@@ -94,6 +94,9 @@ func TestScheduleUpgradeFromM2RollbackPreservationAndCatalog(t *testing.T) {
 			if err = conn.QueryRow(t.Context(), "SELECT full_name,(SELECT timezone FROM clinics LIMIT 1) FROM patients WHERE id=1").Scan(&patientName, &clinicZone); err != nil || patientName != "Preserve patient" || clinicZone != "UTC" {
 				t.Fatal(patientName, clinicZone, err)
 			}
+			if _, err = conn.Exec(t.Context(), "INSERT INTO clinic_schedules(clinic_id,slot_minutes,min_notice_minutes,max_advance_days,weekly,exceptions,version) SELECT id,30,0,30,'[]','[]',7 FROM clinics LIMIT 1"); err != nil {
+				t.Fatal(err)
+			}
 			if err = Ensure(t.Context(), instance, nil); err != nil {
 				t.Fatal("restart", err)
 			}
