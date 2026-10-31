@@ -22,6 +22,8 @@ type Config struct {
 	BillingURL            string
 	SchedulesEnabled      bool
 	BookingsEnabled       bool
+	StaffEnabled          bool
+	StaffOrigin           string
 	PublicBookingsEnabled bool
 	Storage               storage.Config
 }
@@ -86,6 +88,18 @@ func Load() (Config, error) {
 	c.PublicBookingsEnabled = publicFlag == "true"
 	if c.PublicBookingsEnabled && !c.BookingsEnabled {
 		return c, errors.New("PUBLIC_BOOKINGS_ENABLED requiere BOOKINGS_ENABLED")
+	}
+	staffFlag := get("features.staff.enabled", "STAFF_ENABLED", "false")
+	if staffFlag != "true" && staffFlag != "false" {
+		return c, errors.New("STAFF_ENABLED debe ser true o false")
+	}
+	c.StaffEnabled = staffFlag == "true"
+	c.StaffOrigin = get("features.staff.origin", "STAFF_ORIGIN", "")
+	if c.StaffEnabled {
+		origin, e := url.Parse(c.StaffOrigin)
+		if !c.BookingsEnabled || e != nil || origin.Scheme != "https" || origin.Host == "" || origin.User != nil || origin.Path != "" || origin.RawQuery != "" || origin.Fragment != "" {
+			return c, errors.New("STAFF_ENABLED requiere BOOKINGS_ENABLED y STAFF_ORIGIN HTTPS exacto sin path")
+		}
 	}
 	c.Storage = storage.Config{Type: values["app.storage.type"], Directory: values["app.storage.studies-dir"], Endpoint: values["app.storage.s3.endpoint"], Bucket: values["app.storage.s3.bucket"], AccessKey: values["app.storage.s3.access-key"], SecretKey: values["app.storage.s3.secret-key"], Region: values["app.storage.s3.region"]}
 	transformValue := values["app.storage.allow-study-image-transformation"]

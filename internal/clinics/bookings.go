@@ -330,7 +330,12 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 	if err != nil {
 		return err
 	}
-	status, response, err := replayBooking(r.Context(), s.pool, workspace, key, hash)
+	staff := staffFrom(r.Context())
+	var status int
+	var response json.RawMessage
+	if staff == nil {
+		status, response, err = replayBooking(r.Context(), s.pool, workspace, key, hash)
+	}
 	if err != nil {
 		return err
 	}
@@ -338,6 +343,9 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 		return s.writeBookingResult(w, r, public, status, response)
 	}
 	rights := s.rights
+	if staff != nil {
+		rights = s.staffRights
+	}
 	if public != nil {
 		rights = s.publicRights
 	}
@@ -363,6 +371,17 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 	}
 	if err = tx.QueryRow(ctx, "SELECT id FROM doctor_workspaces WHERE id=$1 AND user_id=$2 FOR UPDATE", workspace, user).Scan(&workspace); err != nil {
 		return err
+	}
+	if staff != nil {
+		if op != "create" {
+			previous, err = ownedBooking(ctx, tx, user, previous.ID)
+			if err != nil {
+				return err
+			}
+		}
+		if err = staff.check(ctx, tx, workspace, snapshot, previous, request); err != nil {
+			return err
+		}
 	}
 	status, response, err = replayBooking(ctx, tx, workspace, key, hash)
 	if err != nil {
@@ -498,6 +517,9 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 	}
 	if op == "create" || result.Version != previous.Version {
 		actor := user
+		if staff != nil {
+			actor = "STAFF:" + staff.session.ID
+		}
 		if public != nil {
 			actor = "PUBLIC_BOOKING"
 		}

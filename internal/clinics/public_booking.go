@@ -158,6 +158,14 @@ func (a *publicAdmission) record(ctx context.Context, tx pgx.Tx, b Booking) erro
 }
 func (s *Service) writeBookingResult(w http.ResponseWriter, r *http.Request, a *publicAdmission, status int, response json.RawMessage) error {
 	if a == nil {
+		if staffFrom(r.Context()) != nil {
+			doc, err := staffBookingDocument(response)
+			if err != nil {
+				return err
+			}
+			api.WriteJSON(w, status, doc)
+			return nil
+		}
 		api.WriteJSON(w, status, response)
 		return nil
 	}

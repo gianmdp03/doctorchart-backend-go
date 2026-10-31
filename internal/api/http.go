@@ -104,7 +104,7 @@ func Gateway(secret string, next http.Handler) http.Handler {
 			securityError(Failure(403, "FORBIDDEN", "Acceso denegado."))
 			return
 		}
-		if PublicAppointments(r.Method, r.URL.Path) {
+		if PublicAppointments(r.Method, r.URL.Path) || StaffRoute(r.Method, r.URL.Path) {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -207,4 +207,47 @@ func PublicAppointments(method, p string) bool {
 		return len(parts) == 2 && parts[1] == "doctors" || len(parts) == 3 && parts[1] == "doctors" && publicUUID.MatchString(parts[2]) || len(parts) == 6 && parts[1] == "doctors" && publicUUID.MatchString(parts[2]) && parts[3] == "clinics" && publicUUID.MatchString(parts[4]) && parts[5] == "availability"
 	}
 	return method == "POST" && (len(parts) == 2 && parts[1] == "challenge" || len(parts) == 4 && parts[1] == "doctors" && publicUUID.MatchString(parts[2]) && parts[3] == "bookings")
+}
+
+// StaffRoute is a transport allowlist, not authentication. DoctorChart checks
+// its local session and per-owner rights; no Supabase identity is forwarded.
+func StaffRoute(method, p string) bool {
+	const base = "/api/doctorchart/staff/"
+	if !strings.HasPrefix(p, base) {
+		return false
+	}
+	parts := strings.Split(strings.TrimPrefix(p, base), "/")
+	if len(parts) == 1 {
+		if method == "GET" {
+			return parts[0] == "session" || parts[0] == "assignments"
+		}
+		if method == "POST" {
+			switch parts[0] {
+			case "login", "activate", "recover", "logout", "password":
+				return true
+			}
+		}
+		return false
+	}
+	if len(parts) < 3 || parts[0] != "owners" || !publicUUID.MatchString(parts[1]) {
+		return false
+	}
+	decimal := func(s string) bool {
+		if s == "" || s[0] == '0' || len(s) > 19 {
+			return false
+		}
+		for _, c := range s {
+			if c < '0' || c > '9' {
+				return false
+			}
+		}
+		return true
+	}
+	if method == "GET" && len(parts) == 5 && parts[2] == "clinics" && decimal(parts[3]) {
+		return parts[4] == "bookings" || parts[4] == "availability"
+	}
+	if method == "POST" && len(parts) == 3 && parts[2] == "bookings" {
+		return true
+	}
+	return len(parts) == 5 && parts[2] == "bookings" && decimal(parts[3]) && (method == "PATCH" && parts[4] == "status" || method == "POST" && parts[4] == "reschedule")
 }

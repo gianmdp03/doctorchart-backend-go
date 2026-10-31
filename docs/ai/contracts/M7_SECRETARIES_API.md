@@ -40,3 +40,5 @@ Angular: `/staff/login`, `/staff/activate`, `/staff/recover`, `/staff/calendar` 
 ## PostgreSQL y aceptación
 
 Migración incremental 0009, baseline/0002..0008 inmutables. Tablas locales de cuentas, relaciones, asignaciones, invitaciones, sesiones, límites y auditoría; expansión sin borrar datos. Fresh/upgrade desde8 y rollback transaccional probados en PostgreSQL descartable; downgrade de binario no autorizado sobre9. Preservación M1–M6. Demostrar médico real Supabase + secretaria local a través Gateway/TLS, cookie/CSRF, recuperación/revocación, múltiples médicos, denegación clínica, concurrencia M4, expiración comercial, móvil/oscuro. Ningún omitido equivale a PASS. Sin producción ni M8.
+
+Renovar una invitación pendiente utiliza el mismo POST /secretaries/invitations por email propio: conserva la relación, incrementa versión e invalida todos los códigos previos. Una cuenta ya activada se administra mediante PUT, sin restablecer su identidad.

@@ -13,6 +13,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/syntah/doctorchart-backend-go/internal/api"
+	"github.com/syntah/doctorchart-backend-go/internal/billing"
 )
 
 type clinicSchedule struct {
@@ -343,9 +344,25 @@ func (s *Service) availabilityFor(w http.ResponseWriter, r *http.Request, user s
 	if _, err = tx.Exec(ctx, "SET LOCAL lock_timeout='5s'; SET LOCAL statement_timeout='10s'"); err != nil {
 		return err
 	}
+	var staffSnapshot billing.Snapshot
+	if staffFrom(ctx) != nil {
+		staffSnapshot, err = s.staffRights.Resolve(ctx, user)
+		if err != nil {
+			return unavailable()
+		}
+		if err = s.staffRights.Fence(ctx, tx, staffSnapshot); err != nil {
+			return unavailable()
+		}
+	}
 	var workspace int64
 	if err = tx.QueryRow(ctx, "SELECT id FROM doctor_workspaces WHERE user_id=$1 FOR SHARE", user).Scan(&workspace); err != nil {
 		return err
+	}
+
+	if staff := staffFrom(ctx); staff != nil {
+		if err = staff.check(ctx, tx, workspace, staffSnapshot, Booking{}, bookingRequest{}); err != nil {
+			return err
+		}
 	}
 	clinic, err = scan(tx.QueryRow(ctx, "SELECT "+columns+" FROM clinics WHERE id=$1 AND workspace_id=$2", clinic.ID, workspace))
 	if err != nil {

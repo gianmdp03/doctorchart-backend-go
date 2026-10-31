@@ -22,21 +22,23 @@ import (
 var ErrEntitlementsUnavailable = errors.New("effective entitlements unavailable")
 
 type Snapshot struct {
-	OnlineBooking     *bool      `json:"onlineBooking,omitempty"`
-	OwnerID           string     `json:"ownerId"`
-	Module            string     `json:"module"`
-	Revision          string     `json:"revision"`
-	IssuedAt          time.Time  `json:"issuedAt"`
-	ValidUntil        time.Time  `json:"validUntil"`
-	CoverageExpiresAt *time.Time `json:"coverageExpiresAt"`
-	ClinicManagement  bool       `json:"clinicManagement"`
-	MaxClinics        *int64     `json:"max_clinics"`
-	generation        int64
+	SecretaryManagement *bool      `json:"secretaryManagement,omitempty"`
+	OnlineBooking       *bool      `json:"onlineBooking,omitempty"`
+	OwnerID             string     `json:"ownerId"`
+	Module              string     `json:"module"`
+	Revision            string     `json:"revision"`
+	IssuedAt            time.Time  `json:"issuedAt"`
+	ValidUntil          time.Time  `json:"validUntil"`
+	CoverageExpiresAt   *time.Time `json:"coverageExpiresAt"`
+	ClinicManagement    bool       `json:"clinicManagement"`
+	MaxClinics          *int64     `json:"max_clinics"`
+	generation          int64
 }
 
 // Memory holds only signed, bounded leases. PostgreSQL fences invalidation
 // across instances and requests already in flight. Restart means empty cache.
 type Entitlements struct {
+	v3           bool
 	v2           bool
 	pool         *pgxpool.Pool
 	base, secret string
@@ -88,6 +90,9 @@ func (e *Entitlements) Resolve(ctx context.Context, owner string) (Snapshot, err
 	if e.v2 {
 		endpoint = "/entitlements-v2"
 	}
+	if e.v3 {
+		endpoint = "/entitlements-v3"
+	}
 	req, err := http.NewRequestWithContext(ctx, "GET", e.base+"/internal/doctorchart/owners/"+url.PathEscape(owner)+endpoint, nil)
 	if err != nil {
 		return Snapshot{}, ErrEntitlementsUnavailable
@@ -117,6 +122,9 @@ func (e *Entitlements) Resolve(ctx context.Context, owner string) (Snapshot, err
 	if e.v2 {
 		expectedFields = 9
 	}
+	if e.v3 {
+		expectedFields = 10
+	}
 	if json.Unmarshal(body, &required) != nil || len(required) != expectedFields {
 		return Snapshot{}, ErrEntitlementsUnavailable
 	}
@@ -134,6 +142,9 @@ func (e *Entitlements) Resolve(ctx context.Context, owner string) (Snapshot, err
 		return Snapshot{}, ErrEntitlementsUnavailable
 	}
 	if e.v2 && snapshot.OnlineBooking == nil {
+		return Snapshot{}, ErrEntitlementsUnavailable
+	}
+	if e.v3 && snapshot.SecretaryManagement == nil {
 		return Snapshot{}, ErrEntitlementsUnavailable
 	}
 	if !snapshot.valid(owner, e.now()) {
@@ -182,5 +193,11 @@ func (e *Entitlements) Invalidate(ctx context.Context) error {
 func (e *Entitlements) PublicBookings() *Entitlements {
 	next := NewEntitlements(e.pool, e.base, e.secret)
 	next.v2 = true
+	return next
+}
+
+func (e *Entitlements) Secretaries() *Entitlements {
+	next := e.PublicBookings()
+	next.v3 = true
 	return next
 }

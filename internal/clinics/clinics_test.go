@@ -60,6 +60,7 @@ type fixture struct {
 	handler http.Handler
 	rights  *billing.Entitlements
 	mode    atomic.Int32
+	staff   atomic.Bool
 	online  atomic.Bool
 	limit   atomic.Int64
 	calls   atomic.Int32
@@ -121,6 +122,13 @@ func newFixture(t *testing.T) *fixture {
 			flag := f.online.Load()
 			value.OwnerID = strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/internal/doctorchart/owners/"), "/entitlements-v2")
 			value.OnlineBooking = &flag
+		}
+		if strings.HasSuffix(r.URL.Path, "/entitlements-v3") {
+			flag := f.online.Load()
+			staff := f.staff.Load()
+			value.OwnerID = strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/internal/doctorchart/owners/"), "/entitlements-v3")
+			value.OnlineBooking = &flag
+			value.SecretaryManagement = &staff
 		}
 		if mode == 2 {
 			value.ClinicManagement = false

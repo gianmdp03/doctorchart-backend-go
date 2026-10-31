@@ -110,6 +110,9 @@ func Ensure(ctx context.Context, pool *pgxpool.Pool, seed func(context.Context, 
 		if version == 8 {
 			expected = pins.publicBookings
 		}
+		if version == 9 {
+			expected = pins.secretaries
+		}
 		if catalogHash != expected {
 			return fmt.Errorf("%s schema drift: recorded catalog differs from expected version %d", Backend, version)
 		}
@@ -157,21 +160,26 @@ func Ensure(ctx context.Context, pool *pgxpool.Pool, seed func(context.Context, 
 			return err
 		}
 	}
+	if version < 9 {
+		if err = migrateSecretaries(ctx, tx, pins); err != nil {
+			return err
+		}
+	}
 	if seed != nil {
 		if err = seed(ctx, tx); err != nil {
 			return fmt.Errorf("seed %s baseline: %w", Backend, err)
 		}
 	}
 	// Seed hooks may change managed rows, never the structural contract.
-	if err = validateCatalog(ctx, tx, pins.publicBookings); err != nil {
+	if err = validateCatalog(ctx, tx, pins.secretaries); err != nil {
 		return err
 	}
 	if !marker {
-		if _, err = tx.Exec(ctx, "INSERT INTO public.app_schema_state(id,backend,baseline_version,sql_sha256,catalog_sha256) VALUES(1,$1,$2,$3,$4)", Backend, currentVersion, digest(Schema), pins.publicBookings); err != nil {
+		if _, err = tx.Exec(ctx, "INSERT INTO public.app_schema_state(id,backend,baseline_version,sql_sha256,catalog_sha256) VALUES(1,$1,$2,$3,$4)", Backend, currentVersion, digest(Schema), pins.secretaries); err != nil {
 			return err
 		}
 	} else if version < currentVersion {
-		if _, err = tx.Exec(ctx, "UPDATE public.app_schema_state SET baseline_version=$1,catalog_sha256=$2 WHERE id=1", currentVersion, pins.publicBookings); err != nil {
+		if _, err = tx.Exec(ctx, "UPDATE public.app_schema_state SET baseline_version=$1,catalog_sha256=$2 WHERE id=1", currentVersion, pins.secretaries); err != nil {
 			return err
 		}
 	}

@@ -33,6 +33,9 @@ type Clinic struct {
 }
 
 type Service struct {
+	staffEnabled     bool
+	staffOrigin      string
+	staffRights      *billing.Entitlements
 	publicEnabled    bool
 	publicSecret     string
 	publicRights     *billing.Entitlements
@@ -127,6 +130,10 @@ func (s *Service) Routes(mux *http.ServeMux) {
 				api.WriteError(w, err)
 			}
 		}
+	}
+	if s.staffEnabled {
+		s.staffAuthRoutes(mux)
+		s.staffOwnerRoutes(mux, wrap)
 	}
 	if s.publicEnabled {
 		s.publicRoutes(mux, wrap)
