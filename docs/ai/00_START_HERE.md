@@ -1,9 +1,9 @@
 # Doctor Chart — continuidad breve
 
-31/10/2026. M1–M6 aprobados; M7 secretarias implementado y validado en ensayo, pendiente de aceptación. M8 no autorizado. Ramas codex/m7-secretaries derivadas de los M6 aprobados, en clones normales doctorchart-m3. Nunca trabajar en main ni usar worktrees.
+31/10/2026. M1–M7 aprobados; M8 notificaciones y recuperación implementado y validado en ensayo, pendiente de aceptación. M9 no autorizado. Ramas codex/m8-notifications desde M7, clones normales doctorchart-m3. Main nunca es rama de turnos, sin worktrees.
 
-Leer 05_HANDOFF.md y M7_DELIVERY.md para versiones, pruebas y límites. Contrato: contracts/M7_SECRETARIES_API.md. No hace falta leer auditorías históricas para continuar.
+Leer 05_HANDOFF.md y M8_DELIVERY.md. Contrato: contracts/M8_NOTIFICATIONS_API.md. No hace falta releer auditorías históricas.
 
-Pacientes e historias pertenecen al médico; no clinic_id ni acceso clínico para secretarias. Médico usa Supabase/Gateway; secretaria usa cuenta local Go y permisos por relación/sede. M4 sigue siendo el único motor de reservas. Capacidades comerciales independientes de propietario, BASIC/PRO/UNLIMITED, sin valores por defecto. /appointments sigue como ruta pública.
+Pacientes/historias pertenecen al médico, sin clinic_id ni acceso clínico de secretarias. Médico Supabase, secretaria localGo. M4 único motor de reservas; outboxPostgreSQL envía correos después del commit. /appointments/confirmation permite consulta con código privado sin cuenta ni PII en URL.
 
-Flags desactivados en aplicación normal. Sin producción, bases reales, GitHub remoto, push, merge o despliegues. Conservar turnos y ramas anteriores. No alterar AGENTS.md.
+Flags desactivados en aplicación normal. Sin producción, bases reales, remotos, pushes, merges o despliegues. Conservar turnos/M1–M7 y commits ajenos89f032c/8ac5b14 deBycodefrontend. No alterarAGENTS.md. Editor comercial pendiente para M9, no autorizado.

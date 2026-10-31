@@ -1,5 +1,13 @@
 # Roadmap vigente —31/10/2026
 
+M1–M7 aprobados. M8 notificaciones/outbox/recuperación completado y validado en ensayo, pendiente de aceptación. M9 editorcomercial no autorizado ni iniciado. Sin habilitaciónproductiva o despliegues. Referencia M8_DELIVERY.md.
+
+---
+
+Antecedentes anteriores a M8:
+
+# Roadmap vigente —31/10/2026
+
 M1–M6 aprobados. M7 secretarias y administración delegada completado en ensayo, pendiente de aprobación. Siguiente fase M8 (notificaciones) no autorizada ni iniciada. Sin activación comercial ni producción; referencias técnicas en M7_DELIVERY.md.
 
 ---

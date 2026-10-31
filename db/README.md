@@ -1,3 +1,15 @@
+# M8: esquema10 en desarrolloaislado
+
+Migración0010_notifications.sql;44tablas/45FK. Baseline/0002..0009inmutables. Outboxdurable, accesoaconstancias y recuperaciónemailstaff; sin pacientes/clínica modificados. Fresh/upgrade9→10 y fallosSQL/drift/seed/rollback/reintento probados enPG17/18descartables. No ejecutar en basesreales. Binarioprevio rechaza10; recuperación con binariocompatible o respaldo autorizado, nunca bajar marcador.
+
+M8usa fixtures BASELINE_TEST_ADMIN_DSN y DOCTORCHART_CLINICS_TEST_DATABASE_URL ya validados porownership/nombre/loopback. NOTIFICATIONS_ENABLED=false; activar requiere claveestable32bytesbase64 y SMTPconTLS/OriginHTTPS exacto. Parámetros y límites en docs/ai/M8_DELIVERY.md.
+
+Inspecciónoperativa read-only: SELECT id,kind,state,attempts,last_code,due_at,lease_until FROM notification_outbox ORDER BY id; nunca imprimir payloadcifrado, correosdestinatarios, tokens o credenciales. DEAD no reenvíaautomáticamente: revisarcausa y autorización antes de reponer PENDING; conservarjob/historial, sin borrar ni cambiarpayload.
+
+---
+
+Antecedentes anteriores a M8:
+
 # Esquema de desarrollo M7: versión9
 
 Migración0009_secretaries.sql,41 tablas/40 FK. Baseline y0002..0008 inmutables. Cuenta local, relaciones/sedes, sesiones, invitaciones, contadores y auditoría; sin modificar pacientes. Fresh/upgrade8→9/rollback transaccional/reintento/reinicio y conservación probados en PG17/18 descartables. Suite staff usa DOCTORCHART_CLINICS_TEST_DATABASE_URL, migración BASELINE_TEST_ADMIN_DSN; conservar validaciones de ownership y nombres de fixtures existentes.

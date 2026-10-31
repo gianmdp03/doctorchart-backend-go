@@ -1,15 +1,15 @@
-# Handoff — M7 listo para aprobación
+# Handoff — M8 listo para aprobación
 
-31/10/2026. M6 aceptado por el propietario; M7 implementado, validado técnicamente en ensayo y pendiente de aprobación. M8 no iniciado.
+31/10/2026. Propietario aprobó M7; M8 completado en ensayo, pendiente de aceptación. M9 no iniciado.
 
-Ramas codex/m7-secretaries, clones normales dentro de C:/Users/gcast/Documents/GitHub/doctorchart-m3. Aplicación: backend a70a82b (base51ed413); Angular06f421f (basea0298dd); Billingdf1c063; Gateway20d03ae. Cierres documentales posteriores en HEAD. Contrato previo21d3919.
+Ramas codex/m8-notifications en C:/Users/gcast/Documents/GitHub/doctorchart-m3. Backend aplicación68a4993+pruebase716623; Angulardeee309; Gateway6586a72. Billing69febba intacto, en rama anterior. Cierres documentales posteriores enHEAD. Contrato previo0dc3710.
 
-[Informe canónico M7](M7_DELIVERY.md): alcance, API, seguridad, pruebas, evidencia y límites. [Contrato](contracts/M7_SECRETARIES_API.md). Go DoctorChart553 PASS + regresión finalstaff7; Billing533; Gateway357; race24; PG18migration5; Angular769; hosting8; navegador/servicios reales14.27 casos externos omitidos, no PASS.
+[Informe M8](M8_DELIVERY.md) y [contrato](contracts/M8_NOTIFICATIONS_API.md): endpoints, config, seguridad, pruebas y límites. DoctorChart575PASS +2regresiones finales-race; Gateway358; Notifications-race17; PG18migration5; Angular773; hosting8; navegador/serviciosreales9+3dependencias.21pruebasexternas omitidas, noPASS.
 
-Secretaria local: activación/invitación, login/logout, cambio/recuperación, sesiones Secure/HttpOnly/Strict/CSRF, relaciones por médico/sede y permisos administrativos. Sin Supabase para secretaria ni datos clínicos. Snapshot firmado v3 secretaryManagement, mismo motor M4 y fence comercial. Revocación de relación inmediata; comercial tras outbox/webhook o lease vigente hasta máximo1min/cobertura.
+SMTPSTARTTLS real a Mailpit aislado: confirmación/cancelación/reprogramación/recordatorio e invitación/recuperaciónstaff. Outbox cifrado durable atómico conM4, lease/SKIPLOCKED,2workers,reintentos/reinicio; proveedor caído no revierte reserva. Consulta pública POSTconfirmation por código256bits, bodyonly, limitado/expirable/revocable. Sin clínica ni búsquedas porPII. M7personalrecovery/cookies/CSRF/médicoSupabase intactos.
 
-Límites: entrega de códigos manual, recuperación exige código personal, sin email M8; reprogramación UI dentro de sede, API permite traslado autorizado; editor comercial nuevo flag pendiente. Ensayo HTTPS loopback, no dominios productivos. STAFF_ENABLED=false y flags anteriores desactivados normalmente.
+Límites: SMTP no garantiza exactly-once físico ante ACKperdido; Message-IDestable. No retira correo ya aceptado o cambiado después del chequeo final. Sin backfillmasivo/emailde pacienteclínico. Sin cancelaciónpública. ClaveNOTIFICATIONS_KEY estable necesaria para reinicio/restauración; no rotaciónautomática. Editorcomercial pendiente M9.
 
-Cinco main limpias y sin cambios M7 de esta ejecución: DoctorChart Go d5a89e0; Angular1419697; Billingbf65c04; Bycode frontend89f032c; Gateway55197fa. Bycode frontend recibió un commit ajeno a esta ejecución a11:23-03:00; preservado. Nuevas ramas se conservan también mediante fetch LOCAL sin cambiar main. Turnos/M1–M6 preservados.
+NOTIFICATIONS_ENABLED=false y flags anteriores sin activar normalmente. Entornoensayo HTTPSloopback y Mailpit con certificadoverificado; credencialessintéticas. Recursos propios retirados al cierre con ownership, evidencia fuera deGit en .fixtures/m8/verification-summary.json y integration/capturas.
 
-Evidencia local .fixtures/m7: verification-summary.json, logs y integration/capturas. Recursos descartables propios retirados al cierre; no escrituras/migraciones reales, despliegues, merges, pushes, worktrees ni cambios remotos. Próximo paso: aprobación del propietario antes de otra fase.
+Mainhabituales limpias/sin cambios M8 realizados aquí: DoctorChartGo d5a89e0; Angular1419697; Billingbf65c04; Bycodefrontend8ac5b14; Gateway55197fa. Bycodefrontend recibió otro commitajeno8ac5b14 (31/10 12:15-03:00), descendientede89f032c; ambos preservados sin incorporar. NuevasrefsM8 respaldadas mediante fetchLOCAL sin cambiarcheckout. Sin GitHubremoto, push, merge, worktrees, despliegue, migracionesreales o M9.

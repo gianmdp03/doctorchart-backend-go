@@ -1,5 +1,16 @@
 # Estado vigente —31/10/2026
 
+- M1–M7: aprobados.
+- M8: completado en ensayo, pendiente de aceptación; ver M8_DELIVERY.md.
+- M9: no autorizado. Pendiente editor comercial onlineBooking/secretaryManagement; sin cantidades por plan.
+- Operación futura: proveedorSMTP/DNS, claveestable y activación requieren autorización de entorno. Sin despliegue pendiente implícito.
+
+---
+
+Antecedentes anteriores a M8:
+
+# Estado vigente —31/10/2026
+
 - M1–M6: aprobados por el propietario.
 - M7: implementación y ensayos completos, pendiente de aceptación. Aplicación backenda70a82b, Angular06f421f, Billingdf1c063, Gateway20d03ae. Ver M7_DELIVERY.md y05_HANDOFF.md.
 - M8: no autorizado, no iniciado.
