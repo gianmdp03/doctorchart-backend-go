@@ -100,7 +100,7 @@ func normalizePatientHistory(p *Patient) error {
 	}{
 		{&p.Insurance, []string{"providerName", "planName", "affiliateNumber"}},
 		{&p.Guardian, []string{"fatherFullName", "motherFullName", "siblingsCount", "primaryGuardian", "primaryContactPhone", "hasSiblings", "siblingOrder", "livingArrangement"}},
-		{&p.Personal, []string{"chronicOrPreviousDiseases", "hospitalizationsOrSurgeries", "allergies", "habitualMedication", "birthMeasurements"}},
+		{&p.Personal, []string{"chronicOrPreviousDiseases", "hospitalizationsOrSurgeries", "allergies", "habitualMedication", "birthMeasurements", "clinicalProfile"}},
 		{&p.Family, []string{"paternalDiseases", "maternalDiseases", "siblingDiseases"}},
 	} {
 		if len(*field.raw) == 0 || string(*field.raw) == "null" {
@@ -567,6 +567,7 @@ func (s *Service) UpdatePatient(ctx context.Context, userID string, id int64, re
 }
 
 func (s *Service) Routes(mux *http.ServeMux) {
+	s.summaryRoutes(mux)
 	mux.HandleFunc("POST /api/doctorchart/patients", func(w http.ResponseWriter, r *http.Request) {
 		request, err := api.Decode(w, r)
 		if err != nil {
