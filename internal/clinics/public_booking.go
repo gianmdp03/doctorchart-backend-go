@@ -156,7 +156,10 @@ func (a *publicAdmission) record(ctx context.Context, tx pgx.Tx, b Booking) erro
 	if used {
 		return api.Failure(403, "CHALLENGE_ALREADY_USED", "La verificación ya se utilizó. Reintentá para obtener una nueva.")
 	}
-	_, err := tx.Exec(ctx, "INSERT INTO booking_public_details(booking_id,reference,form_version,form_snapshot,answers,document_country,document_type,document,email,challenge_hash,doctor_name,clinic_name,address,timezone) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)", b.ID, newOpaqueID(), a.request.FormVersion, form, answers, a.request.DocumentCountry, a.request.DocumentType, a.request.Document, a.request.Email, a.challengeHash, a.doctor.Name, a.clinic.Name, a.clinic.Address, a.clinic.Timezone)
+	result, err := tx.Exec(ctx, "INSERT INTO booking_public_details(booking_id,reference,form_version,form_snapshot,answers,document_country,document_type,document,email,challenge_hash,doctor_name,clinic_name,address,timezone) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) ON CONFLICT(challenge_hash) DO NOTHING", b.ID, newOpaqueID(), a.request.FormVersion, form, answers, a.request.DocumentCountry, a.request.DocumentType, a.request.Document, a.request.Email, a.challengeHash, a.doctor.Name, a.clinic.Name, a.clinic.Address, a.clinic.Timezone)
+	if err == nil && result.RowsAffected() == 0 {
+		return api.Failure(403, "CHALLENGE_ALREADY_USED", "La verificación ya se utilizó. Reintentá para obtener una nueva.")
+	}
 	return err
 }
 func (s *Service) writeBookingResult(w http.ResponseWriter, r *http.Request, a *publicAdmission, status int, response json.RawMessage) error {
