@@ -293,18 +293,18 @@ func (s *Service) staffAssignments(w http.ResponseWriter, r *http.Request) error
 			}
 			return e
 		}
-		clinics, e := tx.Query(r.Context(), "SELECT c.id::text,c.name,c.timezone,a.permissions FROM staff_access_clinics x JOIN clinics c ON c.id=x.clinic_id JOIN staff_access a ON a.id=x.access_id WHERE x.access_id=$1 AND c.status<>'ARCHIVED' ORDER BY c.id", rel.id)
+		clinics, e := tx.Query(r.Context(), "SELECT c.id::text,c.name,c.timezone,a.permissions,COALESCE(p.name,'Profesional asignado') FROM staff_access_clinics x JOIN clinics c ON c.id=x.clinic_id JOIN staff_access a ON a.id=x.access_id LEFT JOIN booking_publications p ON p.workspace_id=a.workspace_id WHERE x.access_id=$1 AND c.status<>'ARCHIVED' ORDER BY c.id", rel.id)
 		if e != nil {
 			tx.Rollback(context.Background())
 			return e
 		}
 		for clinics.Next() {
-			var id, name, zone string
+			var id, name, zone, doctorName string
 			var permissions []string
-			if e = clinics.Scan(&id, &name, &zone, &permissions); e != nil {
+			if e = clinics.Scan(&id, &name, &zone, &permissions, &doctorName); e != nil {
 				break
 			}
-			items = append(items, map[string]any{"ownerId": rel.owner, "accessId": rel.id, "clinicId": id, "clinicName": name, "timezone": zone, "permissions": permissions, "validUntil": a.validUntil})
+			items = append(items, map[string]any{"ownerId": rel.owner, "accessId": rel.id, "clinicId": id, "clinicName": name, "doctorName": doctorName, "timezone": zone, "permissions": permissions, "validUntil": a.validUntil})
 		}
 		if e == nil {
 			e = clinics.Err()
