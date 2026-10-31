@@ -1,12 +1,15 @@
-# Handoff M6 — portal público validado en ensayo
-31/10/2026. M5 aceptado y M6 completado para aceptación técnica. Un único agente. [Entrega, pruebas y límites](M6_DELIVERY.md), [contrato](contracts/M6_PUBLIC_APPOINTMENTS_API.md). No repetir auditorías históricas. M7 no autorizado.
+# Handoff — M7 listo para aprobación
 
-Ramas codex/m6-public-booking en los cuatro clones normales de doctorchart-m3. Aplicaciones finales: DoctorChart 8ccf7c2; Angular 5c45d4e; Billing 6bed61d; Gateway d23924f. Cierres documentales posteriores en HEAD. Bases M5 89a2564/a3dfb0d y dependencias M5 80c171c/55197fa; main/turnos/M3/M4/M5 preservados, refs M6 también conservadas mediante fetch exclusivamente local en checkouts habituales.
+31/10/2026. M6 aceptado por el propietario; M7 implementado, validado técnicamente en ensayo y pendiente de aprobación. M8 no iniciado.
 
-Pruebas: DoctorChart 536 PASS, Billing 529 PASS, Gateway 356 PASS, Angular 763 PASS, reservas -race 32 PASS, upgrade PG18 5 PASS, hosting/config 8 PASS, builds/vet PASS. Integración real de aplicación/guards/interceptores/Supabase Auth de ensayo/Gateway/Billing/PostgreSQL: 13 recorridos PASS. Reservas anónimas desktop/móvil, competencia 201/409, formulario versionado, aparición en calendario y aislamiento, Billing caído/revocado, 429 y datos clínicos idénticos. Los 7 usuarios de Auth iniciales no aumentaron. 27 fixtures externos opt-in omitidos, enumerados en evidencia, ninguno nuevo M6 y nunca contados PASS.
+Ramas codex/m7-secretaries, clones normales dentro de C:/Users/gcast/Documents/GitHub/doctorchart-m3. Aplicación: backend a70a82b (base51ed413); Angular06f421f (basea0298dd); Billingdf1c063; Gateway20d03ae. Cierres documentales posteriores en HEAD. Contrato previo21d3919.
 
-Seguridad: IDs públicos independientes; Gateway no acepta identidad administrativa pública. Una sola lease v2 para capacidad online y max_clinics, con fence M2 y motor M4 compartido. Catálogo online_booking_enabled ausente=false, sin cantidades predeterminadas ni nuevas funciones para tiers descartados; v1/legacy conservados. Proof de uso único/SQL atómico, límites compartidos, PII fuera de URLs/cache/logs (stdout y stderr verificados).
+[Informe canónico M7](M7_DELIVERY.md): alcance, API, seguridad, pruebas, evidencia y límites. [Contrato](contracts/M7_SECRETARIES_API.md). Go DoctorChart553 PASS + regresión finalstaff7; Billing533; Gateway357; race24; PG18migration5; Angular769; hosting8; navegador/servicios reales14.27 casos externos omitidos, no PASS.
 
-Esquema 8 por 0008, 34 tablas/32 FK; SQL previo, reservas y clínica intactos. Rollback transaccional ante fallo, sin DOWN destructivo; M5 no puede abrir marcador 8. Recuperación real requiere permiso, respaldo/restauración o binario compatible; no rebajar marcador.
+Secretaria local: activación/invitación, login/logout, cambio/recuperación, sesiones Secure/HttpOnly/Strict/CSRF, relaciones por médico/sede y permisos administrativos. Sin Supabase para secretaria ni datos clínicos. Snapshot firmado v3 secretaryManagement, mismo motor M4 y fence comercial. Revocación de relación inmediata; comercial tras outbox/webhook o lease vigente hasta máximo1min/cobertura.
 
-Flags normales desactivados. Fixtures/servidor propios retirados, evidencia/capturas fuera de Git en .fixtures/m6, sin publicar credenciales sintéticas. Sin GitHub/Cloudflare remoto, merge/push/despliegue o bases reales. Próximo paso: aceptación del propietario; ninguna autorización implícita para publicación comercial, cantidades reales o M7.
+Límites: entrega de códigos manual, recuperación exige código personal, sin email M8; reprogramación UI dentro de sede, API permite traslado autorizado; editor comercial nuevo flag pendiente. Ensayo HTTPS loopback, no dominios productivos. STAFF_ENABLED=false y flags anteriores desactivados normalmente.
+
+Cinco main limpias y sin cambios M7 de esta ejecución: DoctorChart Go d5a89e0; Angular1419697; Billingbf65c04; Bycode frontend89f032c; Gateway55197fa. Bycode frontend recibió un commit ajeno a esta ejecución a11:23-03:00; preservado. Nuevas ramas se conservan también mediante fetch LOCAL sin cambiar main. Turnos/M1–M6 preservados.
+
+Evidencia local .fixtures/m7: verification-summary.json, logs y integration/capturas. Recursos descartables propios retirados al cierre; no escrituras/migraciones reales, despliegues, merges, pushes, worktrees ni cambios remotos. Próximo paso: aprobación del propietario antes de otra fase.

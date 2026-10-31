@@ -1,3 +1,13 @@
+# Esquema de desarrollo M7: versión9
+
+Migración0009_secretaries.sql,41 tablas/40 FK. Baseline y0002..0008 inmutables. Cuenta local, relaciones/sedes, sesiones, invitaciones, contadores y auditoría; sin modificar pacientes. Fresh/upgrade8→9/rollback transaccional/reintento/reinicio y conservación probados en PG17/18 descartables. Suite staff usa DOCTORCHART_CLINICS_TEST_DATABASE_URL, migración BASELINE_TEST_ADMIN_DSN; conservar validaciones de ownership y nombres de fixtures existentes.
+
+STAFF_ENABLED=false por defecto; opt-in de ensayo requiere BOOKINGS_ENABLED/SCHEDULES_ENABLED y STAFF_ORIGIN HTTPS exacto. Ninguna autorización para ejecutar en bases reales. Un binario previo no reconoce9: recuperación mediante binario compatible o restauración de respaldo autorizada, nunca modificar marcador ni borrar tablas. Informe docs/ai/M7_DELIVERY.md.
+
+---
+
+Antecedentes anteriores al cierre M7:
+
 # PostgreSQL — baseline 1 y esquema 4 (M2)
 
 `db/schema.sql` permanece inmutable (23 tablas). `migrations/0002_clinics.sql` agrega `clinics`, `app_schema_migrations`, un índice y el validador IANA; el esquema 2 tiene 25 tablas y 21 FK. M2 agrega clinic_entitlement_epoch mediante 0003_entitlement_epoch.sql. La corrección 0004_clinic_timezone_policy.sql alinea la función IANA y revalida el CHECK: esquema 4 conserva 26 tablas y 21 FK. Baseline y migraciones 0002/0003 intactos. No modifica pacientes ni relaciones clínicas. `AGENTS.md` conserva `production: true`.

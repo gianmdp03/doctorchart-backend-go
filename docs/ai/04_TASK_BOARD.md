@@ -1,3 +1,14 @@
+# Estado vigente —31/10/2026
+
+- M1–M6: aprobados por el propietario.
+- M7: implementación y ensayos completos, pendiente de aceptación. Aplicación backenda70a82b, Angular06f421f, Billingdf1c063, Gateway20d03ae. Ver M7_DELIVERY.md y05_HANDOFF.md.
+- M8: no autorizado, no iniciado.
+- Backlog no bloqueante: editor comercial del nuevo boolean; recuperación asistida sin código requiere diseño seguro; traslado entre sedes desde UI; entrega de invitación por correo pertenece a M8. Sin cuotas propuestas.
+
+---
+
+Antecedentes anteriores al cierre M7:
+
 # Estado vigente M6 — 31/10/2026
 M5 aceptado (89a2564/a3dfb0d). M6 COMPLETADO / VALIDADO EN ENSAYO, pendiente aceptación. Aplicaciones congeladas: DoctorChart 8ccf7c2, Angular 5c45d4e, Billing 6bed61d, Gateway d23924f, ramas codex/m6-public-booking. [Entrega/evidencia/límites](M6_DELIVERY.md). Main/producción intactos, flags normales false, sin cantidades comerciales reales. M7 NO AUTORIZADO.
 

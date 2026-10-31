@@ -1,3 +1,11 @@
+# Roadmap vigente —31/10/2026
+
+M1–M6 aprobados. M7 secretarias y administración delegada completado en ensayo, pendiente de aprobación. Siguiente fase M8 (notificaciones) no autorizada ni iniciada. Sin activación comercial ni producción; referencias técnicas en M7_DELIVERY.md.
+
+---
+
+Antecedentes anteriores al cierre M7:
+
 # Roadmap — lugares administrativos, clínica por médico
 **M1 CERRADO / ARGON APROBADO en 6152867. M2-SOL implementado para revisión, Angular reservado a Argon; M3 no autorizado.**
 
