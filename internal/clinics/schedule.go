@@ -161,7 +161,10 @@ func (s *Service) validateSchedules(ctx context.Context, tx pgx.Tx, workspace in
 		return err
 	}
 	date := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-	return checkAgendaConflicts(ctx, agendas, date.AddDate(0, 0, -1), 369)
+	if err := checkAgendaConflicts(ctx, agendas, date.AddDate(0, 0, -1), 369); err != nil {
+		return err
+	}
+	return validateBookedSchedules(ctx, tx, workspace, now)
 }
 func (s *Service) scheduleRoutes(mux *http.ServeMux, wrap func(func(http.ResponseWriter, *http.Request, string) error) http.HandlerFunc) {
 	mux.HandleFunc("GET /api/doctorchart/clinics/{id}/schedule", wrap(s.getSchedule))
@@ -364,6 +367,10 @@ func (s *Service) availability(w http.ResponseWriter, r *http.Request, user stri
 	if err != nil {
 		return err
 	}
+	occupied, err := occupiedBookingWindows(ctx, tx, workspace, first.Add(-26*time.Hour), first.AddDate(0, 0, days).Add(50*time.Hour))
+	if err != nil {
+		return err
+	}
 	for n := 0; n < days; n++ {
 		date := first.AddDate(0, 0, n)
 		slots := []AvailableSlot{}
@@ -373,7 +380,7 @@ func (s *Service) availability(w http.ResponseWriter, r *http.Request, user stri
 				return err
 			}
 		}
-		result = append(result, AvailabilityDay{Date: date.Format("2006-01-02"), Slots: slots})
+		result = append(result, AvailabilityDay{Date: date.Format("2006-01-02"), Slots: removeOccupiedSlots(slots, occupied)})
 	}
 	api.WriteJSON(w, 200, map[string]any{"clinicId": clinic.ID, "timezone": clinic.Timezone, "scheduleVersion": agenda.Version, "generatedAt": now, "days": result})
 	return nil

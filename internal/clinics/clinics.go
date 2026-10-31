@@ -36,6 +36,7 @@ type Service struct {
 	pool             *pgxpool.Pool
 	rights           *billing.Entitlements
 	schedulesEnabled bool
+	bookingsEnabled  bool
 }
 
 func New(pool *pgxpool.Pool, rights *billing.Entitlements) *Service {
@@ -45,6 +46,11 @@ func New(pool *pgxpool.Pool, rights *billing.Entitlements) *Service {
 // NewWithSchedules opts in only at startup; normal servers keep agenda routes disabled.
 func NewWithSchedules(pool *pgxpool.Pool, rights *billing.Entitlements, enabled bool) *Service {
 	return &Service{pool: pool, rights: rights, schedulesEnabled: enabled}
+}
+
+// NewWithBookings enables both M3 and M4 only for an explicitly opted-in server.
+func NewWithBookings(pool *pgxpool.Pool, rights *billing.Entitlements, schedules, bookings bool) *Service {
+	return &Service{pool: pool, rights: rights, schedulesEnabled: schedules, bookingsEnabled: bookings}
 }
 
 const columns = "id::text,name,country,province,city,address,timezone,status,version::text,created_at,updated_at"
@@ -109,6 +115,9 @@ func (s *Service) Routes(mux *http.ServeMux) {
 				api.WriteError(w, err)
 			}
 		}
+	}
+	if s.bookingsEnabled && s.schedulesEnabled {
+		s.bookingRoutes(mux, wrap)
 	}
 	if s.schedulesEnabled {
 		s.scheduleRoutes(mux, wrap)

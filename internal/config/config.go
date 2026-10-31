@@ -21,6 +21,7 @@ type Config struct {
 	BillingSecret    string
 	BillingURL       string
 	SchedulesEnabled bool
+	BookingsEnabled  bool
 	Storage          storage.Config
 }
 
@@ -69,6 +70,14 @@ func Load() (Config, error) {
 		return c, errors.New("Configuración inválida: SCHEDULES_ENABLED debe ser true o false.")
 	}
 	c.SchedulesEnabled = scheduleFlag == "true"
+	bookingFlag := get("features.bookings.enabled", "BOOKINGS_ENABLED", "false")
+	if bookingFlag != "true" && bookingFlag != "false" {
+		return c, errors.New("Configuración inválida: BOOKINGS_ENABLED debe ser true o false.")
+	}
+	c.BookingsEnabled = bookingFlag == "true"
+	if c.BookingsEnabled && !c.SchedulesEnabled {
+		return c, errors.New("BOOKINGS_ENABLED requiere SCHEDULES_ENABLED.")
+	}
 	c.Storage = storage.Config{Type: values["app.storage.type"], Directory: values["app.storage.studies-dir"], Endpoint: values["app.storage.s3.endpoint"], Bucket: values["app.storage.s3.bucket"], AccessKey: values["app.storage.s3.access-key"], SecretKey: values["app.storage.s3.secret-key"], Region: values["app.storage.s3.region"]}
 	transformValue := values["app.storage.allow-study-image-transformation"]
 	if transformValue != "true" && transformValue != "false" {

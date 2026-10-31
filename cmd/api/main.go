@@ -87,7 +87,7 @@ func run() error {
 	}
 	workspaces := workspace.New(pool, validator)
 	workspaces.Routes(mux)
-	clinics.NewWithSchedules(pool, entitlements, c.SchedulesEnabled).Routes(mux)
+	clinics.NewWithBookings(pool, entitlements, c.SchedulesEnabled, c.BookingsEnabled).Routes(mux)
 	clinicalService, err := clinical.New(pool, workspaces, validator, rules, files)
 	if err != nil {
 		return err
