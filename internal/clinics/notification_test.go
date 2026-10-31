@@ -278,3 +278,86 @@ func TestNotificationPublicRecoveryRateAndNoReferenceOverride(t *testing.T) {
 		t.Fatal("missing recovery rate guidance")
 	}
 }
+
+func TestNotificationAttendedReservationsAndRevokedInvitationsNeverSend(t *testing.T) {
+	f, c, start, p, n, sender := notificationFixture(t)
+	_, b := notificationBooking(t, f, p, start)
+	for _, status := range []string{"CHECKED_IN", "COMPLETED"} {
+		w := bookingRequestFixture(f, "PATCH", "/bookings/"+b.ID+"/status", owner, newBookingKey(), jsonString(map[string]string{"expectedVersion": b.Version, "status": status}))
+		assertCode(t, w, 200, "")
+		b = booked(t, w)
+	}
+	if _, err := f.pool.Exec(t.Context(), "UPDATE notification_outbox SET due_at=now()"); err != nil {
+		t.Fatal(err)
+	}
+	processMail(t, n)
+	processMail(t, n)
+	if sender.count() != 0 {
+		t.Fatal("attended booking sent obsolete confirmation/reminder")
+	}
+	access, code := staffInvite(t, f, owner, c, []string{"view"})
+	// Renewal keeps the relation, consumes old code and produces a distinct job.
+	access2, code2 := staffInvite(t, f, owner, c, []string{"view"})
+	if access2 != access || code == code2 {
+		t.Fatal("invitation not safely renewed")
+	}
+	processMail(t, n)
+	if sender.count() != 0 {
+		t.Fatal("renewed invitation delivered old code")
+	}
+	assertCode(t, f.request("DELETE", "/secretaries/"+access, owner, ""), 204, "")
+	processMail(t, n)
+	if sender.count() != 0 {
+		t.Fatal("revoked invitation still delivered")
+	}
+}
+
+func TestNotificationConcurrentEmailRecoveryTokensAreSingleUse(t *testing.T) {
+	f, c, _, _, n, sender := notificationFixture(t)
+	_, code := staffInvite(t, f, owner, c, []string{"view"})
+	_ = staffActivateTest(t, f, code)
+	assertCode(t, staffReq(f, staffTestClient{}, "POST", "/recovery-email", map[string]string{"email": "assistant@example.invalid"}), 202, "")
+	// The consumed invitation job is discarded before the email recovery job.
+	processMail(t, n)
+	processMail(t, n)
+	parts := strings.SplitN(string(sender.messages[0]), "\r\n\r\n", 2)
+	plain, err := base64.StdEncoding.DecodeString(strings.ReplaceAll(parts[1], "\r\n", ""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	emailCode := ""
+	for _, line := range strings.Split(string(plain), "\r\n") {
+		if len(line) == 43 {
+			emailCode = line
+			break
+		}
+	}
+	if emailCode == "" {
+		t.Fatal("no recovery code in mailbox")
+	}
+	results := make(chan int, 2)
+	var wg sync.WaitGroup
+	for range 2 {
+		wg.Go(func() {
+			w := staffReq(f, staffTestClient{}, "POST", "/recover-email", map[string]string{"email": "assistant@example.invalid", "emailCode": emailCode, "password": "Concurrent-password-2026!"})
+			results <- w.Code
+		})
+	}
+	wg.Wait()
+	close(results)
+	sum := 0
+	for status := range results {
+		sum += status
+	}
+	if sum != 200+401 {
+		t.Fatal("two successful uses of one recovery code", sum)
+	}
+	assertCode(t, staffReq(f, staffTestClient{}, "POST", "/recovery-email", map[string]string{"email": "assistant@example.invalid"}), 202, "")
+	if _, err = f.pool.Exec(t.Context(), "UPDATE staff_email_recovery SET expires_at=now()-interval '1 second'"); err != nil {
+		t.Fatal(err)
+	}
+	processMail(t, n)
+	if sender.count() != 1 {
+		t.Fatal("expired recovery email delivered")
+	}
+}
