@@ -230,14 +230,7 @@ func mustPool(ctx context.Context, sqlPool *sql.DB) *pgxpool.Pool {
 	sqlPool.QueryRowContext(context.Background(), "SELECT current_database()").Scan(&name)
 	u, _ := url.Parse(os.Getenv("BASELINE_TEST_ADMIN_DSN"))
 	u.Path = "/" + name
-	config, err := pgxpool.ParseConfig(u.String())
-	if err != nil {
-		panic(err)
-	}
-	// Match cmd/api's bounded pool instead of scaling test connection count
-	// with the host CPU inventory. Sixteen startup callers still run concurrently.
-	config.MaxConns = 10
-	pool, err := pgxpool.NewWithConfig(context.Background(), config)
+	pool, err := pgxpool.New(context.Background(), u.String())
 	if err != nil {
 		panic(err)
 	}
