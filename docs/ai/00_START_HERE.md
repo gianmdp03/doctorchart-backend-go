@@ -1,10 +1,10 @@
-# Doctor Chart — M5 calendario médico
-30/10/2026. M4 aceptado por el propietario en 7fe9bd6; M5 autorizado, implementado y validado en ensayo. M6 NO autorizado. Un único agente.
+# Doctor Chart — M6 reservas públicas
+31/10/2026. M5 aceptado (backend 89a2564 / Angular a3dfb0d); M6 implementado y validado en ensayo, pendiente aceptación del propietario. Un único agente; M7 NO autorizado.
 
-Leer [entrega M5](M5_DELIVERY.md), [contrato M5](contracts/M5_CALENDAR_API.md) y [handoff](05_HANDOFF.md). Los informes M3/M4 son antecedentes, no instrucciones actuales de detener M5.
+Leer [entrega M6](M6_DELIVERY.md), [contrato público](contracts/M6_PUBLIC_APPOINTMENTS_API.md) y [handoff](05_HANDOFF.md). M1–M5 completos y preservados; informes anteriores son antecedentes, no instrucciones actuales de detener M6 o repartir trabajo con Argon.
 
-Clones normales existentes C:/Users/gcast/Documents/GitHub/doctorchart-m3/{doctorchart-backend-go,doctorchart-frontend}; ramas independientes codex/m5-calendar desde backend M4 7fe9bd6 y Angular M3 d0b7a45. Main, turnos, M3 y M4 preservados. Sin worktrees ni GitHub remoto, merges, pushes o despliegues.
+Clones normales en C:/Users/gcast/Documents/GitHub/doctorchart-m3/{doctorchart-backend-go,doctorchart-frontend,bycode-backend-go,api-ai-gateway-go}, ramas codex/m6-public-booking. Desde las bases exactas M5 y sus dependencias congeladas. Las cinco main habituales, turnos y ramas previas permanecen intactas. Sin worktrees, GitHub remoto, merges, pushes o despliegues.
 
-Calendario privado /calendar: día/semana, sedes, horarios IANA, creación, cancelación, reprogramación, estados e historial. M3/M4 siguen siendo autoridad; extensión administrativa attendeeName separa persona atendida de solicitante. Migración 0007 incremental, sin modificar baseline, pacientes, historias ni 0002..0006. Reservar nunca crea clínica.
+/appointments permite buscar profesionales publicados, elegir sede/slot M3 y confirmar mediante el mismo motor M4, sin cuenta ni historia clínica nueva. Publicación privada y formularios administrativos versionados; IDs públicos opacos, confirmación sin documento/email/teléfono. Capacidad comercial independiente online_booking_enabled, ausente=false, solo BASIC/PRO/UNLIMITED, sin cuotas/precios nuevos. Contrato firmado v2 compatible con v1; una única lease v2 para toda mutación pública.
 
-Solo BASIC/PRO/UNLIMITED y derechos efectivos M2. Flags normales desactivados; solo fixtures aislados activados. Sin cuotas reales, bases reales, portal /appointments, staff, emails, pagos, marketing o M6. Aceptación, activación e integración requieren decisión independiente del propietario.
+Migración 0008 incremental, esquema 8, baseline/0002..0007 inmutables. PUBLIC_BOOKINGS_ENABLED y PUBLIC_APPOINTMENTS_ENABLED siguen false en código normal. Sin pacientes por sede, cambios clínicos automáticos, producción, datos reales, staff, notificaciones/M8, pagos o M7. La aceptación no autoriza activar/publicar ni integrar a main.

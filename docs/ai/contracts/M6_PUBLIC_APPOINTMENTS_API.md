@@ -4,6 +4,8 @@
 ## Derechos
 Decisión explícita del propietario: reservas online requieren capacidad INDEPENDIENTE, sin valores predeterminados por plan. Billing agrega online_booking_enabled boolean opcional al catálogo administrativo existente; ausente/false=no habilitación, solo BASIC/PRO/UNLIMITED configurables para esta extensión. Preservar el mapa completo al editar estas capacidades; sin precios ni cuotas nuevas. GET interno /internal/doctorchart/owners/{owner}/entitlements-v2 conserva los ocho campos M2 + onlineBooking boolean firmado. v1 intacto, lectores legacy intactos. Lease/verificación/invalidation/fence/revisión/vencimiento real M2 reutilizados; no otra suscripción. Publicación/slots/altas requieren onlineBooking y derechos clinics vigentes con cupo no excedido. Caché apta permite continuidad ante Billing caído; ausencia de lease apta=503, capacidad denegada=403. Despublicar no requiere Billing disponible.
 
+Las mutaciones públicas utilizan una única snapshot v2 tanto para onlineBooking como para max_clinics/cobertura, con fence M2 dentro del motor M4; no se mezclan leases privadas v1 y públicas v2. El soporte legacy ENTERPRISE de consultorios v1 no concede esta nueva capacidad.
+
 ## Rutas
 API /api/doctorchart. Públicas únicamente:
 - GET /public/appointments/doctors?country=&province=&city=&specialty=&name=&page=0&size=20 (max20): {items:PublicDoctor[],page,size,hasMore}. Filtros por coincidencia textual literal, especialidad code/nombre. Sin IDs administrativos.

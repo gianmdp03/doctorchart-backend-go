@@ -1,3 +1,7 @@
+# Estado vigente M6 — 31/10/2026
+M5 aceptado (89a2564/a3dfb0d). M6 COMPLETADO / VALIDADO EN ENSAYO, pendiente aceptación. Aplicaciones congeladas: DoctorChart 8ccf7c2, Angular 5c45d4e, Billing 6bed61d, Gateway d23924f, ramas codex/m6-public-booking. [Entrega/evidencia/límites](M6_DELIVERY.md). Main/producción intactos, flags normales false, sin cantidades comerciales reales. M7 NO AUTORIZADO.
+
+## Antecedente M5
 # Estado vigente M5 — 30/10/2026
 M4 aceptado en 7fe9bd6; M5 COMPLETADO / VALIDADO EN ENSAYO, pendiente aceptación. Backend codex/m5-calendar (c63f5f3 + aserción 25a8c6f); Angular codex/m5-calendar (3f09d8d + 0de8490). [Pruebas, evidencia y límites](M5_DELIVERY.md). Main/producción intactos, flags normales false, M6 NO AUTORIZADO.
 

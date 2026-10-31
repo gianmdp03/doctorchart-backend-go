@@ -1,6 +1,10 @@
 # Roadmap — lugares administrativos, clínica por médico
 **M1 CERRADO / ARGON APROBADO en 6152867. M2-SOL implementado para revisión, Angular reservado a Argon; M3 no autorizado.**
 
+# Estado actual — M6
+M5 aceptado. M6 portal público y reservas sin cuenta completado y validado de punta a punta en ensayo; [entrega](M6_DELIVERY.md). Capacidad online independiente, sin defaults por plan ni configuración real. Integración/activación/despliegue requieren autorización separada; M7 no autorizado, avisos pertenecen a M8.
+
+## Antecedente M5
 # Estado actual — M5
 M4 aceptado por el propietario. M5 calendario Angular conectado al motor real, validado con servicios aislados y listo para aceptación; [entrega](M5_DELIVERY.md). Integración a main/activación/publicación requieren autorización separada. M6 y portal/staff/email/pagos/marketing no autorizados.
 

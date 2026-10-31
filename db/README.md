@@ -61,6 +61,12 @@ No ejecutar dos suites simultáneas contra las mismas bases con nombres fijos. G
 
 La prueba de arranque debe mostrar `--- PASS: TestStartupCreatesSchemaAndServesHealth`; un `SKIP` por ausencia de `DOCTORCHART_STARTUP_TEST_DATABASE_URL` no valida esta integración. `TestBaselineUpgradeWithRealSeedsPreservesAdminConfiguration` usa `bootstrap.Run` y los seeds reales sobre baseline 1, verifica transición hasta 4, conservación de configuraciones administradas y reinicio idempotente.
 
+## M6: esquema 8, reservas públicas
+
+0008 agrega cuatro tablas de publicación, sedes públicas, detalles administrativos versionados y rate-limits anónimos; 34 tablas/32 FK. Baseline y 0002..0007 inmutables. `go test ./db -run '^TestPublicBookingMigration' -count=1` verifica upgrade M5→8, conservación de clínica/reservas, SQL fallido/drift/seed tardío, rollback/reintento, reinicio y fresh=upgrade; ejecutado en PostgreSQL 17/18 descartables. Ver entrega M6 para fingerprints independientes y evidencia.
+
+El rollback es transaccional ante fallo, no un DOWN después de aceptar reservas públicas. M5 rechaza el marcador 8; cualquier recuperación real exige autorización independiente, respaldo/restauración probada o binario compatible que conserve escrituras nuevas. No rebajar versión ni borrar datos personales/contadores/reservas para eludir la validación. Ninguna migración real fue ejecutada.
+
 ## M5: esquema 7, persona atendida administrativa
 
 0007 agrega attendee_name nullable con CHECK e inmutabilidad, sin backfill ni cambios clínicos. El lector usa COALESCE(attendee_name,contact_name) para reservas previas. Eventos y recibos anteriores no se reescriben. Instalación vacía y upgrade M4→7 convergen; `go test ./db -run '^TestAttendeeMigration' -count=1` comprueba conservación, fallo tardío, rollback/reintento y reinicio. Ejecución aprobada sobre PostgreSQL 17/18 descartables, además de suite completa. Baseline/0002..0006 permanecen intactos; catálogos fijados desde SQL independiente, registrados en entrega M5.
