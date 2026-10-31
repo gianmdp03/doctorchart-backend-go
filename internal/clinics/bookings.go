@@ -420,6 +420,24 @@ func (s *Service) mutateBooking(w http.ResponseWriter, r *http.Request, user, op
 			return api.Failure(409, "CLINIC_STATE_CONFLICT", "El consultorio no está activo.")
 		}
 		start, _ := bookingInstant(request.Start)
+		// Reuse M3's cross-clinic guard for the exact local dates being booked,
+		// including zone/date-line margins if tzdata changed after configuration.
+		location, zoneErr := time.LoadLocation(clinic.Timezone)
+		if zoneErr != nil {
+			return zoneErr
+		}
+		local := start.In(location)
+		date := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.UTC)
+		agendas, agendaErr := readAgendas(ctx, tx, workspace)
+		if agendaErr != nil {
+			return agendaErr
+		}
+		if agendaErr = checkAgendaConflicts(ctx, agendas, date.AddDate(0, 0, -2), 5); agendaErr != nil {
+			if failure, ok := agendaErr.(*api.Error); ok && failure.Code == "SCHEDULE_CONFLICT" {
+				return slotUnavailable()
+			}
+			return agendaErr
+		}
 		var end time.Time
 		end, err = scheduleSlotEnd(ctx, tx, clinic, start, time.Now().UTC(), false)
 		if err != nil {
