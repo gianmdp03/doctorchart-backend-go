@@ -18,7 +18,7 @@ func TestBookingAttendeeAdministrativeIdentity(t *testing.T) {
 		t.Fatal(b)
 	}
 	assertCode(t, bookingRequestFixture(f, "POST", "/bookings", owner, key, body), 201, "")
-	assertCode(t, bookingRequestFixture(f, "POST", "/bookings", owner, newBookingKey(), strings.TrimSuffix(createBookingBody(c.ID, start.Add(time.Hour)), "}")+`,"attendeeName":" "}`), 400, "INVALID_LENGTH")
+	assertCode(t, bookingRequestFixture(f, "POST", "/bookings", owner, newBookingKey(), strings.TrimSuffix(createBookingBody(c.ID, start.Add(time.Hour)), "}")+`,"attendeeName":" "}`), 400, "INVALID_REQUEST")
 	moved := bookingRequestFixture(f, "POST", "/bookings/"+b.ID+"/reschedule", owner, newBookingKey(), fmt.Sprintf(`{"expectedVersion":"1","clinicId":%q,"start":%q}`, c.ID, start.Add(time.Hour).Format(time.RFC3339)))
 	assertCode(t, moved, 200, "")
 	if booked(t, moved).AttendeeName != b.AttendeeName {
