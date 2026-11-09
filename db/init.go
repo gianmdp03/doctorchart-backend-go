@@ -1,4 +1,4 @@
-// Package db owns baseline creation and structural validation for PostgreSQL 17.
+// Package db owns atomic schema creation, upgrades and validation for PostgreSQL 17 and 18.
 package db
 
 import (
@@ -24,9 +24,9 @@ func digest(value string) string {
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(strings.ReplaceAll(value, "\r\n", "\n"))))
 }
 
-// Ensure accepts only a genuinely empty database or an intact baseline 1.
-// The hook performs idempotent seed DML under the same transaction and lock.
-// No ALTER, adoption, repair or deletion is performed on existing databases.
+// Ensure accepts an empty database or a recognized, intact schema version.
+// Baseline 1 is upgraded through the embedded migration before seed DML, under
+// the same transaction and lock. Unknown, partial or altered schemas are refused.
 func Ensure(ctx context.Context, pool *pgxpool.Pool, seed func(context.Context, pgx.Tx) error) (err error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
@@ -35,7 +35,9 @@ func Ensure(ctx context.Context, pool *pgxpool.Pool, seed func(context.Context, 
 		return fmt.Errorf("%s begin baseline: %w", Backend, err)
 	}
 	defer func() {
-		if e := tx.Rollback(ctx); e != nil && !errors.Is(e, pgx.ErrTxClosed) {
+		cleanup, stop := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer stop()
+		if e := tx.Rollback(cleanup); e != nil && !errors.Is(e, pgx.ErrTxClosed) {
 			err = errors.Join(err, fmt.Errorf("rollback baseline: %w", e))
 		}
 	}()
@@ -45,10 +47,15 @@ func Ensure(ctx context.Context, pool *pgxpool.Pool, seed func(context.Context, 
 	if _, err = tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1,$2)", LockNamespace, LockKey); err != nil {
 		return fmt.Errorf("lock baseline: %w", err)
 	}
+	pins, err := expectedCatalogs(ctx, tx)
+	if err != nil {
+		return err
+	}
 	var marker bool
 	if err = tx.QueryRow(ctx, "SELECT to_regclass('public.app_schema_state') IS NOT NULL").Scan(&marker); err != nil {
 		return err
 	}
+	version := 1
 	if !marker {
 		var empty bool
 		if err = tx.QueryRow(ctx, emptySQL).Scan(&empty); err != nil {
@@ -63,9 +70,12 @@ func Ensure(ctx context.Context, pool *pgxpool.Pool, seed func(context.Context, 
 		if _, err = tx.Exec(ctx, Schema); err != nil {
 			return fmt.Errorf("create %s baseline: %w", Backend, err)
 		}
+		if err = validateCatalog(ctx, tx, pins.baseline); err != nil {
+			return err
+		}
 	} else {
 		var backend, sqlHash, catalogHash string
-		var version, count int
+		var count int
 		if err = tx.QueryRow(ctx, "SELECT count(*) FROM public.app_schema_state").Scan(&count); err != nil {
 			return fmt.Errorf("invalid baseline metadata: %w", err)
 		}
@@ -75,15 +85,92 @@ func Ensure(ctx context.Context, pool *pgxpool.Pool, seed func(context.Context, 
 		if err = tx.QueryRow(ctx, "SELECT backend,baseline_version,sql_sha256,catalog_sha256 FROM public.app_schema_state WHERE id=1").Scan(&backend, &version, &sqlHash, &catalogHash); err != nil {
 			return fmt.Errorf("invalid baseline metadata: %w", err)
 		}
-		if backend != Backend || version != 1 || sqlHash != digest(Schema) {
+		if backend != Backend || (version < 1 || version > currentVersion) || sqlHash != digest(Schema) {
 			return fmt.Errorf("%s incompatible baseline identity/version/checksum", Backend)
 		}
-		var live string
-		if err = tx.QueryRow(ctx, catalogSQL, []string{}).Scan(&live); err != nil {
-			return fmt.Errorf("inspect baseline catalog: %w", err)
+		expected := pins.baseline
+		if version == 2 {
+			expected = pins.clinics
 		}
-		if digest(live) != catalogHash {
-			return fmt.Errorf("%s schema drift: live PostgreSQL catalog differs from baseline; no repair performed", Backend)
+		if version == 3 {
+			expected = pins.entitlements
+		}
+		if version == 4 {
+			expected = pins.timezones
+		}
+		if version == 5 {
+			expected = pins.schedules
+		}
+		if version == 6 {
+			expected = pins.bookings
+		}
+		if version == 7 {
+			expected = pins.attendee
+		}
+		if version == 8 {
+			expected = pins.publicBookings
+		}
+		if version == 9 {
+			expected = pins.secretaries
+		}
+		if version == 10 {
+			expected = pins.notifications
+		}
+		if catalogHash != expected {
+			return fmt.Errorf("%s schema drift: recorded catalog differs from expected version %d", Backend, version)
+		}
+		if err = validateCatalog(ctx, tx, expected); err != nil {
+			return err
+		}
+		if version >= 2 {
+			if err = validateMigration(ctx, tx, pins, version); err != nil {
+				return err
+			}
+		}
+	}
+	if version == 1 {
+		if err = migrateClinics(ctx, tx, pins); err != nil {
+			return err
+		}
+	}
+	if version < 3 {
+		if err = migrateEntitlements(ctx, tx, pins); err != nil {
+			return err
+		}
+	}
+	if version < 4 {
+		if err = migrateTimezones(ctx, tx, pins); err != nil {
+			return err
+		}
+	}
+	if version < 5 {
+		if err = migrateSchedules(ctx, tx, pins); err != nil {
+			return err
+		}
+	}
+	if version < 6 {
+		if err = migrateBookings(ctx, tx, pins); err != nil {
+			return err
+		}
+	}
+	if version < 7 {
+		if err = migrateAttendee(ctx, tx, pins); err != nil {
+			return err
+		}
+	}
+	if version < 8 {
+		if err = migratePublicBookings(ctx, tx, pins); err != nil {
+			return err
+		}
+	}
+	if version < 9 {
+		if err = migrateSecretaries(ctx, tx, pins); err != nil {
+			return err
+		}
+	}
+	if version < 10 {
+		if err = migrateNotifications(ctx, tx, pins); err != nil {
+			return err
 		}
 	}
 	if seed != nil {
@@ -91,12 +178,16 @@ func Ensure(ctx context.Context, pool *pgxpool.Pool, seed func(context.Context, 
 			return fmt.Errorf("seed %s baseline: %w", Backend, err)
 		}
 	}
+	// Seed hooks may change managed rows, never the structural contract.
+	if err = validateCatalog(ctx, tx, pins.notifications); err != nil {
+		return err
+	}
 	if !marker {
-		var live string
-		if err = tx.QueryRow(ctx, catalogSQL, []string{}).Scan(&live); err != nil {
+		if _, err = tx.Exec(ctx, "INSERT INTO public.app_schema_state(id,backend,baseline_version,sql_sha256,catalog_sha256) VALUES(1,$1,$2,$3,$4)", Backend, currentVersion, digest(Schema), pins.notifications); err != nil {
 			return err
 		}
-		if _, err = tx.Exec(ctx, "INSERT INTO public.app_schema_state(id,backend,baseline_version,sql_sha256,catalog_sha256) VALUES(1,$1,1,$2,$3)", Backend, digest(Schema), digest(live)); err != nil {
+	} else if version < currentVersion {
+		if _, err = tx.Exec(ctx, "UPDATE public.app_schema_state SET baseline_version=$1,catalog_sha256=$2 WHERE id=1", currentVersion, pins.notifications); err != nil {
 			return err
 		}
 	}

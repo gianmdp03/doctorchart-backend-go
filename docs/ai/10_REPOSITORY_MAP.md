@@ -1,5 +1,5 @@
 # Mapa de repositorios y alcance verificado
-HEAD/ramas y estado Git local verificados el 29/10/2026: ver [handoff](05_HANDOFF.md). Se cotejaron esquema, bootstrap y política del backend de forma focalizada; no se reauditaron todas las integraciones ni se ejecutaron pruebas. Los puntos de entrada de esta tabla siguen siendo referencias históricas a verificar antes de cada fase.
+HEAD/ramas y estado Git local verificados el 29/10/2026: ver [handoff](05_HANDOFF.md). Se cotejaron esquema, bootstrap y política del backend de forma focalizada; M1 ejecutó pruebas de Go/BD y modificó solo el backend; no se reauditaron todas las integraciones externas. Los puntos de entrada de esta tabla siguen siendo referencias históricas a verificar antes de cada fase.
 | Repositorio | Ámbito técnico reportado | Puntos de entrada reportados |
 |---|---|---|
 | `doctorchart-backend-go` | Go, PostgreSQL, pacientes médicos, wizard, nuevos lugares/turnos/staff | `db/schema.sql`, `db/init.go`, `internal/clinical/patient.go`, `internal/clinical/encounter.go`, `internal/api/http.go`, `internal/workspace/` |

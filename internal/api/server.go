@@ -61,6 +61,11 @@ func BaseRoutes(mux *http.ServeMux, rules *billing.Rules, billingSecret string, 
 			w.WriteHeader(401)
 			return
 		}
+		// Persist the shared fence even if the following legacy reload fails.
+		if err := rules.InvalidateEntitlements(r.Context()); err != nil {
+			w.WriteHeader(503)
+			return
+		}
 		if err := rules.Reload(r.Context()); err != nil {
 			slog.Warn("billing reload unavailable; current rules retained")
 			w.WriteHeader(503)

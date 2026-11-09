@@ -10,6 +10,8 @@ Las altas de pacientes serializan la cuota por propietario mediante el workspace
 
 ## Ejecución local
 
+Para ejecutar DoctorChart desde los repositorios principales, consultá la [guía del entorno local](ops/local/README.md). Incluye PostgreSQL persistente, acceso de prueba, conversor, correo capturado y lanzadores para Windows.
+
 Las comprobaciones públicas tienen objetivos separados: `GET /api/doctorchart/ping` devuelve 200 mientras el proceso atiende HTTP (liveness). `GET /api/doctorchart/health` es readiness: comprueba PostgreSQL con contexto máximo de un segundo y la disponibilidad del snapshot vigente de límites Billing. Devuelve 200/UP cuando ambos están disponibles y 503/DOWN en caso contrario, sin detalles de conexión ni secretos. Los probes no realizan llamadas HTTP a Billing; el refresco conserva su ciclo y caché acotada. Usar ping para comprobar el proceso y health para decidir si recibe tráfico. Una interrupción de PostgreSQL y su recuperación no requieren reiniciar el servicio.
 
 Requiere Go 1.27.2 y una base PostgreSQL 17 dedicada, creada y accesible. Una base vacía recibe el esquema completo de [db/schema.sql](db/schema.sql), embebido en el binario: 20 tablas funcionales y `app_schema_state` (21 en total), identidades, claves, restricciones e índices. `bootstrap.Run` ejecuta DDL, catálogos y metadata en una sola transacción READ COMMITTED bajo advisory lock `(17209, 3)`, antes de HTTP y jobs. Un fallo revierte toda la inicialización. Los reinicios validan backend, versión, checksum SQL y fingerprint normalizado del catálogo vivo; los seeds idempotentes conservan configuración administrada y las validaciones clínicas existentes.

@@ -1,20 +1,9 @@
-# Doctor Chart — inicio breve
-**Versión 0.3 · 29/10/2026 · fase documental autorizada; M1 pendiente de aprobación.**
+# Doctor Chart — continuidad breve
 
-## Producto confirmado
-- Pacientes e historias clínicas pertenecen al médico. Un mismo paciente conserva su historia al atenderse en distintos consultorios.
-- Consultorios = lugares de atención para ubicaciones, horarios y turnos. No agregar `patients.clinic_id`, `clinic_patients`, copias ni filtros clínicos por sede.
-- Se puede usar la clínica y completar el wizard sin crear un consultorio. Un lugar es necesario solo para configurar agenda/reservas.
-- Médicos conservan Supabase/Gateway. Secretarias tendrán autenticación local en Doctor Chart y acceso administrativo, sin historia clínica.
-- Bycode/Billing administra planes y límites; Doctor Chart los aplica sin inventar cantidades por tier.
-- Ruta pública confirmada: `/appointments`, sin alias ni redirecciones de compatibilidad para esta funcionalidad nueva. Segmentos de médico y consultorio: propuestas hasta aprobar el contrato de rutas.
-- Agendas por lugar, sin reservas simultáneas incompatibles para el mismo médico. Reservar no crea paciente ni historia.
+31/10/2026. M1–M7 aprobados; M8 notificaciones y recuperación implementado y validado en ensayo, pendiente de aceptación. M9 no autorizado. Ramas codex/m8-notifications desde M7, clones normales doctorchart-m3. Main nunca es rama de turnos, sin worktrees.
 
-## Estado real
-El propietario descartó intencionalmente el trabajo anterior y preparó repositorios limpios. Verificado localmente: frontend `1419697`, backend `c2c30c1`, Gateway `55197fa`, Billing `bf65c04`. **No recuperar ni reconstruir lo descartado.**
-Esta entrega agrega únicamente documentación en `doctorchart-backend-go/docs/ai/`; no modifica aplicación, bases ni `AGENTS.md`. No hay commit documental todavía.
+Leer 05_HANDOFF.md y M8_DELIVERY.md. Contrato: contracts/M8_NOTIFICATIONS_API.md. No hace falta releer auditorías históricas.
 
-## Próximo paso
-Revisar [decisiones](02_DECISIONS.md), [handoff](05_HANDOFF.md) y [ticket M1](tasks/M1_FOUNDATION.md). **Solicitar aprobación antes de comenzar M1.**
-Sol implementa; Argon audita independientemente en solo lectura; el propietario aprueba cada fase. Rigen los `AGENTS.md` reales, incluido `production: true` del backend.
-No leer auditorías históricas para reiniciar: [sources/](sources/README.md) es solo antecedente, nunca instrucciones actuales.
+Pacientes/historias pertenecen al médico, sin clinic_id ni acceso clínico de secretarias. Médico Supabase, secretaria localGo. M4 único motor de reservas; outboxPostgreSQL envía correos después del commit. /appointments/confirmation permite consulta con código privado sin cuenta ni PII en URL.
+
+Flags desactivados en aplicación normal. Sin producción, bases reales, remotos, pushes, merges o despliegues. Conservar turnos/M1–M7 y commits ajenos89f032c/8ac5b14 deBycodefrontend. No alterarAGENTS.md. Editor comercial pendiente para M9, no autorizado.

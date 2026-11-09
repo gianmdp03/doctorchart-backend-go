@@ -9,18 +9,26 @@ import (
 	"strconv"
 	"strings"
 
+	"encoding/base64"
 	"github.com/joho/godotenv"
 	"github.com/syntah/doctorchart-backend-go/internal/api"
+	"github.com/syntah/doctorchart-backend-go/internal/notifications"
 	"github.com/syntah/doctorchart-backend-go/internal/storage"
 )
 
 type Config struct {
-	Port          string
-	DatabaseURL   string
-	GatewaySecret string
-	BillingSecret string
-	BillingURL    string
-	Storage       storage.Config
+	Notifications         notifications.Config
+	Port                  string
+	DatabaseURL           string
+	GatewaySecret         string
+	BillingSecret         string
+	BillingURL            string
+	SchedulesEnabled      bool
+	BookingsEnabled       bool
+	StaffEnabled          bool
+	StaffOrigin           string
+	PublicBookingsEnabled bool
+	Storage               storage.Config
 }
 
 func Load() (Config, error) {
@@ -63,6 +71,65 @@ func Load() (Config, error) {
 		values[item[0]] = get(item[0], item[1], item[2])
 	}
 	c := Config{Port: values["server.port"], GatewaySecret: values["app.security.gateway-secret"], BillingSecret: values["services.billing.shared-secret"], BillingURL: values["services.billing.url"]}
+	scheduleFlag := get("features.schedules.enabled", "SCHEDULES_ENABLED", "false")
+	if scheduleFlag != "true" && scheduleFlag != "false" {
+		return c, errors.New("Configuración inválida: SCHEDULES_ENABLED debe ser true o false.")
+	}
+	c.SchedulesEnabled = scheduleFlag == "true"
+	bookingFlag := get("features.bookings.enabled", "BOOKINGS_ENABLED", "false")
+	if bookingFlag != "true" && bookingFlag != "false" {
+		return c, errors.New("Configuración inválida: BOOKINGS_ENABLED debe ser true o false.")
+	}
+	c.BookingsEnabled = bookingFlag == "true"
+	if c.BookingsEnabled && !c.SchedulesEnabled {
+		return c, errors.New("BOOKINGS_ENABLED requiere SCHEDULES_ENABLED.")
+	}
+	publicFlag := get("features.public-bookings.enabled", "PUBLIC_BOOKINGS_ENABLED", "false")
+	if publicFlag != "true" && publicFlag != "false" {
+		return c, errors.New("PUBLIC_BOOKINGS_ENABLED debe ser true o false")
+	}
+	c.PublicBookingsEnabled = publicFlag == "true"
+	if c.PublicBookingsEnabled && !c.BookingsEnabled {
+		return c, errors.New("PUBLIC_BOOKINGS_ENABLED requiere BOOKINGS_ENABLED")
+	}
+	staffFlag := get("features.staff.enabled", "STAFF_ENABLED", "false")
+	if staffFlag != "true" && staffFlag != "false" {
+		return c, errors.New("STAFF_ENABLED debe ser true o false")
+	}
+	c.StaffEnabled = staffFlag == "true"
+	c.StaffOrigin = get("features.staff.origin", "STAFF_ORIGIN", "")
+	if c.StaffEnabled {
+		origin, e := url.Parse(c.StaffOrigin)
+		if !c.BookingsEnabled || e != nil || origin.Scheme != "https" || origin.Host == "" || origin.User != nil || origin.Path != "" || origin.RawQuery != "" || origin.Fragment != "" {
+			return c, errors.New("STAFF_ENABLED requiere BOOKINGS_ENABLED y STAFF_ORIGIN HTTPS exacto sin path")
+		}
+	}
+	notifyFlag := get("features.notifications.enabled", "NOTIFICATIONS_ENABLED", "false")
+	if notifyFlag != "true" && notifyFlag != "false" {
+		return c, errors.New("NOTIFICATIONS_ENABLED debe ser true o false")
+	}
+	if notifyFlag == "true" {
+		port, e := strconv.Atoi(get("notifications.smtp.port", "NOTIFICATIONS_SMTP_PORT", "587"))
+		if e != nil {
+			return c, errors.New("Puerto SMTP inválido")
+		}
+		lead, e := strconv.Atoi(get("notifications.reminder-minutes", "NOTIFICATIONS_REMINDER_MINUTES", "1440"))
+		if e != nil || lead < 1 || lead > 10080 {
+			return c, errors.New("Recordatorio inválido")
+		}
+		c.Notifications = notifications.Config{PublicOrigin: get("notifications.public-origin", "NOTIFICATIONS_PUBLIC_ORIGIN", ""), Enabled: true, Key: get("notifications.key", "NOTIFICATIONS_KEY", ""), Host: get("notifications.smtp.host", "NOTIFICATIONS_SMTP_HOST", ""), Port: port, From: get("notifications.smtp.from", "NOTIFICATIONS_SMTP_FROM", ""), Username: get("notifications.smtp.username", "NOTIFICATIONS_SMTP_USERNAME", ""), Password: get("notifications.smtp.password", "NOTIFICATIONS_SMTP_PASSWORD", ""), TLSMode: get("notifications.smtp.tls", "NOTIFICATIONS_SMTP_TLS", "starttls"), ReminderMinutes: lead}
+		raw, e := base64.StdEncoding.DecodeString(c.Notifications.Key)
+		if !c.BookingsEnabled || e != nil || len(raw) != 32 {
+			return c, errors.New("NOTIFICATIONS_ENABLED requiere BOOKINGS_ENABLED y NOTIFICATIONS_KEY de32bytes base64")
+		}
+		origin, e := url.Parse(c.Notifications.PublicOrigin)
+		if e != nil || origin.Scheme != "https" || origin.Host == "" || origin.User != nil || origin.Path != "" || origin.RawQuery != "" || origin.ForceQuery || origin.Fragment != "" {
+			return c, errors.New("NOTIFICATIONS_PUBLIC_ORIGIN debe ser un origen HTTPS exacto")
+		}
+		if _, e = notifications.NewSMTP(c.Notifications); e != nil {
+			return c, e
+		}
+	}
 	c.Storage = storage.Config{Type: values["app.storage.type"], Directory: values["app.storage.studies-dir"], Endpoint: values["app.storage.s3.endpoint"], Bucket: values["app.storage.s3.bucket"], AccessKey: values["app.storage.s3.access-key"], SecretKey: values["app.storage.s3.secret-key"], Region: values["app.storage.s3.region"]}
 	transformValue := values["app.storage.allow-study-image-transformation"]
 	if transformValue != "true" && transformValue != "false" {

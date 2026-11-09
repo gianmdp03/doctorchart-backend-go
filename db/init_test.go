@@ -22,7 +22,7 @@ func fixture(t *testing.T) *sql.DB {
 		t.Skip("owned disposable PostgreSQL admin DSN required")
 	}
 	u, err := url.Parse(raw)
-	if err != nil || u.Hostname() != "127.0.0.1" || u.Port() != "55439" && u.Port() != "55440" && u.Port() != "55442" && u.Port() != "55444" || u.Path != "/postgres" || u.User.Username() != "migration_fixture" {
+	if err != nil || u.Hostname() != "127.0.0.1" || u.Port() != "55439" && u.Port() != "55440" && u.Port() != "55442" && u.Port() != "55444" && u.Port() != "55468" && u.Port() != "55470" || u.Path != "/postgres" || u.User.Username() != "migration_fixture" {
 		t.Fatal("owned loopback high-port admin DSN required")
 	}
 	admin, err := sql.Open("pgx", raw)
@@ -58,7 +58,7 @@ func TestBaselineEmptyRestartAndSequences(t *testing.T) {
 		t.Fatal(err)
 	}
 	var count int
-	if err := pool.QueryRow("SELECT count(*) FROM pg_tables WHERE schemaname='public'").Scan(&count); err != nil || count != 23 {
+	if err := pool.QueryRow("SELECT count(*) FROM pg_tables WHERE schemaname='public'").Scan(&count); err != nil || count != 44 {
 		t.Fatal(count, err)
 	}
 	// Normal sequence advancement is data, never catalog drift.
@@ -204,7 +204,7 @@ func TestBaselineCanonicalLineEndings(t *testing.T) {
 	}
 	original := Schema
 	t.Cleanup(func() { Schema = original })
-	Schema = strings.ReplaceAll(original, "\n", "\r\n")
+	Schema = strings.ReplaceAll(strings.ReplaceAll(original, "\r\n", "\n"), "\n", "\r\n")
 	if err := ensureFixture(t.Context(), pool, nil); err != nil {
 		t.Fatal("equivalent line endings rejected", err)
 	}

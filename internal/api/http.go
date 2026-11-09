@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -103,6 +104,10 @@ func Gateway(secret string, next http.Handler) http.Handler {
 			securityError(Failure(403, "FORBIDDEN", "Acceso denegado."))
 			return
 		}
+		if PublicAppointments(r.Method, r.URL.Path) || StaffRoute(r.Method, r.URL.Path) {
+			next.ServeHTTP(w, r)
+			return
+		}
 		user := r.Header.Get("X-User-Id")
 		if JavaBlank(user) {
 			securityError(Failure(401, "UNAUTHENTICATED", "Se requiere autenticación."))
@@ -189,4 +194,60 @@ func Decode(w http.ResponseWriter, r *http.Request) (map[string]any, error) {
 		return nil, Invalid("La solicitud contiene datos inválidos.")
 	}
 	return value, nil
+}
+
+var publicUUID = regexp.MustCompile("^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
+
+func PublicAppointments(method, p string) bool {
+	if !strings.HasPrefix(p, "/api/doctorchart/public/appointments/") {
+		return false
+	}
+	parts := strings.Split(strings.TrimPrefix(p, "/api/doctorchart/public/appointments"), "/")
+	if method == "GET" {
+		return len(parts) == 2 && parts[1] == "doctors" || len(parts) == 3 && parts[1] == "doctors" && publicUUID.MatchString(parts[2]) || len(parts) == 6 && parts[1] == "doctors" && publicUUID.MatchString(parts[2]) && parts[3] == "clinics" && publicUUID.MatchString(parts[4]) && parts[5] == "availability"
+	}
+	return method == "POST" && (len(parts) == 2 && (parts[1] == "challenge" || parts[1] == "confirmation") || len(parts) == 4 && parts[1] == "doctors" && publicUUID.MatchString(parts[2]) && parts[3] == "bookings")
+}
+
+// StaffRoute is a transport allowlist, not authentication. DoctorChart checks
+// its local session and per-owner rights; no Supabase identity is forwarded.
+func StaffRoute(method, p string) bool {
+	const base = "/api/doctorchart/staff/"
+	if !strings.HasPrefix(p, base) {
+		return false
+	}
+	parts := strings.Split(strings.TrimPrefix(p, base), "/")
+	if len(parts) == 1 {
+		if method == "GET" {
+			return parts[0] == "session" || parts[0] == "assignments"
+		}
+		if method == "POST" {
+			switch parts[0] {
+			case "login", "activate", "recover", "logout", "password", "recovery-email", "recover-email":
+				return true
+			}
+		}
+		return false
+	}
+	if len(parts) < 3 || parts[0] != "owners" || !publicUUID.MatchString(parts[1]) {
+		return false
+	}
+	decimal := func(s string) bool {
+		if s == "" || s[0] == '0' || len(s) > 19 {
+			return false
+		}
+		for _, c := range s {
+			if c < '0' || c > '9' {
+				return false
+			}
+		}
+		return true
+	}
+	if method == "GET" && len(parts) == 5 && parts[2] == "clinics" && decimal(parts[3]) {
+		return parts[4] == "bookings" || parts[4] == "availability"
+	}
+	if method == "POST" && len(parts) == 3 && parts[2] == "bookings" {
+		return true
+	}
+	return len(parts) == 5 && parts[2] == "bookings" && decimal(parts[3]) && (method == "PATCH" && parts[4] == "status" || method == "POST" && parts[4] == "reschedule")
 }

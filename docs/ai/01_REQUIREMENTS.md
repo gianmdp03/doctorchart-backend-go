@@ -38,3 +38,6 @@
 
 ## Aún no aprobado
 - Semántica exacta de cupos activo/inactivo/archivado, downgrade, snapshot comercial, verificación pública del profesional, detalle de inicio de sesión staff y políticas operativas de planes vencidos: ver `03_PENDING_CONTRACTS.md`.
+
+## Coordinación desde M2
+Sol implementa backend/BD/Billing y Gemini Argon frontend, en repos distintos con un escritor exclusivo por directorio Git y sin worktrees. Contrato de gestión propuesto, aún no aprobado: [M2-CLINICS-v0.1](contracts/M2_CLINICS_API.md). Sus reglas de cuota/estados/fallo comercial son propuestas; no elevan decisiones pendientes a confirmadas.

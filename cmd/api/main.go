@@ -18,7 +18,9 @@ import (
 	"github.com/syntah/doctorchart-backend-go/internal/billing"
 	"github.com/syntah/doctorchart-backend-go/internal/bootstrap"
 	"github.com/syntah/doctorchart-backend-go/internal/clinical"
+	"github.com/syntah/doctorchart-backend-go/internal/clinics"
 	"github.com/syntah/doctorchart-backend-go/internal/config"
+	"github.com/syntah/doctorchart-backend-go/internal/notifications"
 	"github.com/syntah/doctorchart-backend-go/internal/storage"
 	"github.com/syntah/doctorchart-backend-go/internal/wizard"
 	"github.com/syntah/doctorchart-backend-go/internal/workspace"
@@ -64,6 +66,8 @@ func run() error {
 		return errors.New("PostgreSQL is unavailable")
 	}
 	rules := billing.New(c.BillingURL)
+	entitlements := billing.NewEntitlements(pool, c.BillingURL, c.BillingSecret)
+	rules.SetInvalidator(entitlements.Invalidate)
 	rules.Load(startup)
 	mux := http.NewServeMux()
 	api.BaseRoutes(mux, rules, c.BillingSecret, func(ctx context.Context) error {
@@ -82,8 +86,18 @@ func run() error {
 	if err := bootstrap.Run(startup, pool, validator); err != nil {
 		return err
 	}
+	notices, err := notifications.New(pool, c.Notifications)
+	if err != nil {
+		return err
+	}
+	if notices != nil {
+		if err = notices.ValidateKey(startup); err != nil {
+			return err
+		}
+	}
 	workspaces := workspace.New(pool, validator)
 	workspaces.Routes(mux)
+	clinics.NewWithBookings(pool, entitlements, c.SchedulesEnabled, c.BookingsEnabled).WithPublicBookings(c.PublicBookingsEnabled, c.GatewaySecret).WithStaff(c.StaffEnabled, c.StaffOrigin).WithNotifications(notices).Routes(mux)
 	clinicalService, err := clinical.New(pool, workspaces, validator, rules, files)
 	if err != nil {
 		return err
@@ -97,6 +111,14 @@ func run() error {
 	clinicalService.CalculatorRoutes(mux)
 	clinicalService.StudyRoutes(mux)
 	clinicalService.PrintRoutes(mux)
+	notificationsDone := make(chan struct{})
+	go func() {
+		defer close(notificationsDone)
+		if notices != nil {
+			notices.Run(ctx)
+		}
+	}()
+	defer func() { stop(); <-notificationsDone }()
 	maintenanceDone := make(chan struct{})
 	go func() { defer close(maintenanceDone); clinicalService.Maintain(ctx) }()
 	rulesDone := make(chan struct{})

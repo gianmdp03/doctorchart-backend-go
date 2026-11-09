@@ -1,15 +1,15 @@
 # Matriz de tests (seleccionar por fase; nunca marcar OK sin evidencia)
-**No ejecutada durante R0 documental.** Los casos de agenda, cuotas, staff y público corresponden a fases futuras; no son requisitos de implementación de M1.
+**R0 fue documental. M1 ejecutó los casos marcados, con evidencia en el handoff.** Agenda, cuotas, staff y público corresponden a fases futuras; no se declaran implementados.
 ## Protección de clínica existente
 - [ ] El médico conserva el mismo paciente/historia al atender jueves en A y viernes en B, sin crear copias por consultorio.
-- [ ] El alta clínica no exige ningún lugar de atención y el wizard funciona sin crear `clinics`.
-- [ ] Consultas, estudios, recetas, vacunas, documentos, archivos, dashboard y borradores siguen visibles por médico/paciente; regresiones clínicas pasan.
-- [ ] No se agregó `patients.clinic_id` ni filtros clínicos por ubicación, tampoco como asociación opcional.
+- [x] El alta clínica no exige ningún lugar de atención y el wizard funciona sin crear registros de lugares.
+- [x] Consultas, estudios, recetas, vacunas, documentos, archivos, dashboard y borradores siguen visibles por médico/paciente; regresiones clínicas pasan.
+- [x] No se agregó `patients.clinic_id` ni filtros clínicos por ubicación, tampoco como asociación opcional.
 - [ ] Nadie ajeno al médico accede a historias, especialmente secretarias y público.
 
 ## Esquema y límites
-- [ ] Migraciones desde baseline con datos conservan IDs, relaciones y archivos; instalación limpia llega al mismo catálogo.
-- [ ] Checksums, drift, versiones desconocidas e inicializaciones simultáneas se tratan de forma segura.
+- [x] Migraciones desde baseline con datos conservan IDs, relaciones y archivos; instalación limpia llega al mismo catálogo.
+- [x] Checksums, drift, versiones desconocidas e inicializaciones simultáneas se tratan de forma segura.
 - [ ] Dos altas de lugares para el último cupo producen una sola admisión (si cuota aprobada =1).
 - [ ] Downgrade/vencimiento no elimina historias, reservas ni lugares; errores comerciales no conceden infinito.
 - [ ] Duplicado/desorden de webhook y Billing caído tratados según contrato aprobado.
@@ -31,3 +31,17 @@
 ## Rutas y UI — fases futuras
 - [ ] Portal público usa `/appointments` sin alias ni redirecciones; segmentos de médico y consultorio se verifican solo contra contrato aprobado.
 - [ ] Selectores usan `app-date-picker`, formato argentino `dd/MM/aaaa` e ISO únicamente en la frontera de datos.
+
+M1 verifica filas/referencias de medios; no reejecuta la integración del converter externo ni un despliegue. El flujo del mismo paciente entre agendas sigue pendiente de las fases de turnos.
+
+## Correcciones posteriores a Argon — APROBADAS en 6152867
+- [x] Startup real habilitado con `DOCTORCHART_STARTUP_TEST_DATABASE_URL` y `doctorchart_startup_test`; 25 tablas, seeds y health/ping ante caída/recuperación PostgreSQL; PASS sin SKIP.
+- [x] Baseline 1 con seeds reales → `bootstrap.Run` → 2 y reinicio; configuraciones administradas preservadas, una migración y cero lugares inventados.
+- [ ] M2: validación IANA en Go además del CHECK SQL, pendiente de fase autorizada.
+Resultados, entornos y cinco pruebas externas omitidas: [correcciones](reviews/M1_CORRECTIONS.md).
+
+## Preparación M2
+La revalidación final de Argon aprobó M1; las cinco omisiones externas justificadas no bloquean su cierre. No se reejecutaron tests en la fase documental actual.
+Pruebas M2-SOL ejecutadas según [entrega](reviews/M2_SOL_DELIVERY.md); frontend todavía pendiente. Las definen los tickets [Sol](tasks/M2_SOL.md) y [Argon](tasks/M2_ARGON.md), ambos sobre el [mismo contrato](contracts/M2_CLINICS_API.md). Distinguir mocks de integración comercial real y coordinar cualquier ejecución que escriba en Git ajeno.
+
+M2-SOL: propiedad cruzada/versiones/IANA, último cupo concurrente, snapshot offline/expiración/fence/fetch invalidado, compatibilidad Billing legacy, interoperabilidad real entre handlers y migración 2→3 con rollback: PASS. Revisión independiente todavía pendiente.

@@ -1,29 +1,14 @@
-# Contratos y decisiones pendientes
-**29/10/2026.** No reabrir propiedad clínica ni ruta base: pacientes/historias por médico; portal público `/appointments`, sin alias ni redirecciones para esta función.
+# Pendientes tras M2-SOL
+M1 cerrado/APROBADO en 6152867. M2-SOL implementado; revisión independiente y aceptación pendientes. M3 no autorizado.
 
-## Antes de M1
-- Resuelto: cuatro repositorios inspeccionados y limpios antes de docs. El propietario descartó intencionalmente el trabajo anterior; no recuperar nada.
-- Verificado: `production: true`; baseline 1 y fingerprint en `db/init.go`/`db/catalog.go`. Para M1 se propone migración incremental, manteniendo baseline, transacción, checksums y rechazo de drift. No extender la excepción histórica de estudios.
-- Aprobar [M1](tasks/M1_FOUNDATION.md): mínimos de ubicación, nombre técnico `clinics`, ID bigint, FK al workspace propietario, estados y restricciones. Son propuestas de ingeniería, no decisiones ya confirmadas.
-- Propuesta: M1 solo infraestructura + tabla, sin API/altas para usuarios hasta cuotas Billing. Ninguna relación nueva con pacientes.
-- Al autorizar implementación, definir entorno PostgreSQL 17 descartable propio autorizado. No usar DSN existente ni inferir permiso para crear/destruir bases a partir de esta fase documental.
-
-## Billing — antes de M2
-- Auditoría histórica reportó `module_tier_limits`, `billing_webhook_jobs` y recarga de catálogo por callback. Verificar código y revisiones reales antes de implementar; R0 no probó esa integración.
-- Contrato efectivo/versionado por médico, cuotas de lugares y secretarias, invalidación durable y disponibilidad ante fallos.
-- Aprobar qué consume cupo (activo/inactivo/archivado, invitaciones pendientes), downgrade, vencimiento, cantidades y features en Bycode. No inventar cuotas.
-- Verificar compatibilidad de claves nuevas, PUT del editor de límites, readiness y claims/cachés antiguas.
-
-## Staff — antes de acceso local
-Autenticación local Doctor Chart confirmada; diseño de invitación, verificación de email, contraseña, sesiones, cookie, CORS/CSRF, recuperación, revocación y contrato Gateway pendientes.
-Definir permisos multi-médico, asignación por lugar y comportamiento ante suscripción vencida. Nunca exponer historias, recetas o estudios.
-
-## Agenda y público — antes de T1/T2/T4
-- Franjas, duración/intervalo, zonas IANA, excepciones con reservas existentes y bloqueo/exclusión por médico entre lugares.
-- Formularios versionados, solicitante separado del atendido y vínculo opcional al paciente del mismo médico. Reservar no crea ficha ni empareja por DNI.
-- Ruta base confirmada: `/appointments`. Segmentos de médico y consultorio, identificadores públicos y separación del panel administrativo siguen como propuestas hasta aprobar el contrato completo de rutas.
-- Publicación/directorio, verificación profesional, prevención de abuso, notificaciones, recuperación y requisitos de privacidad aplicables por definir.
-
-## Clínica existente
-Se usa sin consultorios. No inventar lugares para datos históricos, trasladar pacientes ni agregar `patients.clinic_id`.
-Registrar lugar como metadato opcional de consulta sería otra propuesta futura, con aprobación independiente; no cambia propiedad ni autorización clínica.
+- **Activación comercial acotada:** propietario debe configurar max_clinics explícitamente en Billing para BASIC, PRO y UNLIMITED; API administrativa verificada, campo aún ausente en panel Angular Billing. No se inventan cantidades ni se copian cupos clínicos. Sin clave/cobertura apta: capabilities UNAVAILABLE y mutaciones 503; lecturas locales seguras.
+- **P2 comercial referido por el propietario, NO BLOQUEANTE para M2:** FREE_TRIAL no activado y ENTERPRISE fuera de oferta; no ampliar catálogo, seeds ni flujos. Reconocimiento legacy/alias conservados. Los tres planes vigentes configuran/resuelven max_clinics en pruebas descartables PASS sin SKIP.
+- **Corrección P2 implementada:** Go y nueva migración 4 excluyen Etc/, con UTC/regiones preservados, preflight bloqueante sobre filas incompatibles, catálogo validado y rollback sin cambios de datos. Revisión independiente pendiente. Ver [correcciones](reviews/M2_SOL_CORRECTIONS.md).
+- **P1 pendiente de Argon:** consultorios no consume contexto clínico timeZone; no ampliar el listado Go. Excluir /clinics y sus rutas hijas del interceptor Angular, preservándolo para cálculos/límites de día/documentos clínicos. Instrucción y regresiones conjuntas en correcciones. Sin ese cambio, listado Angular sigue recibiendo 400.
+- **Hashes aclarados:** aa7ff31… corresponde a propuesta v0.1; canónico v1 = 70e096102182fb5d0880997b6ff428e058d756b987c3d8c2238c8743f780e2fd, blob Git 9007d55. DTO, tablas de rutas/errores y ejemplos JSON no cambiaron entre ambos; sí cambió política aprobada de snapshots. No es una diferencia de finales de línea.
+- **Frontend comercial pendiente:** exponer max_clinics para BASIC/PRO/UNLIMITED en el administrador de Bycode, reutilizando API y preservando cuotas clínicas; sin asignar cantidades. Ticket y autorización propios antes de implementar. También siguen los hallazgos de revisión frontend DoctorChart.
+- **Resuelto técnicamente:** [API M2-CLINICS-v1](contracts/M2_CLINICS_API.md) congelada, endpoint interno firmado de Billing y [snapshots](contracts/M2_EFFECTIVE_ENTITLEMENTS.md). Snapshot apto permite operar con Billing caído solo hasta su vencimiento original. Sin copia apta, bloqueo.
+- Catálogo legacy conserva sus dos claves; nuevos derechos llegan por propietario, con cuota opcional administrada. Cambios de cobertura/catalogo notifican por outbox/callback existente.
+- No se promete revocación instantánea: callback recibido invalida entre réplicas; evento todavía no recibido o modificación manual sin callback queda acotado a lease máximo de 60s, jamás más allá de cobertura.
+- Aplicación consolidada: DoctorChart corregido en 594402e (base ea1c89d, entrega inicial 1dd09bc); Billing 80c171c intacto. Revalidación independiente, correcciones frontend, integración, merge/push/despliegue/configuración real requieren sus autorizaciones. Revisar [correcciones](reviews/M2_SOL_CORRECTIONS.md).
+- Staff, horarios, reservas y portal público requieren fases futuras; /appointments sin alias y sin segmentos adicionales definidos aquí. Pacientes/historias permanecen por médico.

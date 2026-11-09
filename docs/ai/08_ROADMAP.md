@@ -1,26 +1,46 @@
-# Roadmap revisado — clínica global por médico, ubicaciones solo para turnos
-**R0 documental autorizado y entregado, pendiente de aceptación. M1 y las demás fases de implementación no están autorizadas.**
+# Roadmap vigente —31/10/2026
 
-| Fase | Resultado | Criterio clave |
+M1–M7 aprobados. M8 notificaciones/outbox/recuperación completado y validado en ensayo, pendiente de aceptación. M9 editorcomercial no autorizado ni iniciado. Sin habilitaciónproductiva o despliegues. Referencia M8_DELIVERY.md.
+
+---
+
+Antecedentes anteriores a M8:
+
+# Roadmap vigente —31/10/2026
+
+M1–M6 aprobados. M7 secretarias y administración delegada completado en ensayo, pendiente de aprobación. Siguiente fase M8 (notificaciones) no autorizada ni iniciada. Sin activación comercial ni producción; referencias técnicas en M7_DELIVERY.md.
+
+---
+
+Antecedentes anteriores al cierre M7:
+
+# Roadmap — lugares administrativos, clínica por médico
+**M1 CERRADO / ARGON APROBADO en 6152867. M2-SOL implementado para revisión, Angular reservado a Argon; M3 no autorizado.**
+
+# Estado actual — M6
+M5 aceptado. M6 portal público y reservas sin cuenta completado y validado de punta a punta en ensayo; [entrega](M6_DELIVERY.md). Capacidad online independiente, sin defaults por plan ni configuración real. Integración/activación/despliegue requieren autorización separada; M7 no autorizado, avisos pertenecen a M8.
+
+## Antecedente M5
+# Estado actual — M5
+M4 aceptado por el propietario. M5 calendario Angular conectado al motor real, validado con servicios aislados y listo para aceptación; [entrega](M5_DELIVERY.md). Integración a main/activación/publicación requieren autorización separada. M6 y portal/staff/email/pagos/marketing no autorizados.
+
+## Antecedente M4
+# Estado actual — M4
+M1/M2 aprobados; M3 aceptado (ff5053b backend, d0b7a45 Angular). M4 motor de reservas implementado sobre M3, con pruebas PostgreSQL y autenticación real de ensayo; [entrega y límites](M4_DELIVERY.md). Sin integración a main/producción. M5 calendario/UI, portal público, staff y notificaciones requieren autorizaciones posteriores.
+
+## Antecedente M2 — estados históricos
+| Fase | Resultado / estado | Dependencia para avanzar |
 |---|---|---|
-| R0 | Documentación instalada desde estado limpio intencional | Entregado: Git registrado, docs persistidas sin commit, cero código/SQL; aceptación pendiente |
-| M1 | Migraciones versionadas + `clinics` como **ubicaciones** | BD vacía y upgrade convergen; integridad/conservación; sin cambios clínicos |
-| M2 | Integración comercial y administración de lugares | Cuotas de Billing respetadas y serializadas; alta/archivo sin pérdida |
-| T0 | Auth local staff + contrato Gateway | Médico Supabase inalterado; secretaria aislada y revocable |
-| T1 | Agendas y excepciones | Franja por lugar, sin doble ocupación del médico y sin anular turnos sin aviso |
-| T2 | Motor de reservas + formularios versionados | Slot confirmado transaccionalmente, solicitante≠paciente posible, vínculo clínico opcional |
-| T3 | Panel turnos médico/staff | Mismo motor y reglas, staff sin datos clínicos |
-| T4 | Directorio y reservas públicas | `/appointments`, protección de abuso y pago presencial; segmentos de médico/consultorio pendientes |
+| R0 | Documentación base en d5a89e0 | Completada |
+| M1 | Esquema 2 + clinics, commit final 6152867, APROBADO | Integración controlada pendiente; no merge/despliegue |
+| M2-SOL | Corrección congelada: DoctorChart 594402e / Billing 80c171c | Revalidar esquema 4; Argon quita contexto timeZone de consultorios; cuotas reales por configurar |
+| M2-ARGON | ea4f4d7 auditado por Sol en solo lectura | Corregir tres P2; observación P3 en informe cruzado; autorización e integración pendientes |
+| Integración M2 | Validar API real/UI/derechos y revisión cruzada | Ambos entregan evidencia; propietario autoriza integración/activación |
+| T0 | Auth local staff | Contrato propio y permiso; fuera de M2 |
+| T1 | Horarios/excepciones por lugar | Sin doble ocupación del médico; fuera de M2 |
+| T2 | Reservas/formularios versionados | Motor común; reserva no crea clínica |
+| T3–T4 | Panel staff y portal /appointments | Contratos y fases posteriores aprobados |
 
-Los límites comerciales reales se preparan en Bycode/Billing antes de habilitar M2 para usuarios. Se puede reordenar T0/T1 si los contratos lo requieren; nunca mezclar escrituras de ambos agentes.
-
-## Trabajo expresamente eliminado respecto de versiones 0.1/0.2
-- `patients.clinic_id`, backfill de pacientes, creación de sede inicial para migrar registros, aislamiento de clínica por consultorio.
-- Revisión transversal de todos los endpoints clínicos para filtro por sede, selectores de contexto clínico, borradores por sede, match de DNI entre sedes.
-- Wizard condicionado a crear sede, vistas longitudinales o duplicación de pacientes.
-
-## Validación transversal
-- Mantener regresiones clínicas actuales, sin afectar login médico.
-- Registrar tests ejecutados y no ejecutados; revisión de Argon; aceptación humana antes de merge/despliegue.
-
-No recuperar el trabajo anterior descartado intencionalmente. La confirmación de `/appointments` no aprueba segmentos anidados ni rutas administrativas.
+Ramas backend M2 pueden partir del M1 aprobado sin integrarlo a main; frontend usa su base independiente. Un escritor por Git; revisión cruzada y sin worktrees.
+El [contrato único](contracts/M2_CLINICS_API.md) está congelado; M2-SOL autorizado e implementado con snapshot apto durante caída Billing. No extender a M3.
+Sin cantidades por tier inventadas, escrituras por derechos desconocidos ni exposición operativa de mocks. Sin cambios clínicos por sede, pacientes duplicados o consultorio obligatorio.

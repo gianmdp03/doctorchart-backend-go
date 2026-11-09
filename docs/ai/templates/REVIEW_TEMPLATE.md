@@ -1,5 +1,5 @@
 # Revisión independiente · <ID de tarea>
-**Revisor:** Argon | **Fecha:** | **Repo / base / head SHA:**
+**Revisor:** <Sol o Gemini Argon, distinto del autor> | **Fecha:** | **Repo / base / head SHA:**
 **Alcance inspeccionado:** | **Accesos faltantes:**
 
 ## Resultado breve
@@ -23,5 +23,5 @@
 - Revisión de migración/datos:
 - Regresiones relevantes:
 
-## Recomendación al responsable Sol
+## Recomendación al implementador
 (No aplicar cambios por cuenta propia.)
