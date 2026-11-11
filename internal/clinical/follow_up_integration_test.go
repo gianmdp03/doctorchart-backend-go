@@ -24,6 +24,7 @@ func followUpDashboard(t *testing.T, s *Service, owner, zone string) encounterDa
 	s.EncounterRoutes(mux)
 	request := httptest.NewRequest("GET", "/api/doctorchart/encounters/dashboard?timeZone="+zone, nil)
 	request.Header.Set("X-Gateway-Secret", "follow-up-test")
+	bindFixtureContext(t, s.pool, request, owner)
 	request.Header.Set("X-User-Id", owner)
 	request.Header.Set("X-User-Role", "SUPER_ADMIN")
 	response := httptest.NewRecorder()
@@ -72,6 +73,7 @@ func TestFollowUpDatePersistenceAndValidation(t *testing.T) {
 		s.EncounterRoutes(mux)
 		request := httptest.NewRequest("GET", fmt.Sprintf("/api/doctorchart/encounters/%d", created.ID), nil)
 		request.Header.Set("X-Gateway-Secret", "follow-up-test")
+		bindFixtureContext(t, s.pool, request, identity.UserID)
 		request.Header.Set("X-User-Id", identity.UserID)
 		request.Header.Set("X-User-Role", "SUPER_ADMIN")
 		response := httptest.NewRecorder()
@@ -234,6 +236,17 @@ func TestFollowUpDashboardLatestDateWindowOwnershipAndRefresh(t *testing.T) {
 	}
 	// Empty accounts still receive [], so the UI can distinguish no controls
 	// from an unavailable response.
+	var specialtyID int64
+	if err := s.pool.QueryRow(t.Context(), "SELECT id FROM specialties WHERE code='pediatrics'").Scan(&specialtyID); err != nil {
+		t.Fatal(err)
+	}
+	empty, err := s.workspaces.Select(t.Context(), "empty-owner", map[string]any{"specialtyId": json.Number(fmt.Sprint(specialtyID)), "expectedVersion": nil})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.workspaces.Edit(t.Context(), "empty-owner", "finish", map[string]any{"expectedVersion": json.Number(fmt.Sprint(empty.Version))}); err != nil {
+		t.Fatal(err)
+	}
 	if got := followUpDashboard(t, s, "empty-owner", zone); len(got.Upcoming) != 0 {
 		t.Fatal("empty owner has reminders")
 	}

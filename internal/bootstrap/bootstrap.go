@@ -19,8 +19,8 @@ import (
 	"github.com/syntah/doctorchart-backend-go/internal/wizard"
 )
 
-// Captured from the pinned Spring startup in the owned empty reference database.
-// Includes Jackson's explicit nulls and Hibernate's initial version values.
+// Original catalogs were captured from the pinned Spring reference startup;
+// additional system specialties use the same published WizardDefinition v1.
 //
 //go:embed seed.json
 var seedJSON []byte
@@ -54,39 +54,49 @@ func seed(ctx context.Context, tx pgx.Tx, validator *wizard.Validator) error {
 			if count == 0 {
 				return errors.New("Specialty catalog exists but has no active published wizard")
 			}
-		} else {
-			for _, row := range seeds["specialties"] {
-				old := fmt.Sprint(row["id"])
-				var definition map[string]any
-				for _, w := range seeds["wizard_defaults"] {
-					if fmt.Sprint(w["specialty_id"]) == old {
-						definition = w
-					}
+		}
+		// db.Ensure serializes startups. Match stable codes, never replace an
+		// existing specialty or its administered draft/publication (even inactive).
+		for _, row := range seeds["specialties"] {
+			var existingID int64
+			err := tx.QueryRow(ctx, "SELECT id FROM specialties WHERE lower(code)=lower($1)", row["code"]).Scan(&existingID)
+			if err == nil {
+				specialtyIDs[fmt.Sprint(row["id"])] = existingID
+				continue
+			}
+			if !errors.Is(err, pgx.ErrNoRows) {
+				return err
+			}
+			old := fmt.Sprint(row["id"])
+			var definition map[string]any
+			for _, w := range seeds["wizard_defaults"] {
+				if fmt.Sprint(w["specialty_id"]) == old {
+					definition = w
 				}
-				if definition == nil {
-					return errors.New("missing specialty bootstrap wizard")
-				}
-				if err := validator.Validate(definition["draft_definition"].(map[string]any)); err != nil {
-					return fmt.Errorf("invalid specialty bootstrap wizard: %w", err)
-				}
-				now := time.Now().UTC().Truncate(time.Microsecond)
-				row["created_at"] = now
-				row["updated_at"] = now
-				row["active"] = false
-				row["version"] = int64(0)
-				id, err := insert(ctx, tx, "specialties", []string{"code", "display_name", "description", "active", "navigation", "patient_record_tabs", "patient_record_actions", "created_at", "updated_at", "version"}, row)
-				if err != nil {
-					return err
-				}
-				specialtyIDs[old] = id
-				definition["specialty_id"] = id
-				definition["updated_at"] = time.Now().UTC().Truncate(time.Microsecond)
-				if _, err = insert(ctx, tx, "wizard_defaults", []string{"specialty_id", "draft_definition", "published_definition", "published_version", "version", "updated_at"}, definition); err != nil {
-					return err
-				}
-				if _, err = tx.Exec(ctx, "UPDATE specialties SET active=true,version=1,updated_at=$2 WHERE id=$1", id, time.Now().UTC().Truncate(time.Microsecond)); err != nil {
-					return err
-				}
+			}
+			if definition == nil {
+				return errors.New("missing specialty bootstrap wizard")
+			}
+			if err := validator.Validate(definition["draft_definition"].(map[string]any)); err != nil {
+				return fmt.Errorf("invalid specialty bootstrap wizard: %w", err)
+			}
+			now := time.Now().UTC().Truncate(time.Microsecond)
+			row["created_at"] = now
+			row["updated_at"] = now
+			row["active"] = false
+			row["version"] = int64(0)
+			id, err := insert(ctx, tx, "specialties", []string{"code", "display_name", "description", "active", "navigation", "patient_record_tabs", "patient_record_actions", "created_at", "updated_at", "version"}, row)
+			if err != nil {
+				return err
+			}
+			specialtyIDs[old] = id
+			definition["specialty_id"] = id
+			definition["updated_at"] = time.Now().UTC().Truncate(time.Microsecond)
+			if _, err = insert(ctx, tx, "wizard_defaults", []string{"specialty_id", "draft_definition", "published_definition", "published_version", "version", "updated_at"}, definition); err != nil {
+				return err
+			}
+			if _, err = tx.Exec(ctx, "UPDATE specialties SET active=true,version=1,updated_at=$2 WHERE id=$1", id, time.Now().UTC().Truncate(time.Microsecond)); err != nil {
+				return err
 			}
 		}
 		for _, row := range seeds["chart_definitions"] {

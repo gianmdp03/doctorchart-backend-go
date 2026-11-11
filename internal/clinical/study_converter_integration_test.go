@@ -75,10 +75,10 @@ func TestLiveStudyHTTPConverterAndPersistence(t *testing.T) {
 	if err := pool.QueryRow(ctx, `INSERT INTO specialties(active,code,created_at,display_name,navigation,patient_record_actions,patient_record_tabs,updated_at,version) VALUES(true,'CONVERTER_TEST',now(),'Fixture','[]','["PRINT_DOCUMENT"]','["SUMMARY","ENCOUNTERS","STUDIES","PRESCRIPTIONS"]',now(),0) RETURNING id`).Scan(&specialtyID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(ctx, `INSERT INTO doctor_workspaces(created_at,current_step_key,definition,onboarding_completed,updated_at,user_id,version,specialty_id) VALUES(now(),'done','{"modulesConfig":{}}',true,now(),'fixture-owner',0,$1)`, specialtyID); err != nil {
+	if _, err := pool.Exec(ctx, `WITH workspace AS (INSERT INTO doctor_workspaces(created_at,updated_at,user_id,version) VALUES(now(),now(),'fixture-owner',0) RETURNING id) INSERT INTO doctor_specialty_contexts(workspace_id,created_at,current_step_key,definition,onboarding_completed,updated_at,version,specialty_id) SELECT id,now(),'done','{"modulesConfig":{}}',true,now(),0,$1 FROM workspace`, specialtyID); err != nil {
 		t.Fatal(err)
 	}
-	if err := pool.QueryRow(ctx, `INSERT INTO patients(birth_date,form_definition_snapshot,form_values,formula_context,formula_results,full_name,updated_at,user_id,version,workspace_version) VALUES('2000-01-01','{}','{}','{}','{}','Synthetic Patient',now(),'fixture-owner',0,0) RETURNING id`).Scan(&patientID); err != nil {
+	if err := pool.QueryRow(ctx, `INSERT INTO patients(birth_date,form_definition_snapshot,form_values,formula_context,formula_results,full_name,updated_at,user_id,version,workspace_version,workspace_id,specialty_context_id) VALUES('2000-01-01','{}','{}','{}','{}','Synthetic Patient',now(),'fixture-owner',0,0,(SELECT id FROM doctor_workspaces WHERE user_id='fixture-owner'),(SELECT c.id FROM doctor_specialty_contexts c JOIN doctor_workspaces w ON w.id=c.workspace_id WHERE w.user_id='fixture-owner')) RETURNING id`).Scan(&patientID); err != nil {
 		t.Fatal(err)
 	}
 	countStudies := func() int {
@@ -143,7 +143,7 @@ func TestLiveStudyHTTPConverterAndPersistence(t *testing.T) {
 			}
 			objects[r.URL.Path] = data
 			if revokeAfterStorage.Swap(false) {
-				if _, err := pool.Exec(ctx, "UPDATE patients SET user_id='revoked-owner' WHERE id=$1", patientID); err != nil {
+				if _, err := pool.Exec(ctx, "UPDATE specialties SET patient_record_tabs=patient_record_tabs-'STUDIES' WHERE id=(SELECT c.specialty_id FROM doctor_specialty_contexts c JOIN patients p ON p.specialty_context_id=c.id WHERE p.id=$1)", patientID); err != nil {
 					t.Error(err)
 				}
 			}
@@ -205,6 +205,7 @@ func TestLiveStudyHTTPConverterAndPersistence(t *testing.T) {
 		req.Header.Set("Content-Type", writer.FormDataContentType())
 		if authenticated {
 			req.Header.Set("X-Gateway-Secret", gatewayKey)
+			bindFixtureContext(t, pool, req, user)
 			req.Header.Set("X-User-Id", user)
 			req.Header.Set("X-User-Role", role)
 			req.Header.Set("X-User-Plan", "PRO")
@@ -218,7 +219,7 @@ func TestLiveStudyHTTPConverterAndPersistence(t *testing.T) {
 		user, role    string
 		authenticated bool
 		status        int
-	}{{"fixture-owner", "DOCTOR", false, 401}, {"other-owner", "DOCTOR", true, 403}, {"fixture-owner", "VIEWER", true, 403}} {
+	}{{"fixture-owner", "DOCTOR", false, 401}, {"other-owner", "DOCTOR", true, 404}, {"fixture-owner", "VIEWER", true, 403}} {
 		response := upload(test.user, test.role, "", test.authenticated)
 		if response.Code != test.status || converterCalls.Load() != 0 || putCalls.Load() != 0 || countStudies() != 0 {
 			t.Fatalf("authorization bypass: %d %s", response.Code, response.Body.String())
@@ -276,7 +277,7 @@ func TestLiveStudyHTTPConverterAndPersistence(t *testing.T) {
 	if response.Code != 403 || countStudies() != 1 || objectCount != 1 || deleteCalls.Load() != 2 {
 		t.Fatalf("changed ownership was accepted or left an object: %d %s", response.Code, response.Body.String())
 	}
-	if _, err := pool.Exec(ctx, "UPDATE patients SET user_id='fixture-owner' WHERE id=$1", patientID); err != nil {
+	if _, err := pool.Exec(ctx, "UPDATE specialties SET patient_record_tabs=patient_record_tabs || '[\"STUDIES\"]'::jsonb WHERE id=(SELECT c.specialty_id FROM doctor_specialty_contexts c JOIN patients p ON p.specialty_context_id=c.id WHERE p.id=$1)", patientID); err != nil {
 		t.Fatal(err)
 	}
 	// Twenty concurrent uploads must complete even with only two DB connections.
@@ -317,6 +318,7 @@ func TestLiveStudyHTTPConverterAndPersistence(t *testing.T) {
 		r := httptest.NewRequest(method, path, strings.NewReader(body)).WithContext(ctx)
 		r.Header.Set("Content-Type", "application/json")
 		r.Header.Set("X-Gateway-Secret", gatewayKey)
+		bindFixtureContext(t, pool, r, user)
 		r.Header.Set("X-User-Id", user)
 		r.Header.Set("X-User-Role", role)
 		r.Header.Set("X-User-Plan", "PRO")
@@ -328,7 +330,11 @@ func TestLiveStudyHTTPConverterAndPersistence(t *testing.T) {
 	documentPath := fmt.Sprintf("/api/doctorchart/patients/%d/prescriptions", patientID)
 	prescriptionBody := `{"type":"PRESCRIPTION","diagnosisDescription":"Synthetic diagnosis","prescriptions":[{"medicationName":"Synthetic medicine","dosage":"5 mg","administrationRoute":"oral","frequency":"daily","durationDays":5}],"diagnosticOrders":[]}`
 	for _, actor := range []struct{ user, role string }{{"other-owner", "DOCTOR"}, {"fixture-owner", "VIEWER"}} {
-		if w := documentRequest("POST", documentPath, actor.user, actor.role, prescriptionBody); w.Code != 403 {
+		want := 403
+		if actor.user != "fixture-owner" {
+			want = 404
+		}
+		if w := documentRequest("POST", documentPath, actor.user, actor.role, prescriptionBody); w.Code != want {
 			t.Fatal("document creation bypassed authorization", w.Code)
 		}
 	}
@@ -347,7 +353,7 @@ func TestLiveStudyHTTPConverterAndPersistence(t *testing.T) {
 	if w.Code != 200 || !bytes.HasPrefix(w.Body.Bytes(), []byte("%PDF")) || w.Header().Get("Content-Type") != "application/pdf" || !strings.Contains(w.Header().Get("Cache-Control"), "no-store") {
 		t.Fatal("baseline private PDF generation failed", w.Code)
 	}
-	if w := documentRequest("GET", recordPath+"/pdf", "other-owner", "DOCTOR", ""); w.Code != 403 {
+	if w := documentRequest("GET", recordPath+"/pdf", "other-owner", "DOCTOR", ""); w.Code != 404 {
 		t.Fatal("foreign owner read a PDF", w.Code)
 	}
 	ordersBody := `{"type":"STUDY_ORDERS","prescriptions":[],"diagnosticOrders":["Synthetic laboratory order"]}`

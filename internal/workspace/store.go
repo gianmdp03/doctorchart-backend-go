@@ -63,6 +63,7 @@ type Default struct {
 }
 type Setup struct {
 	ID                 int64           `json:"id"`
+	ContextID          int64           `json:"specialtyContextId"`
 	Version            int64           `json:"version"`
 	Specialty          Summary         `json:"specialty"`
 	SourceVersion      *int64          `json:"sourceWizardVersion"`
@@ -114,11 +115,24 @@ func defaultWizard(ctx context.Context, tx pgx.Tx, id int64) (Default, error) {
 	return d, err
 }
 func readWorkspace(ctx context.Context, tx pgx.Tx, userID string) (*workspace, error) {
+	requested := api.SpecialtyContextID(ctx)
+	if requested == 0 {
+		var count int
+		if err := tx.QueryRow(ctx, "SELECT count(*),COALESCE(min(c.id),0) FROM doctor_specialty_contexts c JOIN doctor_workspaces w ON w.id=c.workspace_id WHERE w.user_id=$1", userID).Scan(&count, &requested); err != nil {
+			return nil, err
+		}
+		if count > 1 {
+			return nil, api.Failure(400, "SPECIALTY_CONTEXT_REQUIRED", "Elegí la especialidad de esta solicitud.")
+		}
+		if count == 0 {
+			return nil, nil
+		}
+	}
 	var w workspace
 	var specialtyID int64
-	err := tx.QueryRow(ctx, `SELECT id,version,specialty_id,source_wizard_version,draft_source_wizard_version,onboarding_completed,current_step_key,definition,draft_definition,patient_columns_config,quick_notes,created_at FROM doctor_workspaces WHERE user_id=$1`, userID).Scan(&w.ID, &w.Setup.Version, &specialtyID, &w.SourceVersion, &w.DraftSourceVersion, &w.Completed, &w.Step, &w.Definition, &w.Draft, &w.Preferences.Columns, &w.Preferences.Notes, &w.Created)
+	err := tx.QueryRow(ctx, `SELECT w.id,c.id,c.version,c.specialty_id,c.source_wizard_version,c.draft_source_wizard_version,c.onboarding_completed,c.current_step_key,c.definition,c.draft_definition,p.patient_columns_config,p.quick_notes,w.created_at,p.version FROM doctor_workspaces w JOIN doctor_specialty_contexts c ON c.workspace_id=w.id JOIN specialty_context_preferences p ON p.specialty_context_id=c.id WHERE w.user_id=$1 AND c.id=$2`, userID, requested).Scan(&w.ID, &w.ContextID, &w.Setup.Version, &specialtyID, &w.SourceVersion, &w.DraftSourceVersion, &w.Completed, &w.Step, &w.Definition, &w.Draft, &w.Preferences.Columns, &w.Preferences.Notes, &w.Created, &w.Preferences.Version)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil
+		return nil, api.Failure(404, "SPECIALTY_CONTEXT_NOT_FOUND", "La especialidad no está disponible.")
 	}
 	if err != nil {
 		return nil, err
@@ -129,7 +143,6 @@ func readWorkspace(ctx context.Context, tx pgx.Tx, userID string) (*workspace, e
 	}
 	w.Specialty = s.summary()
 	w.Experience = s.experience()
-	w.Preferences.Version = w.Setup.Version
 	w.UserID = userID
 	w.Definition, err = wizard.WithSystemHistory(w.Definition)
 	if err != nil {
@@ -196,7 +209,7 @@ func (s *Store) Specialties(ctx context.Context, admin bool) ([]Specialty, error
 	err := s.transaction(ctx, true, func(tx pgx.Tx) error {
 		query := "SELECT " + specialtyColumns + " FROM specialties"
 		if !admin {
-			query += " WHERE active=true AND EXISTS(SELECT 1 FROM wizard_defaults w WHERE w.specialty_id=specialties.id AND w.published_definition IS NOT NULL)"
+			query += " WHERE lower(code) IN ('pediatrics','general_medicine','dermatology') AND active=true AND EXISTS(SELECT 1 FROM wizard_defaults w WHERE w.specialty_id=specialties.id AND w.published_definition IS NOT NULL)"
 		}
 		query += " ORDER BY display_name,id"
 		rows, err := tx.Query(ctx, query)
@@ -236,7 +249,7 @@ func (s *Store) Wizard(ctx context.Context, id int64, published bool) (any, erro
 		if err != nil {
 			return err
 		}
-		if !specialty.Active || len(d.Published) == 0 {
+		if !supportedSpecialty(specialty.Code) || !specialty.Active || len(d.Published) == 0 {
 			return api.Failure(404, "SPECIALTY_NOT_FOUND", "La especialidad no está disponible.")
 		}
 		result = struct {
@@ -278,6 +291,20 @@ func (s *Store) Preferences(ctx context.Context, userID string) (Preferences, er
 	return result, err
 }
 func (s *Store) Profile(ctx context.Context, userID string) (any, error) {
+	if api.SpecialtyContextID(ctx) == 0 {
+		contexts, err := s.Contexts(ctx, userID)
+		if err != nil {
+			return nil, err
+		}
+		if len(contexts) > 1 {
+			var id int64
+			var created time.Time
+			if err = s.pool.QueryRow(ctx, "SELECT id,created_at FROM doctor_workspaces WHERE user_id=$1", userID).Scan(&id, &created); err != nil {
+				return nil, err
+			}
+			return map[string]any{"id": id, "userId": userID, "specialty": nil, "isSpecialtyLocked": true, "createdAt": api.FormatInstant(created), "contexts": contexts}, nil
+		}
+	}
 	var result any
 	err := s.transaction(ctx, true, func(tx pgx.Tx) error {
 		w, err := readWorkspace(ctx, tx, userID)
@@ -300,19 +327,28 @@ func (s *Store) Profile(ctx context.Context, userID string) (any, error) {
 }
 
 func saveWorkspace(ctx context.Context, tx pgx.Tx, w *workspace) error {
-	var row pgx.Row
 	if w.ID == 0 {
-		row = tx.QueryRow(ctx, `INSERT INTO doctor_workspaces(user_id,specialty_id,definition,draft_definition,source_wizard_version,draft_source_wizard_version,current_step_key,onboarding_completed,patient_columns_config,quick_notes,version,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,0,clock_timestamp(),clock_timestamp()) RETURNING id,version,created_at`, w.UserID, w.Specialty.ID, w.Definition, w.Draft, w.SourceVersion, w.DraftSourceVersion, w.Step, w.Completed, w.Preferences.Columns, w.Preferences.Notes)
-	} else {
-		row = tx.QueryRow(ctx, `UPDATE doctor_workspaces SET specialty_id=$2,definition=$3,draft_definition=$4,source_wizard_version=$5,draft_source_wizard_version=$6,current_step_key=$7,onboarding_completed=$8,patient_columns_config=$9,quick_notes=$10,version=version+1,updated_at=clock_timestamp() WHERE id=$1 AND version=$11 RETURNING id,version,created_at`, w.ID, w.Specialty.ID, w.Definition, w.Draft, w.SourceVersion, w.DraftSourceVersion, w.Step, w.Completed, w.Preferences.Columns, w.Preferences.Notes, w.Setup.Version)
+		if err := tx.QueryRow(ctx, `INSERT INTO doctor_workspaces(user_id,version,created_at,updated_at) VALUES($1,0,clock_timestamp(),clock_timestamp()) RETURNING id,version,created_at`, w.UserID).Scan(&w.ID, &w.Preferences.Version, &w.Created); err != nil {
+			return err
+		}
 	}
-	if err := row.Scan(&w.ID, &w.Setup.Version, &w.Created); err != nil {
+	// Preserve the workspace lock used by clinical writes and the global agenda.
+	// Ownership is checked here too; context IDs supplied by a client grant no access.
+	if err := tx.QueryRow(ctx, "SELECT id FROM doctor_workspaces WHERE id=$1 AND user_id=$2 FOR UPDATE", w.ID, w.UserID).Scan(&w.ID); err != nil {
+		return err
+	}
+	var row pgx.Row
+	if w.ContextID == 0 {
+		row = tx.QueryRow(ctx, `INSERT INTO doctor_specialty_contexts(workspace_id,specialty_id,definition,draft_definition,source_wizard_version,draft_source_wizard_version,current_step_key,onboarding_completed,version,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,0,clock_timestamp(),clock_timestamp()) RETURNING id,version`, w.ID, w.Specialty.ID, w.Definition, w.Draft, w.SourceVersion, w.DraftSourceVersion, w.Step, w.Completed)
+	} else {
+		row = tx.QueryRow(ctx, `UPDATE doctor_specialty_contexts SET specialty_id=$3,definition=$4,draft_definition=$5,source_wizard_version=$6,draft_source_wizard_version=$7,current_step_key=$8,onboarding_completed=$9,version=version+1,updated_at=greatest(clock_timestamp(),updated_at+interval '1 microsecond') WHERE id=$1 AND workspace_id=$2 AND version=$10 RETURNING id,version`, w.ContextID, w.ID, w.Specialty.ID, w.Definition, w.Draft, w.SourceVersion, w.DraftSourceVersion, w.Step, w.Completed, w.Setup.Version)
+	}
+	if err := row.Scan(&w.ContextID, &w.Setup.Version); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return api.Failure(409, "VERSION_CONFLICT", "La configuración cambió. Actualizá los datos antes de guardar.")
 		}
 		return err
 	}
-	w.Preferences.Version = w.Setup.Version
 	return nil
 }
 
@@ -339,6 +375,9 @@ func (s *Store) Effective(ctx context.Context, tx pgx.Tx, userID string, expecte
 	w, err := readWorkspace(ctx, tx, userID)
 	if err != nil {
 		return nil, err
+	}
+	if w == nil {
+		return nil, api.Failure(404, "SPECIALTY_CONTEXT_NOT_FOUND", "El contexto clínico no está disponible.")
 	}
 	if !w.Completed || len(w.Definition) == 0 {
 		return nil, api.Failure(409, "ONBOARDING_REQUIRED", "Completá la configuración antes de crear registros.")

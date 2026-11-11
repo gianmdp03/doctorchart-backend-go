@@ -57,6 +57,7 @@ type Measurements struct {
 }
 type Patient struct {
 	ID               int64           `json:"id"`
+	ContextID        int64           `json:"specialtyContextId"`
 	Version          int64           `json:"version"`
 	FullName         string          `json:"fullName"`
 	BirthDate        string          `json:"birthDate"`
@@ -81,11 +82,11 @@ type Patient struct {
 	owner            string
 }
 
-const patientColumns = "id,version,full_name,birth_date::text,national_id,gender,blood_type,phone,email,address,insurance_info,allergies,chronic_conditions,guardian_info,personal_history,family_history,form_values,formula_results,form_definition_snapshot,formula_context,workspace_version,user_id"
+const patientColumns = "id,version,full_name,birth_date::text,national_id,gender,blood_type,phone,email,address,insurance_info,allergies,chronic_conditions,guardian_info,personal_history,family_history,form_values,formula_results,form_definition_snapshot,formula_context,workspace_version,user_id,specialty_context_id"
 
 func scanPatient(row pgx.Row) (Patient, error) {
 	var p Patient
-	err := row.Scan(&p.ID, &p.Version, &p.FullName, &p.BirthDate, &p.NationalID, &p.Gender, &p.BloodType, &p.Phone, &p.Email, &p.Address, &p.Insurance, &p.Allergies, &p.Chronic, &p.Guardian, &p.Personal, &p.Family, &p.Values, &p.Results, &p.Snapshot, &p.Context, &p.WorkspaceVersion, &p.owner)
+	err := row.Scan(&p.ID, &p.Version, &p.FullName, &p.BirthDate, &p.NationalID, &p.Gender, &p.BloodType, &p.Phone, &p.Email, &p.Address, &p.Insurance, &p.Allergies, &p.Chronic, &p.Guardian, &p.Personal, &p.Family, &p.Values, &p.Results, &p.Snapshot, &p.Context, &p.WorkspaceVersion, &p.owner, &p.ContextID)
 	if err == nil {
 		err = normalizePatientHistory(&p)
 	}
@@ -137,15 +138,12 @@ func normalizePatientHistory(p *Patient) error {
 	return nil
 }
 func ownedPatient(ctx context.Context, tx pgx.Tx, userID string, id int64) (Patient, error) {
-	p, err := scanPatient(tx.QueryRow(ctx, "SELECT "+patientColumns+" FROM patients WHERE id=$1", id))
+	p, err := scanPatient(tx.QueryRow(ctx, "SELECT "+patientColumns+" FROM patients WHERE id=$1 AND user_id=$2 AND ($3::bigint=0 AND (SELECT count(*) FROM doctor_specialty_contexts scope_c JOIN doctor_workspaces scope_w ON scope_w.id=scope_c.workspace_id WHERE scope_w.user_id=$2)=1 OR specialty_context_id=$3)", id, userID, api.SpecialtyContextID(ctx)))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return p, api.Failure(404, "PATIENT_NOT_FOUND", "No se encontró el paciente.")
 	}
 	if err != nil {
 		return p, err
-	}
-	if p.owner != userID {
-		return p, api.Failure(403, "FORBIDDEN", "No tenés permiso para acceder a este paciente.")
 	}
 	return p, nil
 }
@@ -154,15 +152,12 @@ func ownedPatient(ctx context.Context, tx pgx.Tx, userID string, id int64) (Pati
 // Count/check/write then serializes across pools and backend instances.
 func lockPatient(ctx context.Context, tx pgx.Tx, userID string, id int64) error {
 	var owner string
-	err := tx.QueryRow(ctx, "SELECT user_id FROM patients WHERE id=$1 FOR UPDATE", id).Scan(&owner)
+	err := tx.QueryRow(ctx, "SELECT user_id FROM patients WHERE id=$1 AND user_id=$2 AND ($3::bigint=0 AND (SELECT count(*) FROM doctor_specialty_contexts scope_c JOIN doctor_workspaces scope_w ON scope_w.id=scope_c.workspace_id WHERE scope_w.user_id=$2)=1 OR specialty_context_id=$3) FOR UPDATE", id, userID, api.SpecialtyContextID(ctx)).Scan(&owner)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return api.Failure(404, "PATIENT_NOT_FOUND", "No se encontró el paciente.")
 	}
 	if err != nil {
 		return err
-	}
-	if owner != userID {
-		return api.Failure(403, "FORBIDDEN", "No tenés permiso para acceder a este paciente.")
 	}
 	return nil
 }
@@ -474,7 +469,7 @@ func (s *Service) CreatePatient(ctx context.Context, identity api.Identity, requ
 		if err != nil {
 			return err
 		}
-		p := Patient{owner: identity.UserID, WorkspaceVersion: setup.Version, Allergies: json.RawMessage(`[]`), Chronic: json.RawMessage(`[]`)}
+		p := Patient{ContextID: setup.ContextID, owner: identity.UserID, WorkspaceVersion: setup.Version, Allergies: json.RawMessage(`[]`), Chronic: json.RawMessage(`[]`)}
 		form = wizard.WithClinicalHistory(form)
 		p.Snapshot, err = json.Marshal(form)
 		if err != nil {
@@ -487,7 +482,7 @@ func (s *Service) CreatePatient(ctx context.Context, identity api.Identity, requ
 		if err := applyPatient(&p, evaluation); err != nil {
 			return err
 		}
-		err = tx.QueryRow(ctx, `INSERT INTO patients(user_id,workspace_version,full_name,birth_date,national_id,gender,blood_type,phone,email,address,guardian_info,family_history,insurance_info,form_values,formula_results,form_definition_snapshot,formula_context,allergies,chronic_conditions,personal_history,version,updated_at) VALUES($1,$2,$3,$4::date,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,0,clock_timestamp()) RETURNING id,version`, p.owner, p.WorkspaceVersion, p.FullName, p.BirthDate, p.NationalID, p.Gender, p.BloodType, p.Phone, p.Email, p.Address, p.Guardian, p.Family, p.Insurance, p.Values, p.Results, p.Snapshot, p.Context, p.Allergies, p.Chronic, p.Personal).Scan(&p.ID, &p.Version)
+		err = tx.QueryRow(ctx, `INSERT INTO patients(user_id,workspace_version,full_name,birth_date,national_id,gender,blood_type,phone,email,address,guardian_info,family_history,insurance_info,form_values,formula_results,form_definition_snapshot,formula_context,allergies,chronic_conditions,personal_history,workspace_id,specialty_context_id,version,updated_at) VALUES($1,$2,$3,$4::date,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,0,clock_timestamp()) RETURNING id,version`, p.owner, p.WorkspaceVersion, p.FullName, p.BirthDate, p.NationalID, p.Gender, p.BloodType, p.Phone, p.Email, p.Address, p.Guardian, p.Family, p.Insurance, p.Values, p.Results, p.Snapshot, p.Context, p.Allergies, p.Chronic, p.Personal, setup.ID, setup.ContextID).Scan(&p.ID, &p.Version)
 		if err != nil {
 			return err
 		}
@@ -599,7 +594,7 @@ func (s *Service) UpdatePatient(ctx context.Context, userID string, id int64, re
 
 func (s *Service) Routes(mux *http.ServeMux) {
 	s.summaryRoutes(mux)
-	mux.HandleFunc("POST /api/doctorchart/patients", func(w http.ResponseWriter, r *http.Request) {
+	s.handle(mux, "POST /api/doctorchart/patients", func(w http.ResponseWriter, r *http.Request) {
 		request, err := api.Decode(w, r)
 		if err != nil {
 			api.WriteError(w, err)
@@ -613,7 +608,7 @@ func (s *Service) Routes(mux *http.ServeMux) {
 		w.Header().Set("Location", "/api/doctorchart/patients/"+strconv.FormatInt(p.ID, 10))
 		api.WriteJSON(w, 201, p)
 	})
-	mux.HandleFunc("GET /api/doctorchart/patients/{id}", func(w http.ResponseWriter, r *http.Request) {
+	s.handle(mux, "GET /api/doctorchart/patients/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 		if err != nil {
 			api.WriteError(w, api.Invalid("La solicitud contiene datos inválidos."))
@@ -626,7 +621,7 @@ func (s *Service) Routes(mux *http.ServeMux) {
 		}
 		api.WriteJSON(w, 200, p)
 	})
-	mux.HandleFunc("PUT /api/doctorchart/patients/{id}", func(w http.ResponseWriter, r *http.Request) {
+	s.handle(mux, "PUT /api/doctorchart/patients/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 		if err != nil {
 			api.WriteError(w, api.Invalid("La solicitud contiene datos inválidos."))

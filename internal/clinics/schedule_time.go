@@ -21,18 +21,24 @@ type ScheduleDay struct {
 	Ranges  []ScheduleRange `json:"ranges"`
 }
 type ScheduleRange struct {
-	Start string `json:"start"`
-	End   string `json:"end"`
+	ID          string `json:"id,omitempty"`
+	ContextID   string `json:"specialtyContextId,omitempty"`
+	SlotMinutes int    `json:"slotMinutes,omitempty"`
+	Start       string `json:"start"`
+	End         string `json:"end"`
 }
 type ScheduleException struct {
+	ID      string          `json:"id,omitempty"`
 	From    string          `json:"from"`
 	Through string          `json:"through"`
 	Label   string          `json:"label"`
 	Ranges  []ScheduleRange `json:"ranges"`
 }
 type AvailableSlot struct {
-	Start time.Time `json:"start"`
-	End   time.Time `json:"end"`
+	blockID, contextID string
+	SpecialtyContextID string    `json:"specialtyContextId,omitempty"`
+	Start              time.Time `json:"start"`
+	End                time.Time `json:"end"`
 }
 type AvailabilityDay struct {
 	Date  string          `json:"date"`
@@ -86,7 +92,7 @@ func validateRanges(ranges []ScheduleRange) error {
 	return nil
 }
 func (c ScheduleConfig) Validate() error {
-	if c.SlotMinutes < 5 || c.SlotMinutes > 480 || c.MinNoticeMinutes < 0 || c.MinNoticeMinutes > 525600 || c.MaxAdvanceDays < 1 || c.MaxAdvanceDays > 366 {
+	if (c.SlotMinutes != 0 && (c.SlotMinutes < 5 || c.SlotMinutes > 480)) || c.MinNoticeMinutes < 0 || c.MinNoticeMinutes > 525600 || c.MaxAdvanceDays < 1 || c.MaxAdvanceDays > 366 {
 		return fmt.Errorf("duración, anticipación u horizonte fuera de límites técnicos")
 	}
 	if len(c.Weekly) > 7 || len(c.Exceptions) > 100 {
@@ -98,7 +104,7 @@ func (c ScheduleConfig) Validate() error {
 			return fmt.Errorf("día semanal inválido o repetido")
 		}
 		seen[day.Weekday] = true
-		if err := validateRanges(day.Ranges); err != nil {
+		if err := c.validateBlocks(day.Ranges); err != nil {
 			return err
 		}
 	}
@@ -121,7 +127,7 @@ func (c ScheduleConfig) Validate() error {
 			return fmt.Errorf("las excepciones se superponen")
 		}
 		previous = e.Through
-		if err := validateRanges(e.Ranges); err != nil {
+		if err := c.validateBlocks(e.Ranges); err != nil {
 			return err
 		}
 	}
@@ -171,15 +177,25 @@ func (c ScheduleConfig) slots(ctx context.Context, date time.Time, loc *time.Loc
 	}
 	earliest := now.Add(time.Duration(c.MinNoticeMinutes) * time.Minute)
 	latest := now.Add(time.Duration(c.MaxAdvanceDays) * 24 * time.Hour)
-	duration := time.Duration(c.SlotMinutes) * time.Minute
 	err := civilMinutes(ctx, date, loc, func(instant time.Time, minute int) {
-		if instant.Before(earliest) || instant.Add(duration).After(latest) {
+		if instant.Before(earliest) {
 			return
 		}
 		for _, r := range ranges {
+			minutes := r.SlotMinutes
+			if minutes == 0 {
+				minutes = c.SlotMinutes
+			}
+			if minutes < 5 || minutes > 480 {
+				continue
+			}
+			duration := time.Duration(minutes) * time.Minute
+			if instant.Add(duration).After(latest) {
+				continue
+			}
 			begin, _ := wallMinute(r.Start, false)
 			end, _ := wallMinute(r.End, true)
-			if minute < begin || minute+c.SlotMinutes > end || (minute-begin)%c.SlotMinutes != 0 {
+			if minute < begin || minute+minutes > end || (minute-begin)%minutes != 0 {
 				continue
 			}
 			// Refuse slots that cross an offset jump, including a backward transition.
@@ -188,9 +204,35 @@ func (c ScheduleConfig) slots(ctx context.Context, date time.Time, loc *time.Loc
 			if startOffset != endOffset {
 				continue
 			}
-			slots = append(slots, AvailableSlot{Start: instant.UTC(), End: instant.Add(duration).UTC()})
+			slots = append(slots, AvailableSlot{Start: instant.UTC(), End: instant.Add(duration).UTC(), blockID: r.ID, contextID: r.ContextID, SpecialtyContextID: r.ContextID})
 			break
 		}
 	})
 	return slots, err
+}
+
+func (c ScheduleConfig) validateBlocks(ranges []ScheduleRange) error {
+	if err := validateRanges(ranges); err != nil {
+		return err
+	}
+	for _, r := range ranges {
+		m := r.SlotMinutes
+		if m == 0 {
+			m = c.SlotMinutes
+		}
+		if m < 5 || m > 480 {
+			return fmt.Errorf("la duración de cada bloque debe estar entre 5 y 480 minutos")
+		}
+		if r.ID != "" {
+			if _, err := decimal(r.ID, true); err != nil {
+				return fmt.Errorf("identificador de bloque inválido")
+			}
+		}
+		if r.ContextID != "" {
+			if _, err := decimal(r.ContextID, true); err != nil {
+				return fmt.Errorf("contexto de bloque inválido")
+			}
+		}
+	}
+	return nil
 }

@@ -59,14 +59,14 @@ func (s *Service) CatalogRoutes(mux *http.ServeMux) error {
 	if err := json.Unmarshal(medicationsJSON, &medications); err != nil {
 		return err
 	}
-	mux.HandleFunc("GET /api/doctorchart/medications", func(w http.ResponseWriter, r *http.Request) {
+	s.handle(mux, "GET /api/doctorchart/medications", func(w http.ResponseWriter, r *http.Request) {
 		if err := s.workspaces.RequireFeature(r.Context(), api.User(r.Context()).UserID, "MEDICATION_CATALOG"); err != nil {
 			api.WriteError(w, err)
 			return
 		}
 		api.WriteJSON(w, 200, medications)
 	})
-	mux.HandleFunc("GET /api/doctorchart/medications/search", func(w http.ResponseWriter, r *http.Request) {
+	s.handle(mux, "GET /api/doctorchart/medications/search", func(w http.ResponseWriter, r *http.Request) {
 		limit := 10
 		if value := r.URL.Query().Get("limit"); value != "" {
 			n, err := strconv.ParseInt(value, 10, 32)
@@ -98,7 +98,7 @@ func (s *Service) CatalogRoutes(mux *http.ServeMux) error {
 		}
 		api.WriteJSON(w, 200, result)
 	})
-	mux.HandleFunc("GET /api/doctorchart/vaccination-calendar", func(w http.ResponseWriter, r *http.Request) {
+	s.handle(mux, "GET /api/doctorchart/vaccination-calendar", func(w http.ResponseWriter, r *http.Request) {
 		var result json.RawMessage
 		err := s.transaction(r.Context(), true, func(tx pgx.Tx) error {
 			if err := s.workspaces.Feature(r.Context(), tx, api.User(r.Context()).UserID, "VACCINATION_CALENDAR"); err != nil {
@@ -116,7 +116,7 @@ func (s *Service) CatalogRoutes(mux *http.ServeMux) error {
 		}
 		api.WriteJSON(w, 200, result)
 	})
-	mux.HandleFunc("GET /api/doctorchart/charts", func(w http.ResponseWriter, r *http.Request) {
+	s.handle(mux, "GET /api/doctorchart/charts", func(w http.ResponseWriter, r *http.Request) {
 		result := []Chart{}
 		err := s.transaction(r.Context(), true, func(tx pgx.Tx) error {
 			if err := s.workspaces.Feature(r.Context(), tx, api.User(r.Context()).UserID, "GROWTH"); err != nil {
@@ -142,7 +142,7 @@ func (s *Service) CatalogRoutes(mux *http.ServeMux) error {
 		}
 		api.WriteJSON(w, 200, result)
 	})
-	mux.HandleFunc("GET /api/doctorchart/workspace/charts", func(w http.ResponseWriter, r *http.Request) {
+	s.handle(mux, "GET /api/doctorchart/workspace/charts", func(w http.ResponseWriter, r *http.Request) {
 		result := []ChartConfig{}
 		err := s.transaction(r.Context(), true, func(tx pgx.Tx) error {
 			userID := api.User(r.Context()).UserID
@@ -169,7 +169,7 @@ func (s *Service) CatalogRoutes(mux *http.ServeMux) error {
 		}
 		api.WriteJSON(w, 200, result)
 	})
-	mux.HandleFunc("PUT /api/doctorchart/workspace/charts", func(w http.ResponseWriter, r *http.Request) {
+	s.handle(mux, "PUT /api/doctorchart/workspace/charts", func(w http.ResponseWriter, r *http.Request) {
 		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 26<<20))
 		var requests []struct {
 			Code     string             `json:"chartCode"`

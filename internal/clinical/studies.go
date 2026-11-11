@@ -145,14 +145,14 @@ func (s *Service) DeletePatient(ctx context.Context, user string, id int64) erro
 	return err
 }
 func (s *Service) StudyRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("DELETE /api/doctorchart/patients/{id}", func(w http.ResponseWriter, r *http.Request) {
+	s.handle(mux, "DELETE /api/doctorchart/patients/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id, err := pathID(r, "id")
 		if err == nil {
 			err = s.DeletePatient(r.Context(), api.User(r.Context()).UserID, id)
 		}
 		clinicalReply(w, nil, err, 204)
 	})
-	mux.HandleFunc("GET /api/doctorchart/patients/{patientId}/studies", func(w http.ResponseWriter, r *http.Request) {
+	s.handle(mux, "GET /api/doctorchart/patients/{patientId}/studies", func(w http.ResponseWriter, r *http.Request) {
 		if err := prescriptionRole(r); err != nil {
 			api.WriteError(w, err)
 			return
@@ -181,7 +181,7 @@ func (s *Service) StudyRoutes(mux *http.ServeMux) {
 		}
 		clinicalReply(w, result, err, 200)
 	})
-	mux.HandleFunc("POST /api/doctorchart/patients/{patientId}/studies", func(w http.ResponseWriter, r *http.Request) {
+	s.handle(mux, "POST /api/doctorchart/patients/{patientId}/studies", func(w http.ResponseWriter, r *http.Request) {
 		if err := prescriptionRole(r); err != nil {
 			api.WriteError(w, err)
 			return
@@ -342,7 +342,7 @@ func (s *Service) StudyRoutes(mux *http.ServeMux) {
 		}
 		clinicalReply(w, result, err, 201)
 	})
-	mux.HandleFunc("GET /api/doctorchart/patients/{patientId}/studies/{studyId}", func(w http.ResponseWriter, r *http.Request) {
+	s.handle(mux, "GET /api/doctorchart/patients/{patientId}/studies/{studyId}", func(w http.ResponseWriter, r *http.Request) {
 		if err := prescriptionRole(r); err != nil {
 			api.WriteError(w, err)
 			return
@@ -350,7 +350,7 @@ func (s *Service) StudyRoutes(mux *http.ServeMux) {
 		result, err := s.readStudy(r)
 		clinicalReply(w, result, err, 200)
 	})
-	mux.HandleFunc("GET /api/doctorchart/patients/{patientId}/studies/{studyId}/file", func(w http.ResponseWriter, r *http.Request) {
+	s.handle(mux, "GET /api/doctorchart/patients/{patientId}/studies/{studyId}/file", func(w http.ResponseWriter, r *http.Request) {
 		if err := prescriptionRole(r); err != nil {
 			api.WriteError(w, err)
 			return
@@ -399,7 +399,7 @@ func (s *Service) StudyRoutes(mux *http.ServeMux) {
 		w.Header().Set("Content-Disposition", studyDisposition(result.OriginalFileName))
 		http.ServeContent(w, r, "", time.Time{}, seeker)
 	})
-	mux.HandleFunc("DELETE /api/doctorchart/patients/{patientId}/studies/{studyId}", func(w http.ResponseWriter, r *http.Request) {
+	s.handle(mux, "DELETE /api/doctorchart/patients/{patientId}/studies/{studyId}", func(w http.ResponseWriter, r *http.Request) {
 		if err := prescriptionRole(r); err != nil {
 			api.WriteError(w, err)
 			return

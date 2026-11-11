@@ -95,7 +95,7 @@ func (v *Validator) Evaluate(form, values, context map[string]any) (Evaluation, 
 			order = append(order, key)
 		}
 	}
-	violations := clinicalHistoryErrors(values)
+	violations := clinicalHistoryErrors(form, values)
 	issue := func(key, code string) {
 		violations = append(violations, api.FieldError{Path: valuePath(key), Code: code})
 	}

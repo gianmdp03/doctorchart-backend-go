@@ -52,7 +52,11 @@ func TestDashboardFollowUpQuery(t *testing.T) {
 	patient := func(owner, name string) int64 {
 		t.Helper()
 		var id int64
-		if err := tx.QueryRow(ctx, `INSERT INTO patients(full_name,birth_date,user_id,updated_at,version,workspace_version,form_definition_snapshot,form_values,formula_context,formula_results) VALUES($1,'2000-01-01',$2,now(),0,0,'{}','{}','{}','{}') RETURNING id`, name, owner).Scan(&id); err != nil {
+		if _, err := tx.Exec(ctx, `WITH w AS (INSERT INTO doctor_workspaces(user_id,version,created_at,updated_at) VALUES($1,0,now(),now()) ON CONFLICT(user_id) DO UPDATE SET user_id=EXCLUDED.user_id RETURNING id)
+        INSERT INTO doctor_specialty_contexts(workspace_id,specialty_id,version,current_step_key,onboarding_completed,created_at,updated_at) SELECT id,$2,0,'completed',true,now(),now() FROM w ON CONFLICT(workspace_id,specialty_id) DO NOTHING`, owner, specialty); err != nil {
+			t.Fatal(err)
+		}
+		if err := tx.QueryRow(ctx, `INSERT INTO patients(full_name,birth_date,user_id,updated_at,version,workspace_version,form_definition_snapshot,form_values,formula_context,formula_results,workspace_id,specialty_context_id) VALUES($1,'2000-01-01',$2,now(),0,0,'{}','{}','{}','{}',(SELECT id FROM doctor_workspaces WHERE user_id=$2::varchar(100)),(SELECT c.id FROM doctor_specialty_contexts c JOIN doctor_workspaces w ON w.id=c.workspace_id WHERE w.user_id=$2::varchar(100))) RETURNING id`, name, owner).Scan(&id); err != nil {
 			t.Fatal(err)
 		}
 		return id

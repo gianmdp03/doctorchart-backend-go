@@ -218,7 +218,7 @@ func (s *Service) summaryRoutes(mux *http.ServeMux) {
 		if method == "PUT" {
 			path = "/clinical-profile"
 		}
-		mux.HandleFunc(method+" /api/doctorchart/patients/{id}"+path, func(w http.ResponseWriter, r *http.Request) {
+		s.handle(mux, method+" /api/doctorchart/patients/{id}"+path, func(w http.ResponseWriter, r *http.Request) {
 			id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 			if err != nil || id <= 0 {
 				api.WriteError(w, api.Invalid("El paciente no es válido."))

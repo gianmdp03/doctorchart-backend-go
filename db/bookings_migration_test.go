@@ -43,7 +43,7 @@ func bookingUpgradeFixture(t *testing.T) *sql.DB {
 func bookingMigrationSnapshot(t *testing.T, pool *sql.DB) map[string]string {
 	t.Helper()
 	snapshot := timezoneDataSnapshot(t, pool)
-	snapshot["agendas"] = readString(t, pool, "SELECT COALESCE(jsonb_agg(to_jsonb(s) ORDER BY clinic_id),'[]'::jsonb)::text FROM clinic_schedules s")
+	snapshot["agendas"] = readString(t, pool, "SELECT COALESCE(jsonb_agg((to_jsonb(s)-'slot_minutes'-'weekly'-'exceptions'-'workspace_id') ORDER BY clinic_id),'[]'::jsonb)::text FROM clinic_schedules s")
 	snapshot["old history"] = readString(t, pool, "SELECT jsonb_agg(to_jsonb(m) ORDER BY version)::text FROM app_schema_migrations m WHERE version<6")
 	snapshot["original marker"] = readString(t, pool, "SELECT backend||':'||sql_sha256||':'||initialized_at::text FROM app_schema_state")
 	return snapshot
@@ -87,7 +87,7 @@ func TestBookingMigrationFromM3PreservesDataAndRollsBack(t *testing.T) {
 			if !reflect.DeepEqual(before, bookingMigrationSnapshot(t, pool)) {
 				t.Fatal("upgrade modified M3 data")
 			}
-			if readString(t, pool, "SELECT baseline_version::text FROM app_schema_state") != "10" || readString(t, pool, "SELECT count(*)::text FROM app_schema_migrations WHERE version=6") != "1" {
+			if readString(t, pool, "SELECT baseline_version::text FROM app_schema_state") != "15" || readString(t, pool, "SELECT count(*)::text FROM app_schema_migrations WHERE version=6") != "1" {
 				t.Fatal("missing booking migration metadata")
 			}
 			fresh := fixture(t)
@@ -98,7 +98,14 @@ func TestBookingMigrationFromM3PreservesDataAndRollsBack(t *testing.T) {
 				t.Fatal("fresh and M3 upgrade catalogs differ")
 			}
 			// Retain every booking, audit event and replay receipt across bootstrap restarts.
-			if _, err = pool.Exec("INSERT INTO bookings(workspace_id,clinic_id,patient_id,start_at,end_at,contact_name) SELECT 1,id,1,'2030-01-01 09:00Z','2030-01-01 09:30Z','Preserve reservation' FROM clinics LIMIT 1; INSERT INTO booking_events(booking_id,version,kind,actor_id,after_document) SELECT id,1,'CREATED','m1-owner',jsonb_build_object('id',id::text) FROM bookings; INSERT INTO booking_idempotency(workspace_id,key,request_sha256,booking_id,response_status,response_document) SELECT workspace_id,'migration-key-0001',repeat('a',64),id,201,jsonb_build_object('id',id::text) FROM bookings"); err != nil {
+			if _, err = pool.Exec(`UPDATE doctor_specialty_contexts SET onboarding_completed=true,definition=COALESCE(definition,'{}');
+ INSERT INTO schedule_blocks(clinic_id,workspace_id,specialty_context_id,weekday,start_minute,end_minute,slot_minutes)
+ SELECT s.clinic_id,s.workspace_id,c.id,2,540,720,30 FROM clinic_schedules s JOIN doctor_specialty_contexts c ON c.workspace_id=s.workspace_id;
+ INSERT INTO bookings(workspace_id,clinic_id,patient_id,start_at,end_at,contact_name,specialty_context_id,specialty_snapshot,clinic_snapshot,provenance)
+ SELECT b.workspace_id,b.clinic_id,1,'2030-01-01 09:00Z','2030-01-01 09:30Z','Preserve reservation',c.id,jsonb_build_object('id',sp.id::text,'code',sp.code,'name',sp.display_name),public.booking_clinic_snapshot(b.clinic_id),public.booking_block_snapshot(b.id)
+ FROM schedule_blocks b JOIN doctor_specialty_contexts c ON c.id=b.specialty_context_id JOIN specialties sp ON sp.id=c.specialty_id LIMIT 1;
+ INSERT INTO booking_events(booking_id,version,kind,actor_id,after_document) SELECT id,1,'CREATED','m1-owner',jsonb_build_object('id',id::text) FROM bookings;
+ INSERT INTO booking_idempotency(workspace_id,key,request_sha256,booking_id,response_status,response_document) SELECT workspace_id,'migration-key-0001',repeat('a',64),id,201,jsonb_build_object('id',id::text) FROM bookings`); err != nil {
 				t.Fatal(err)
 			}
 			snapshot := func() string {

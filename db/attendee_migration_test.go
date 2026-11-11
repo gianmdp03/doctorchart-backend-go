@@ -32,7 +32,7 @@ func TestAttendeeMigrationFromM4AndRollback(t *testing.T) {
 				t.Fatal(err)
 			}
 			snapshot := func() string {
-				return readString(t, pool, "SELECT json_build_object('bookings',(SELECT jsonb_agg(to_jsonb(b)-'attendee_name') FROM bookings b),'events',(SELECT jsonb_agg(to_jsonb(e)) FROM booking_events e),'receipts',(SELECT jsonb_agg(to_jsonb(i)) FROM booking_idempotency i),'patients',(SELECT jsonb_agg(to_jsonb(p)) FROM patients p))::text")
+				return readString(t, pool, "SELECT json_build_object('bookings',(SELECT jsonb_agg((to_jsonb(b)-'specialty_context_id'-'specialty_snapshot'-'clinic_snapshot'-'provenance')-'attendee_name') FROM bookings b),'events',(SELECT jsonb_agg(to_jsonb(e)) FROM booking_events e),'receipts',(SELECT jsonb_agg(to_jsonb(i)) FROM booking_idempotency i),'patients',(SELECT jsonb_agg((to_jsonb(p)-'workspace_id'-'specialty_context_id')) FROM patients p))::text")
 			}
 			before := snapshot()
 			if fail {

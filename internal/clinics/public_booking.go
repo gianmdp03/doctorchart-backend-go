@@ -17,6 +17,7 @@ import (
 )
 
 type PublicBookingRequest struct {
+	ContextID       string            `json:"specialtyContextId,omitempty"`
 	ClinicID        string            `json:"clinicId"`
 	Start           string            `json:"start"`
 	FormVersion     string            `json:"formVersion"`
@@ -32,6 +33,7 @@ type PublicBookingRequest struct {
 	Solution        string            `json:"solution,omitempty"`
 }
 type publicAdmission struct {
+	contextID                   string
 	doctorID, clinicID, network string
 	request                     PublicBookingRequest
 	doctor                      PublicDoctor
@@ -45,6 +47,11 @@ var phonePattern = regexp.MustCompile(`^\+?[0-9 ()-]{7,30}$`)
 var countryPattern = regexp.MustCompile(`^[A-Z]{2}$`)
 
 func validatePublicRequest(p *PublicBookingRequest) error {
+	if p.ContextID != "" {
+		if _, err := decimal(p.ContextID, true); err != nil {
+			return field("specialtyContextId", "INVALID_ID")
+		}
+	}
 	p.ContactName = strings.TrimSpace(p.ContactName)
 	p.AttendeeName = strings.TrimSpace(p.AttendeeName)
 	p.Email = strings.TrimSpace(p.Email)
@@ -106,6 +113,13 @@ func (a *publicAdmission) check(ctx context.Context, tx pgx.Tx, s *Service, work
 		return err
 	}
 	if current.workspace != workspace || !current.published {
+		return publicMissing()
+	}
+	a.contextID, err = choosePublicContext(current, a.request.ContextID)
+	if err != nil {
+		return err
+	}
+	if !publicContextClinic(current, a.contextID, a.clinicID) {
 		return publicMissing()
 	}
 	a.doctor = current
@@ -177,7 +191,13 @@ func (s *Service) writeBookingResult(w http.ResponseWriter, r *http.Request, a *
 	if err := s.pool.QueryRow(r.Context(), "SELECT reference::text,doctor_name,clinic_name,address,timezone FROM booking_public_details WHERE booking_id=$1", b.ID).Scan(&reference, &name, &clinic, &address, &timezone); err != nil {
 		return err
 	}
+	if b.ClinicSnapshot.Timezone != "" {
+		clinic, address, timezone = b.ClinicSnapshot.Name, b.ClinicSnapshot.PublicAddress, b.ClinicSnapshot.Timezone
+	}
 	document := map[string]any{"reference": reference, "status": b.Status, "start": b.Start, "end": b.End, "doctorName": name, "clinicName": clinic, "address": address, "timezone": timezone, "contactName": b.ContactName, "attendeeName": b.AttendeeName}
+	if b.Specialty.Name != "" {
+		document["specialtyName"] = b.Specialty.Name
+	}
 	if s.notices != nil {
 		code, expires, err := s.notices.Code(r.Context(), b.ID)
 		if err != nil {
@@ -221,7 +241,7 @@ func (s *Service) publicCreate(w http.ResponseWriter, r *http.Request) error {
 	logical.Solution = ""
 	raw, _ := json.Marshal(logical)
 	sum := sha256.Sum256(append([]byte("public-create\n"+doctor.ID+"\n"), raw...))
-	request := bookingRequest{ClinicID: internalID, Start: p.Start, ContactName: p.ContactName, ContactPhone: p.ContactPhone, AttendeeName: &p.AttendeeName}
+	request := bookingRequest{ClinicID: internalID, Start: p.Start, ContactName: p.ContactName, ContactPhone: p.ContactPhone, AttendeeName: &p.AttendeeName, ContextID: p.ContextID}
 	return s.applyBooking(w, r, doctor.owner, "create", Booking{}, request, "public:"+key, hex.EncodeToString(sum[:]), a)
 }
 func (s *Service) publicAvailability(w http.ResponseWriter, r *http.Request) error {
@@ -244,7 +264,14 @@ func (s *Service) publicAvailability(w http.ResponseWriter, r *http.Request) err
 		return err
 	}
 	r.SetPathValue("id", id)
-	return s.availabilityFor(w, r, d.owner, &publicAdmission{doctorID: d.ID, clinicID: r.PathValue("publicClinicId"), doctor: d})
+	selected, err := choosePublicContext(d, r.URL.Query().Get("specialtyContextId"))
+	if err != nil {
+		return err
+	}
+	if !publicContextClinic(d, selected, r.PathValue("publicClinicId")) {
+		return publicMissing()
+	}
+	return s.availabilityFor(w, r, d.owner, &publicAdmission{doctorID: d.ID, clinicID: r.PathValue("publicClinicId"), doctor: d, contextID: selected})
 }
 func (s *Service) publicBookingDetails(w http.ResponseWriter, r *http.Request, user string) error {
 	b, err := ownedBooking(r.Context(), s.pool, user, r.PathValue("id"))

@@ -12,10 +12,10 @@ func TestScheduleCivilTime(t *testing.T) {
 		ranges           []ScheduleRange
 		want             int
 	}{
-		{"split", "2026-11-02", "UTC", []ScheduleRange{{"09:00", "10:00"}, {"14:00", "15:00"}}, 4},
-		{"spring gap", "2026-03-08", "America/New_York", []ScheduleRange{{"01:00", "04:00"}}, 4},
-		{"fall repeated", "2026-11-01", "America/New_York", []ScheduleRange{{"01:00", "02:00"}}, 4},
-		{"skipped civil date", "2011-12-30", "Pacific/Apia", []ScheduleRange{{"09:00", "10:00"}}, 0},
+		{"split", "2026-11-02", "UTC", []ScheduleRange{{Start: "09:00", End: "10:00"}, {Start: "14:00", End: "15:00"}}, 4},
+		{"spring gap", "2026-03-08", "America/New_York", []ScheduleRange{{Start: "01:00", End: "04:00"}}, 4},
+		{"fall repeated", "2026-11-01", "America/New_York", []ScheduleRange{{Start: "01:00", End: "02:00"}}, 4},
+		{"skipped civil date", "2011-12-30", "Pacific/Apia", []ScheduleRange{{Start: "09:00", End: "10:00"}}, 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			day, err := civilDate(tc.date)
@@ -44,7 +44,7 @@ func TestScheduleCivilTime(t *testing.T) {
 }
 func TestScheduleValidationAndExceptions(t *testing.T) {
 	day, _ := civilDate("2026-11-02")
-	config := ScheduleConfig{SlotMinutes: 30, MaxAdvanceDays: 1, Weekly: []ScheduleDay{{Weekday: 1, Ranges: []ScheduleRange{{"09:00", "12:00"}}}}, Exceptions: []ScheduleException{{From: "2026-11-02", Through: "2026-11-03", Label: "Vacaciones", Ranges: []ScheduleRange{}}}}
+	config := ScheduleConfig{SlotMinutes: 30, MaxAdvanceDays: 1, Weekly: []ScheduleDay{{Weekday: 1, Ranges: []ScheduleRange{{Start: "09:00", End: "12:00"}}}}, Exceptions: []ScheduleException{{From: "2026-11-02", Through: "2026-11-03", Label: "Vacaciones", Ranges: []ScheduleRange{}}}}
 	if err := config.Validate(); err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +53,7 @@ func TestScheduleValidationAndExceptions(t *testing.T) {
 		t.Fatal(result, err)
 	}
 	config.Exceptions = nil
-	config.Weekly[0].Ranges = append(config.Weekly[0].Ranges, ScheduleRange{"11:00", "13:00"})
+	config.Weekly[0].Ranges = append(config.Weekly[0].Ranges, ScheduleRange{Start: "11:00", End: "13:00"})
 	if config.Validate() == nil {
 		t.Fatal("overlap accepted")
 	}

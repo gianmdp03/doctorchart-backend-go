@@ -71,7 +71,15 @@ INSERT INTO doctor_workspaces(created_at,current_step_key,definition,onboarding_
 		values := make(map[string]string)
 		for _, table := range []string{"specialties", "wizard_defaults", "clinical_calculation_definitions", "chart_definitions", "specialty_calculator_defaults", "vaccination_calendars", "vaccination_doses", "doctor_workspaces"} {
 			var rows string
-			if err := pool.QueryRow(ctx, "SELECT COALESCE(jsonb_agg(to_jsonb(r) ORDER BY id),'[]'::jsonb)::text FROM "+pgx.Identifier{"public", table}.Sanitize()+" r").Scan(&rows); err != nil {
+			query := "SELECT COALESCE(jsonb_agg(to_jsonb(r) ORDER BY id),'[]'::jsonb)::text FROM " + pgx.Identifier{"public", table}.Sanitize() + " r"
+			var contexts bool
+			if err := pool.QueryRow(ctx, "SELECT to_regclass('public.doctor_specialty_contexts') IS NOT NULL").Scan(&contexts); err != nil {
+				t.Fatal(err)
+			}
+			if table == "doctor_workspaces" && contexts {
+				query = "SELECT COALESCE(jsonb_agg(r ORDER BY id),'[]'::jsonb)::text FROM (SELECT w.id,to_jsonb(w) || (to_jsonb(c)-'id'-'workspace_id'-'created_at'-'updated_at'-'version') r FROM doctor_workspaces w JOIN doctor_specialty_contexts c ON c.workspace_id=w.id) projected"
+			}
+			if err := pool.QueryRow(ctx, query).Scan(&rows); err != nil {
 				t.Fatal(err)
 			}
 			values[table] = rows
@@ -95,10 +103,10 @@ INSERT INTO doctor_workspaces(created_at,current_step_key,definition,onboarding_
 		var version, migrations, clinics int
 		var timestamp time.Time
 		var checksum string
-		if err := pool.QueryRow(ctx, "SELECT baseline_version,initialized_at,sql_sha256,(SELECT count(*) FROM app_schema_migrations WHERE version IN (2,3,4,5,6,7,8,9,10)),(SELECT count(*) FROM clinics) FROM app_schema_state").Scan(&version, &timestamp, &checksum, &migrations, &clinics); err != nil {
+		if err := pool.QueryRow(ctx, "SELECT baseline_version,initialized_at,sql_sha256,(SELECT count(*) FROM app_schema_migrations WHERE version IN (2,3,4,5,6,7,8,9,10,11,12,13,14,15)),(SELECT count(*) FROM clinics) FROM app_schema_state").Scan(&version, &timestamp, &checksum, &migrations, &clinics); err != nil {
 			t.Fatal(err)
 		}
-		if version != 10 || migrations != 9 || clinics != 0 || !initialized.Equal(timestamp) || checksum != sqlHash {
+		if version != 15 || migrations != 14 || clinics != 0 || !initialized.Equal(timestamp) || checksum != sqlHash {
 			t.Fatal("upgrade/restart changed baseline identity, duplicated migration or invented places")
 		}
 	}

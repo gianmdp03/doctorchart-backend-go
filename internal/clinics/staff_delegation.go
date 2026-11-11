@@ -97,6 +97,11 @@ func staffBookingDocument(raw json.RawMessage) (map[string]any, error) {
 		return nil, err
 	}
 	delete(b, "patientId")
+	delete(b, "provenance")
+	if clinic, ok := b["clinicSnapshot"].(map[string]any); ok {
+		delete(clinic, "address")
+		delete(clinic, "publicAddress")
+	}
 	return b, nil
 }
 func (s *Service) staffReadTx(r *http.Request, a *staffAdmission) (pgx.Tx, error) {

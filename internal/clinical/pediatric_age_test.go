@@ -100,7 +100,7 @@ func TestPediatricDirectoryFiltersAndSpecialtyIsolation(t *testing.T) {
 	if err := pool.QueryRow(ctx, `INSERT INTO specialties(active,code,created_at,display_name,navigation,patient_record_actions,patient_record_tabs,updated_at,version) SELECT active,'cardiology',now(),'Pediatría (editable name)',navigation,patient_record_actions,patient_record_tabs,now(),version FROM specialties WHERE code='pediatrics' RETURNING id`).Scan(&otherSpecialty); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(ctx, `UPDATE doctor_workspaces SET specialty_id=$1 WHERE user_id='integrity-other'`, otherSpecialty); err != nil {
+	if _, err := pool.Exec(ctx, `UPDATE doctor_specialty_contexts SET specialty_id=$1 WHERE workspace_id=(SELECT id FROM doctor_workspaces WHERE user_id='integrity-other')`, otherSpecialty); err != nil {
 		t.Fatal(err)
 	}
 	todayText := time.Now().In(services[0].viewZone(ctx)).Format("2006-01-02")
@@ -115,7 +115,7 @@ func TestPediatricDirectoryFiltersAndSpecialtyIsolation(t *testing.T) {
 	}
 	for _, owner := range []string{"integrity-owner", "integrity-other"} {
 		for i, birth := range births {
-			_, err := pool.Exec(ctx, `INSERT INTO patients(birth_date,form_definition_snapshot,form_values,formula_context,formula_results,full_name,updated_at,user_id,version,workspace_version) VALUES($1,'{}','{}','{}','{}',$2,now(),$3,0,0)`, birth, fmt.Sprintf("Fixture %02d", i), owner)
+			_, err := pool.Exec(ctx, `INSERT INTO patients(birth_date,form_definition_snapshot,form_values,formula_context,formula_results,full_name,updated_at,user_id,version,workspace_version,workspace_id,specialty_context_id) VALUES($1,'{}','{}','{}','{}',$2,now(),$3,0,0,(SELECT id FROM doctor_workspaces WHERE user_id=$3::varchar(100)),(SELECT c.id FROM doctor_specialty_contexts c JOIN doctor_workspaces w ON w.id=c.workspace_id WHERE w.user_id=$3::varchar(100)))`, birth, fmt.Sprintf("Fixture %02d", i), owner)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -203,7 +203,7 @@ func TestPediatricDirectoryFiltersAndSpecialtyIsolation(t *testing.T) {
 
 	// Reproduce the report through the HTTP route, with a real two-year-old row.
 	const name = "Two-year-old regression"
-	if _, err := pool.Exec(ctx, `INSERT INTO patients(birth_date,form_definition_snapshot,form_values,formula_context,formula_results,full_name,updated_at,user_id,version,workspace_version) VALUES($1,'{}','{}','{}','{}',$2,now(),'integrity-owner',0,0)`, yearsBefore(today, 2), name); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO patients(birth_date,form_definition_snapshot,form_values,formula_context,formula_results,full_name,updated_at,user_id,version,workspace_version,workspace_id,specialty_context_id) VALUES($1,'{}','{}','{}','{}',$2,now(),'integrity-owner',0,0,(SELECT id FROM doctor_workspaces WHERE user_id='integrity-owner'),(SELECT c.id FROM doctor_specialty_contexts c JOIN doctor_workspaces w ON w.id=c.workspace_id WHERE w.user_id='integrity-owner'))`, yearsBefore(today, 2), name); err != nil {
 		t.Fatal(err)
 	}
 	mux := http.NewServeMux()
@@ -214,6 +214,7 @@ func TestPediatricDirectoryFiltersAndSpecialtyIsolation(t *testing.T) {
 		query := url.Values{"filter": {filter}, "search": {name}, "size": {"1"}, "page": {"0"}}
 		request := httptest.NewRequest(http.MethodGet, "/api/doctorchart/patients?"+query.Encode(), nil)
 		request.Header.Set("X-Gateway-Secret", secret)
+		bindFixtureContext(t, services[0].pool, request, "integrity-owner")
 		request.Header.Set("X-User-Id", "integrity-owner")
 		request.Header.Set("X-User-Plan", "BASIC")
 		request.Header.Set("X-User-Plan-Expires-At", time.Now().Add(time.Hour).Format(time.RFC3339Nano))

@@ -46,6 +46,7 @@ type Message struct {
 	To        string    `json:"to"`
 	Doctor    string    `json:"doctor,omitempty"`
 	Clinic    string    `json:"clinic,omitempty"`
+	Specialty string    `json:"specialty,omitempty"`
 	Address   string    `json:"address,omitempty"`
 	Timezone  string    `json:"timezone,omitempty"`
 	Start     time.Time `json:"start,omitempty"`
@@ -165,7 +166,7 @@ func (s *Service) BookingChanged(ctx context.Context, tx pgx.Tx, id, version, ki
 	var m Message
 	var status string
 	var end time.Time
-	err := tx.QueryRow(ctx, `SELECT p.email,p.doctor_name,c.name,COALESCE(cp.address,''),c.timezone,b.start_at,b.end_at,p.reference::text,b.status FROM bookings b JOIN booking_public_details p ON p.booking_id=b.id JOIN clinics c ON c.id=b.clinic_id LEFT JOIN clinic_publications cp ON cp.clinic_id=c.id AND cp.enabled WHERE b.id=$1`, id).Scan(&m.To, &m.Doctor, &m.Clinic, &m.Address, &m.Timezone, &m.Start, &end, &m.Reference, &status)
+	err := tx.QueryRow(ctx, `SELECT p.email,p.doctor_name,b.clinic_snapshot->>'name',b.clinic_snapshot->>'publicAddress',b.clinic_snapshot->>'timezone',b.start_at,b.end_at,p.reference::text,b.status,b.specialty_snapshot->>'name' FROM bookings b JOIN booking_public_details p ON p.booking_id=b.id WHERE b.id=$1`, id).Scan(&m.To, &m.Doctor, &m.Clinic, &m.Address, &m.Timezone, &m.Start, &end, &m.Reference, &status, &m.Specialty)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
 	}

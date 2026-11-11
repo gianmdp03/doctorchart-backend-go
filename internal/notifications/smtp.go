@@ -124,7 +124,7 @@ func (s *Service) render(kind, key string, m Message) ([]byte, error) {
 		if err != nil {
 			return nil, errors.New("invalid notification timezone")
 		}
-		text = subject + ".\n\nProfesional: " + m.Doctor + "\nConsultorio: " + m.Clinic + "\nFecha y hora: " + m.Start.In(zone).Format("02/01/2006 15:04") + " (hora local del consultorio)\n"
+		text = subject + ".\n\nProfesional: " + m.Doctor + "\nEspecialidad: " + m.Specialty + "\nConsultorio: " + m.Clinic + "\nFecha y hora: " + m.Start.In(zone).Format("02/01/2006 15:04") + " (hora local del consultorio)\n"
 		if m.Address != "" {
 			text += "Dirección pública: " + m.Address + "\n"
 		}

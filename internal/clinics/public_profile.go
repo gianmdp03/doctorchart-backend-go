@@ -31,13 +31,14 @@ type PublicForm struct {
 	Questions []PublicQuestion `json:"questions"`
 }
 type PublicDoctor struct {
-	ID            string         `json:"id"`
-	Name          string         `json:"name"`
-	Description   string         `json:"description"`
-	SpecialtyCode string         `json:"specialtyCode"`
-	Specialty     string         `json:"specialty"`
-	Clinics       []PublicClinic `json:"clinics"`
-	Form          PublicForm     `json:"form"`
+	ID            string          `json:"id"`
+	Name          string          `json:"name"`
+	Description   string          `json:"description"`
+	SpecialtyCode string          `json:"specialtyCode"`
+	Specialty     string          `json:"specialty"`
+	Clinics       []PublicClinic  `json:"clinics"`
+	Form          PublicForm      `json:"form"`
+	Specialties   []PublicContext `json:"specialties"`
 	owner         string
 	workspace     int64
 	published     bool
@@ -61,6 +62,7 @@ type Publication struct {
 	Published       bool              `json:"published"`
 	Clinics         []PublishedClinic `json:"clinics"`
 	Questions       []PublicQuestion  `json:"questions"`
+	ContextIDs      []string          `json:"specialtyContextIds,omitempty"`
 }
 
 func (s *Service) readPublicDoctor(ctx context.Context, q scheduleReader, id string) (PublicDoctor, error) {
@@ -69,7 +71,7 @@ func (s *Service) readPublicDoctor(ctx context.Context, q scheduleReader, id str
 	if !opaqueID.MatchString(id) {
 		return d, publicMissing()
 	}
-	err := q.QueryRow(ctx, "SELECT p.public_id::text,p.name,p.description,s.code,s.display_name,p.version::text,p.questions,w.user_id,w.id,p.published FROM booking_publications p JOIN doctor_workspaces w ON w.id=p.workspace_id JOIN specialties s ON s.id=w.specialty_id WHERE p.public_id=$1", id).Scan(&d.ID, &d.Name, &d.Description, &d.SpecialtyCode, &d.Specialty, &d.Form.Version, &questions, &d.owner, &d.workspace, &d.published)
+	err := q.QueryRow(ctx, "SELECT p.public_id::text,p.name,p.description,p.version::text,p.questions,w.user_id,w.id,p.published FROM booking_publications p JOIN doctor_workspaces w ON w.id=p.workspace_id WHERE p.public_id=$1", id).Scan(&d.ID, &d.Name, &d.Description, &d.Form.Version, &questions, &d.owner, &d.workspace, &d.published)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return d, publicMissing()
 	}
@@ -79,20 +81,24 @@ func (s *Service) readPublicDoctor(ctx context.Context, q scheduleReader, id str
 	if err = json.Unmarshal(questions, &d.Form.Questions); err != nil {
 		return d, err
 	}
-	d.Clinics = []PublicClinic{}
-	rows, err := q.Query(ctx, "SELECT p.public_id::text,c.name,c.country,c.province,c.city,p.address,c.timezone FROM clinic_publications p JOIN clinics c ON c.id=p.clinic_id WHERE p.workspace_id=$1 AND p.enabled AND c.status='ACTIVE' ORDER BY c.name,c.id", d.workspace)
+	d.Specialties, err = readPublicContexts(ctx, q, d.workspace)
 	if err != nil {
 		return d, err
 	}
-	defer rows.Close()
-	for rows.Next() {
-		var c PublicClinic
-		if err = rows.Scan(&c.ID, &c.Name, &c.Country, &c.Province, &c.City, &c.Address, &c.Timezone); err != nil {
-			return d, err
+	d.Clinics = []PublicClinic{}
+	seen := map[string]bool{}
+	for _, offer := range d.Specialties {
+		for _, c := range offer.Clinics {
+			if !seen[c.ID] {
+				seen[c.ID] = true
+				d.Clinics = append(d.Clinics, c)
+			}
 		}
-		d.Clinics = append(d.Clinics, c)
 	}
-	return d, rows.Err()
+	if len(d.Specialties) == 1 {
+		d.SpecialtyCode, d.Specialty = d.Specialties[0].Code, d.Specialties[0].Name
+	}
+	return d, nil
 }
 func (s *Service) onlineRights(ctx context.Context, owner string) error {
 	snap, err := s.publicRights.Resolve(ctx, owner)
@@ -159,7 +165,9 @@ func (s *Service) publicDirectory(w http.ResponseWriter, r *http.Request) error 
 		}
 	}
 	// Filter locations on the same enabled public clinic; never return private rows.
-	rows, err := s.pool.Query(r.Context(), "SELECT p.public_id::text FROM booking_publications p JOIN doctor_workspaces w ON w.id=p.workspace_id JOIN specialties s ON s.id=w.specialty_id WHERE p.published AND strpos(lower(p.name),lower($1))>0 AND (strpos(lower(s.display_name),lower($2))>0 OR lower(s.code)=lower($2)) AND EXISTS(SELECT 1 FROM clinic_publications cp JOIN clinics c ON c.id=cp.clinic_id WHERE cp.workspace_id=p.workspace_id AND cp.enabled AND c.status='ACTIVE' AND strpos(lower(c.country),lower($3))>0 AND strpos(lower(c.province),lower($4))>0 AND strpos(lower(c.city),lower($5))>0) ORDER BY lower(p.name),p.public_id LIMIT $6 OFFSET $7", q.Get("name"), q.Get("specialty"), q.Get("country"), q.Get("province"), q.Get("city"), size+1, page*size)
+	rows, err := s.pool.Query(r.Context(), `SELECT p.public_id::text FROM booking_publications p WHERE p.published AND strpos(lower(p.name),lower($1))>0 AND EXISTS(
+ SELECT 1 FROM publication_specialty_contexts pc JOIN doctor_specialty_contexts cctx ON cctx.id=pc.specialty_context_id AND cctx.workspace_id=pc.workspace_id JOIN specialties s ON s.id=cctx.specialty_id JOIN clinic_publications cp ON cp.workspace_id=pc.workspace_id JOIN clinics c ON c.id=cp.clinic_id
+ WHERE pc.workspace_id=p.workspace_id AND cctx.onboarding_completed AND cctx.definition IS NOT NULL AND s.active AND (strpos(lower(s.display_name),lower($2))>0 OR lower(s.code)=lower($2)) AND cp.enabled AND c.status='ACTIVE' AND `+publicOfferExists+` AND strpos(lower(c.country),lower($3))>0 AND strpos(lower(c.province),lower($4))>0 AND strpos(lower(c.city),lower($5))>0) ORDER BY lower(p.name),p.public_id LIMIT $6 OFFSET $7`, q.Get("name"), q.Get("specialty"), q.Get("country"), q.Get("province"), q.Get("city"), size+1, page*size)
 	if err != nil {
 		return err
 	}
@@ -216,12 +224,14 @@ func (s *Service) publishedSpecialties(ctx context.Context, country string) ([]p
 		SELECT DISTINCT s.code, s.display_name
 		FROM booking_publications p
 		JOIN doctor_workspaces w ON w.id = p.workspace_id
-		JOIN specialties s ON s.id = w.specialty_id
-		WHERE p.published AND EXISTS (
+		JOIN doctor_specialty_contexts cctx ON cctx.workspace_id = w.id
+		JOIN publication_specialty_contexts pcs ON pcs.workspace_id=w.id AND pcs.specialty_context_id=cctx.id
+		JOIN specialties s ON s.id = cctx.specialty_id
+		WHERE p.published AND cctx.onboarding_completed AND cctx.definition IS NOT NULL AND s.active AND EXISTS (
 			SELECT 1 FROM clinic_publications cp
 			JOIN clinics c ON c.id = cp.clinic_id
 			WHERE cp.workspace_id = p.workspace_id AND cp.enabled AND c.status = 'ACTIVE'
-			  AND strpos(lower(c.country), lower($1)) > 0
+			  AND strpos(lower(c.country), lower($1)) > 0 AND `+publicOfferExists+`
 		)
 		ORDER BY s.display_name, s.code`, country)
 	if err != nil {
@@ -270,6 +280,25 @@ func (s *Service) getPublication(w http.ResponseWriter, r *http.Request, user st
 	}
 	if err = rows.Err(); err != nil {
 		return err
+	}
+	rows.Close()
+	contextRows, e := s.pool.Query(r.Context(), "SELECT specialty_context_id::text FROM publication_specialty_contexts WHERE workspace_id=$1 ORDER BY specialty_context_id", workspace)
+	if e != nil {
+		return e
+	}
+	p.ContextIDs = []string{}
+	for contextRows.Next() {
+		var id string
+		if e = contextRows.Scan(&id); e != nil {
+			contextRows.Close()
+			return e
+		}
+		p.ContextIDs = append(p.ContextIDs, id)
+	}
+	e = contextRows.Err()
+	contextRows.Close()
+	if e != nil {
+		return e
 	}
 	api.WriteJSON(w, 200, p)
 	return nil
@@ -376,6 +405,9 @@ func (s *Service) putPublication(w http.ResponseWriter, r *http.Request, user st
 		if _, err = tx.Exec(ctx, "INSERT INTO clinic_publications(clinic_id,workspace_id,public_id,enabled,address) VALUES($1,$2,$3,$4,$5) ON CONFLICT(clinic_id) DO UPDATE SET enabled=excluded.enabled,address=excluded.address", c.ClinicID, workspace, newOpaqueID(), c.Enabled, strings.TrimSpace(c.Address)); err != nil {
 			return err
 		}
+	}
+	if err = publicationContexts(ctx, tx, workspace, p.ContextIDs); err != nil {
+		return err
 	}
 	if err = tx.Commit(ctx); err != nil {
 		return err

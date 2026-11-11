@@ -147,7 +147,7 @@ func (s *Service) printable(ctx context.Context, user string, patientID, id int6
 			doc.Orders = record.Orders
 			doc.Author.UserID = record.Author
 			var specialty string
-			err = tx.QueryRow(ctx, "SELECT s.display_name FROM doctor_workspaces w JOIN specialties s ON s.id=w.specialty_id WHERE w.user_id=$1", record.Author).Scan(&specialty)
+			err = tx.QueryRow(ctx, "SELECT s.display_name FROM doctor_specialty_contexts c JOIN specialties s ON s.id=c.specialty_id WHERE c.id=$1", patient.ContextID).Scan(&specialty)
 			if err == nil {
 				doc.Author.Specialty = &specialty
 			} else if !errors.Is(err, pgx.ErrNoRows) {
@@ -222,8 +222,8 @@ func (s *Service) PrintRoutes(mux *http.ServeMux) {
 			}
 		}
 	}
-	mux.HandleFunc("GET /api/doctorchart/patients/{patientId}/prescriptions/{recordId}/print", handler(false, false))
-	mux.HandleFunc("GET /api/doctorchart/patients/{patientId}/prescriptions/{recordId}/pdf", handler(false, true))
-	mux.HandleFunc("GET /api/doctorchart/patients/{patientId}/encounters/{recordId}/print", handler(true, false))
-	mux.HandleFunc("GET /api/doctorchart/patients/{patientId}/encounters/{recordId}/pdf", handler(true, true))
+	s.handle(mux, "GET /api/doctorchart/patients/{patientId}/prescriptions/{recordId}/print", handler(false, false))
+	s.handle(mux, "GET /api/doctorchart/patients/{patientId}/prescriptions/{recordId}/pdf", handler(false, true))
+	s.handle(mux, "GET /api/doctorchart/patients/{patientId}/encounters/{recordId}/print", handler(true, false))
+	s.handle(mux, "GET /api/doctorchart/patients/{patientId}/encounters/{recordId}/pdf", handler(true, true))
 }

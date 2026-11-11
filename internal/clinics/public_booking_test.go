@@ -95,6 +95,9 @@ func TestPublicBookingNoLoginSharedEngineAndSnapshots(t *testing.T) {
 		t.Fatal(list.Body.String())
 	}
 	b := page.Items[0]
+	if b.ContextID == "" || b.Specialty.Name == "" || b.Provenance.Kind != "SCHEDULE_BLOCK" || response["specialtyName"] != b.Specialty.Name {
+		t.Fatal("public booking lost persisted specialty", b, response)
+	}
 	details := f.request("GET", "/bookings/"+b.ID+"/public-details", owner, "")
 	assertCode(t, details, 200, "")
 	assertCode(t, f.request("GET", "/bookings/"+b.ID+"/public-details", other, ""), 404, "BOOKING_NOT_FOUND")

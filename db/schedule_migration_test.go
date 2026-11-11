@@ -94,7 +94,7 @@ func TestScheduleUpgradeFromM2RollbackPreservationAndCatalog(t *testing.T) {
 			if err = conn.QueryRow(t.Context(), "SELECT full_name,(SELECT timezone FROM clinics LIMIT 1) FROM patients WHERE id=1").Scan(&patientName, &clinicZone); err != nil || patientName != "Preserve patient" || clinicZone != "UTC" {
 				t.Fatal(patientName, clinicZone, err)
 			}
-			if _, err = conn.Exec(t.Context(), "INSERT INTO clinic_schedules(clinic_id,slot_minutes,min_notice_minutes,max_advance_days,weekly,exceptions,version) SELECT id,30,0,30,'[]','[]',7 FROM clinics LIMIT 1"); err != nil {
+			if _, err = conn.Exec(t.Context(), "INSERT INTO clinic_schedules(clinic_id,workspace_id,min_notice_minutes,max_advance_days,version) SELECT id,workspace_id,0,30,7 FROM clinics LIMIT 1"); err != nil {
 				t.Fatal(err)
 			}
 			if err = Ensure(t.Context(), instance, nil); err != nil {
@@ -105,7 +105,7 @@ func TestScheduleUpgradeFromM2RollbackPreservationAndCatalog(t *testing.T) {
 				t.Fatal("restart altered stored agenda", agendaVersion, err)
 			}
 			var version, count int
-			if err = conn.QueryRow(t.Context(), "SELECT baseline_version,(SELECT count(*) FROM app_schema_migrations WHERE version=5) FROM app_schema_state").Scan(&version, &count); err != nil || version != 10 || count != 1 {
+			if err = conn.QueryRow(t.Context(), "SELECT baseline_version,(SELECT count(*) FROM app_schema_migrations WHERE version=5) FROM app_schema_state").Scan(&version, &count); err != nil || version != 15 || count != 1 {
 				t.Fatal(version, count, err)
 			}
 			fresh := fixture(t)

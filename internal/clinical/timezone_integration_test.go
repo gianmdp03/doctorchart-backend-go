@@ -27,7 +27,7 @@ func TestTimeZoneCreationImmutabilityAndDocumentReprint(t *testing.T) {
 	services, pool := integrityFixture(t, 100, 100)
 	s := services[0]
 	madrid := zoneContext(t, "Europe/Madrid")
-	argentina := zoneContext(t, "America/Argentina/Buenos_Aires")
+	argentina := zoneContext(t, "America/Buenos_Aires")
 	identity := api.Identity{UserID: "integrity-owner", Plan: "BASIC", Roles: []string{"ROLE_COMPANY"}}
 	patient, err := s.CreatePatient(madrid, identity, integrityPatientRequest())
 	if err != nil {
@@ -65,6 +65,9 @@ func TestTimeZoneCreationImmutabilityAndDocumentReprint(t *testing.T) {
 	updated, err := s.UpdateEncounter(argentina, identity.UserID, encounter.ID, edit)
 	if err != nil || updated.Date != encounter.Date {
 		t.Fatal("ordinary edit changed time", err)
+	}
+	if loaded, err := s.GetPatient(argentina, identity.UserID, patient.ID); err != nil || loaded.ID != patient.ID {
+		t.Fatal("browser timezone alias broke patient reload after consultation", err)
 	}
 	body := map[string]any{"type": "STUDY_ORDERS", "diagnosisDescription": "Prueba", "generalInstructions": "", "prescriptions": []any{}, "diagnosticOrders": []any{"Laboratorio"}}
 	prescription, err := s.CreatePrescription(madrid, identity.UserID, patient.ID, body)
@@ -115,6 +118,7 @@ func TestDashboardUsesRequestCalendarDay(t *testing.T) {
 	app := api.Gateway("timezone-test", api.Dispatch(mux))
 	request := httptest.NewRequest("GET", "/api/doctorchart/encounters/dashboard?timeZone=Pacific%2FKiritimati", nil)
 	request.Header.Set("X-Gateway-Secret", "timezone-test")
+	bindFixtureContext(t, s.pool, request, identity.UserID)
 	request.Header.Set("X-User-Id", identity.UserID)
 	request.Header.Set("X-User-Role", "SUPER_ADMIN")
 	call := func(want int64) {

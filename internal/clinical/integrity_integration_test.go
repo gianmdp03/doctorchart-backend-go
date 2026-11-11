@@ -59,7 +59,7 @@ func integrityFixture(t *testing.T, patients, records int) ([2]*Service, *pgxpoo
 		t.Fatal(err)
 	}
 	for _, owner := range []string{"integrity-owner", "integrity-other"} {
-		_, err := pool.Exec(context.Background(), `INSERT INTO doctor_workspaces(created_at,current_step_key,definition,onboarding_completed,updated_at,user_id,version,specialty_id) SELECT now(),'COMPLETE',w.published_definition,true,now(),$1,0,s.id FROM specialties s JOIN wizard_defaults w ON w.specialty_id=s.id ORDER BY s.id LIMIT 1`, owner)
+		_, err := pool.Exec(context.Background(), `WITH workspace AS (INSERT INTO doctor_workspaces(created_at,updated_at,user_id,version) VALUES(now(),now(),$1,0) RETURNING id) INSERT INTO doctor_specialty_contexts(workspace_id,created_at,current_step_key,definition,onboarding_completed,updated_at,version,specialty_id) SELECT workspace.id,now(),'COMPLETE',d.published_definition,true,now(),0,s.id FROM workspace CROSS JOIN specialties s JOIN wizard_defaults d ON d.specialty_id=s.id WHERE lower(s.code)='pediatrics'`, owner)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -212,7 +212,7 @@ func TestClinicalIntegrityAuthorizationAndUnlimited(t *testing.T) {
 	_, err := s[0].CreateEncounter(context.Background(), api.Identity{UserID: "integrity-owner", Plan: "BASIC"}, integrityEncounterRequest(p.ID, "FOLLOW_UP"))
 	integrityError(t, err, 400, "FIRST_VISIT_REQUIRED")
 	_, err = s[1].CreateEncounter(context.Background(), api.Identity{UserID: "integrity-other", Plan: "BASIC"}, integrityEncounterRequest(p.ID, "FIRST_VISIT"))
-	integrityError(t, err, 403, "FORBIDDEN")
+	integrityError(t, err, 404, "PATIENT_NOT_FOUND")
 	for _, kind := range []string{"FIRST_VISIT", "FOLLOW_UP", "FOLLOW_UP"} {
 		if _, err := s[0].CreateEncounter(context.Background(), api.Identity{UserID: "integrity-owner", Plan: "BASIC"}, integrityEncounterRequest(p.ID, kind)); err != nil {
 			t.Fatal(err)
@@ -372,6 +372,7 @@ func TestClinicalIntegrityHTTPContract(t *testing.T) {
 		r := httptest.NewRequest(http.MethodPost, path, bytes.NewReader(payload))
 		r.Header.Set("Content-Type", "application/json")
 		r.Header.Set("X-Gateway-Secret", "integrity-fixture-gateway-secret")
+		bindFixtureContext(t, s[0].pool, r, owner)
 		r.Header.Set("X-User-Id", owner)
 		r.Header.Set("X-User-Role", "COMPANY")
 		r.Header.Set("X-User-Plan", "BASIC")
@@ -398,7 +399,7 @@ func TestClinicalIntegrityHTTPContract(t *testing.T) {
 		t.Fatal("patient Location contract changed")
 	}
 	call("/api/doctorchart/patients", "integrity-owner", integrityPatientRequest(), 403, "FORBIDDEN")
-	call("/api/doctorchart/encounters", "integrity-other", integrityEncounterRequest(p.ID, "FIRST_VISIT"), 403, "FORBIDDEN")
+	call("/api/doctorchart/encounters", "integrity-other", integrityEncounterRequest(p.ID, "FIRST_VISIT"), 404, "PATIENT_NOT_FOUND")
 	first := call("/api/doctorchart/encounters", "integrity-owner", integrityEncounterRequest(p.ID, "FIRST_VISIT"), 201, "")
 	var e Encounter
 	if err := json.Unmarshal(first.Body.Bytes(), &e); err != nil || e.ID == 0 || e.PatientID != p.ID || e.Type != "FIRST_VISIT" {

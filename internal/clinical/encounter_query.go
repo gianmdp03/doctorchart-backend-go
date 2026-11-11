@@ -67,7 +67,7 @@ type encounterDashboard struct {
 }
 
 func (s *Service) encounterQueryRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/doctorchart/encounters", func(w http.ResponseWriter, r *http.Request) {
+	s.handle(mux, "GET /api/doctorchart/encounters", func(w http.ResponseWriter, r *http.Request) {
 		page, err := pageFor(r.URL.Query(), map[string]string{"encounterDate": "encounter_date", "id": "id"}, "e", "encounter_date", "DESC")
 		search := strings.TrimSpace(r.URL.Query().Get("search"))
 		if err == nil && api.JavaLength(search) > 200 {
@@ -77,14 +77,14 @@ func (s *Service) encounterQueryRoutes(mux *http.ServeMux) {
 		var result any
 		if err == nil {
 			err = s.readSnapshot(r.Context(), func(tx pgx.Tx) error {
-				where := `p.user_id=$1 AND (lower(p.full_name) LIKE $2 ESCAPE '!' OR lower(e.chief_complaint) LIKE $2 ESCAPE '!' OR lower(e.primary_diagnosis_description) LIKE $2 ESCAPE '!' OR lower(e.primary_diagnosis_code) LIKE $2 ESCAPE '!')`
+				where := `p.user_id=$1 AND ($3::bigint=0 AND (SELECT count(*) FROM doctor_specialty_contexts scope_c JOIN doctor_workspaces scope_w ON scope_w.id=scope_c.workspace_id WHERE scope_w.user_id=$1)=1 OR p.specialty_context_id=$3) AND (lower(p.full_name) LIKE $2 ESCAPE '!' OR lower(e.chief_complaint) LIKE $2 ESCAPE '!' OR lower(e.primary_diagnosis_description) LIKE $2 ESCAPE '!' OR lower(e.primary_diagnosis_code) LIKE $2 ESCAPE '!')`
 				var total int64
-				args := []any{api.User(r.Context()).UserID, pattern}
+				args := []any{api.User(r.Context()).UserID, pattern, api.SpecialtyContextID(r.Context())}
 				if err := tx.QueryRow(r.Context(), "SELECT count(*)"+encounterFrom+"WHERE "+where, args...).Scan(&total); err != nil {
 					return err
 				}
 				args = append(args, page.size, page.number*page.size)
-				content, err := s.encounterList(r.Context(), tx, where, args, page.order+" LIMIT $3 OFFSET $4")
+				content, err := s.encounterList(r.Context(), tx, where, args, page.order+" LIMIT $4 OFFSET $5")
 				if err != nil {
 					return err
 				}
@@ -94,14 +94,14 @@ func (s *Service) encounterQueryRoutes(mux *http.ServeMux) {
 		}
 		clinicalReply(w, result, err, 200)
 	})
-	mux.HandleFunc("GET /api/doctorchart/encounters/dashboard", func(w http.ResponseWriter, r *http.Request) {
+	s.handle(mux, "GET /api/doctorchart/encounters/dashboard", func(w http.ResponseWriter, r *http.Request) {
 		today := time.Now().In(s.viewZone(r.Context()))
 		start := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, s.viewZone(r.Context()))
 		month := time.Date(today.Year(), today.Month(), 1, 0, 0, 0, 0, s.viewZone(r.Context()))
 		result := encounterDashboard{Date: today.Format("2006-01-02"), Recent: []recentEncounter{}}
 		err := s.readSnapshot(r.Context(), func(tx pgx.Tx) error {
 			owner := api.User(r.Context()).UserID
-			if err := tx.QueryRow(r.Context(), `SELECT (SELECT count(*) FROM patients WHERE user_id=$1),count(*) FILTER(WHERE e.encounter_date>=$2 AND e.encounter_date<$3),count(*) FILTER(WHERE e.encounter_date>=$4 AND e.encounter_date<$5) FROM clinical_encounters e JOIN patients p ON p.id=e.patient_id WHERE p.user_id=$1`, owner, month, month.AddDate(0, 1, 0), start, start.AddDate(0, 0, 1)).Scan(&result.Patients, &result.Month, &result.Today); err != nil {
+			if err := tx.QueryRow(r.Context(), `SELECT (SELECT count(*) FROM patients WHERE user_id=$1 AND ($6::bigint=0 AND (SELECT count(*) FROM doctor_specialty_contexts scope_c JOIN doctor_workspaces scope_w ON scope_w.id=scope_c.workspace_id WHERE scope_w.user_id=$1)=1 OR specialty_context_id=$6)),count(*) FILTER(WHERE e.encounter_date>=$2 AND e.encounter_date<$3),count(*) FILTER(WHERE e.encounter_date>=$4 AND e.encounter_date<$5) FROM clinical_encounters e JOIN patients p ON p.id=e.patient_id WHERE p.user_id=$1 AND ($6::bigint=0 AND (SELECT count(*) FROM doctor_specialty_contexts scope_c JOIN doctor_workspaces scope_w ON scope_w.id=scope_c.workspace_id WHERE scope_w.user_id=$1)=1 OR p.specialty_context_id=$6)`, owner, month, month.AddDate(0, 1, 0), start, start.AddDate(0, 0, 1), api.SpecialtyContextID(r.Context())).Scan(&result.Patients, &result.Month, &result.Today); err != nil {
 				return err
 			}
 			var err error
@@ -110,7 +110,7 @@ func (s *Service) encounterQueryRoutes(mux *http.ServeMux) {
 				return err
 			}
 			// Read the additional patient fields in the same query and snapshot.
-			rows, err := tx.Query(r.Context(), "SELECT "+encounterColumns+`,p.birth_date::text,p.national_id`+encounterFrom+"WHERE p.user_id=$1 ORDER BY e.encounter_date DESC,e.id DESC LIMIT 8", owner)
+			rows, err := tx.Query(r.Context(), "SELECT "+encounterColumns+`,p.birth_date::text,p.national_id`+encounterFrom+"WHERE p.user_id=$1 AND ($2::bigint=0 AND (SELECT count(*) FROM doctor_specialty_contexts scope_c JOIN doctor_workspaces scope_w ON scope_w.id=scope_c.workspace_id WHERE scope_w.user_id=$1)=1 OR p.specialty_context_id=$2) ORDER BY e.encounter_date DESC,e.id DESC LIMIT 8", owner, api.SpecialtyContextID(r.Context()))
 			if err != nil {
 				return err
 			}

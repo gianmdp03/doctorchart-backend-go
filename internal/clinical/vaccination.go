@@ -333,7 +333,7 @@ func (s *Service) SaveVaccination(ctx context.Context, userID string, patientID 
 	return result, err
 }
 func (s *Service) VaccinationRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/doctorchart/patients/{id}/vaccinations", func(w http.ResponseWriter, r *http.Request) {
+	s.handle(mux, "GET /api/doctorchart/patients/{id}/vaccinations", func(w http.ResponseWriter, r *http.Request) {
 		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 		if err != nil {
 			api.WriteError(w, api.Invalid("La solicitud contiene datos inválidos."))
@@ -346,7 +346,7 @@ func (s *Service) VaccinationRoutes(mux *http.ServeMux) {
 		}
 		api.WriteJSON(w, 200, result)
 	})
-	mux.HandleFunc("PUT /api/doctorchart/patients/{id}/vaccinations/{applicationId}", func(w http.ResponseWriter, r *http.Request) {
+	s.handle(mux, "PUT /api/doctorchart/patients/{id}/vaccinations/{applicationId}", func(w http.ResponseWriter, r *http.Request) {
 		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 		if err != nil {
 			api.WriteError(w, api.Invalid("La solicitud contiene datos inválidos."))

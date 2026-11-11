@@ -37,6 +37,29 @@ func firstStep(definition map[string]any) string {
 
 var stepPattern = regexp.MustCompile(`^(specialty|encounter|patient:[A-Za-z][A-Za-z0-9_-]{0,79})$`)
 
+func supportedSpecialty(code string) bool {
+	switch strings.ToLower(code) {
+	case "pediatrics", "general_medicine", "dermatology":
+		return true
+	}
+	return false
+}
+
+// The current context is always resolved through the authenticated owner.
+// An optional ID fences stale clients without allowing arbitrary context access.
+func authorizeContext(w *workspace, request map[string]any) error {
+	if raw, present := request["specialtyContextId"]; present {
+		id, err := api.Integer(raw, "specialtyContextId", 1)
+		if err != nil {
+			return err
+		}
+		if w == nil || w.ContextID != id {
+			return api.Failure(404, "SPECIALTY_CONTEXT_NOT_FOUND", "El contexto clínico no está disponible.")
+		}
+	}
+	return nil
+}
+
 func normalizeStep(step string, previous, next map[string]any) (string, error) {
 	if !stepPattern.MatchString(step) {
 		return "", api.Failure(400, "INVALID_STEP", "El paso del wizard no es válido.")
@@ -72,7 +95,12 @@ func normalizeStep(step string, previous, next map[string]any) (string, error) {
 }
 
 func (s *Store) Select(ctx context.Context, userID string, request map[string]any) (*Setup, error) {
-	if err := api.Only(request, "specialtyId", "expectedVersion"); err != nil {
+	var scopeErr error
+	ctx, scopeErr = contextRequest(ctx, request)
+	if scopeErr != nil {
+		return nil, scopeErr
+	}
+	if err := api.Only(request, "specialtyId", "expectedVersion", "specialtyContextId"); err != nil {
 		return nil, err
 	}
 	id, err := api.Integer(request["specialtyId"], "specialtyId", 1)
@@ -90,6 +118,9 @@ func (s *Store) Select(ctx context.Context, userID string, request map[string]an
 		}
 		w, err := readWorkspace(ctx, tx, userID)
 		if err != nil {
+			return err
+		}
+		if err := authorizeContext(w, request); err != nil {
 			return err
 		}
 		if w == nil {
@@ -115,7 +146,7 @@ func (s *Store) Select(ctx context.Context, userID string, request map[string]an
 		if err != nil {
 			return err
 		}
-		if !specialty.Active || len(d.Published) == 0 {
+		if !supportedSpecialty(specialty.Code) || !specialty.Active || len(d.Published) == 0 {
 			return api.Failure(409, "SPECIALTY_NOT_AVAILABLE", "La especialidad no está disponible.")
 		}
 		definition, err := wizard.Decode(d.Published)
@@ -143,7 +174,12 @@ func (s *Store) Select(ctx context.Context, userID string, request map[string]an
 }
 
 func (s *Store) Edit(ctx context.Context, userID, operation string, request map[string]any) (*Setup, error) {
-	allowed := []string{"expectedVersion"}
+	var scopeErr error
+	ctx, scopeErr = contextRequest(ctx, request)
+	if scopeErr != nil {
+		return nil, scopeErr
+	}
+	allowed := []string{"expectedVersion", "specialtyContextId"}
 	if operation == "draft" {
 		allowed = append(allowed, "definition", "currentStepKey")
 	}
@@ -173,6 +209,9 @@ func (s *Store) Edit(ctx context.Context, userID, operation string, request map[
 			return err
 		}
 		if err := requireWorkspace(w); err != nil {
+			return err
+		}
+		if err := authorizeContext(w, request); err != nil {
 			return err
 		}
 		if err := version(w.Setup.Version, expected, workspaceConflict); err != nil {
@@ -294,7 +333,7 @@ func (s *Store) UpdatePreferences(ctx context.Context, userID string, request ma
 			}
 			w.Preferences.Notes = &value
 		} else {
-			if err := version(w.Setup.Version, expected, workspaceConflict); err != nil {
+			if err := version(w.Preferences.Version, expected, workspaceConflict); err != nil {
 				return err
 			}
 			w.Preferences.Columns, err = json.Marshal(columns)
@@ -302,7 +341,14 @@ func (s *Store) UpdatePreferences(ctx context.Context, userID string, request ma
 				return err
 			}
 		}
-		if err := saveWorkspace(ctx, tx, w); err != nil {
+		// Administrative changes never rewrite or bump clinical configuration.
+		query := `UPDATE specialty_context_preferences SET patient_columns_config=$2,version=version+1 WHERE specialty_context_id=$1 AND EXISTS(SELECT 1 FROM doctor_specialty_contexts c JOIN doctor_workspaces w ON w.id=c.workspace_id WHERE c.id=$1 AND w.user_id=$3) AND version=$4 RETURNING version,patient_columns_config,quick_notes`
+		args := []any{w.ContextID, w.Preferences.Columns, userID, w.Preferences.Version}
+		if notes {
+			query = `UPDATE specialty_context_preferences SET quick_notes=$2,version=version+1 WHERE specialty_context_id=$1 AND EXISTS(SELECT 1 FROM doctor_specialty_contexts c JOIN doctor_workspaces w ON w.id=c.workspace_id WHERE c.id=$1 AND w.user_id=$3) RETURNING version,patient_columns_config,quick_notes`
+			args = []any{w.ContextID, w.Preferences.Notes, userID}
+		}
+		if err := tx.QueryRow(ctx, query, args...).Scan(&w.Preferences.Version, &w.Preferences.Columns, &w.Preferences.Notes); err != nil {
 			return err
 		}
 		result = w.Preferences

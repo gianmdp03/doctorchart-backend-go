@@ -95,7 +95,7 @@ func newFixture(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	for _, user := range []string{owner, other} {
-		if _, err := pool.Exec(t.Context(), "INSERT INTO doctor_workspaces(created_at,current_step_key,onboarding_completed,updated_at,user_id,version,specialty_id) SELECT now(),'COMPLETE',true,now(),$1,0,min(id) FROM specialties", user); err != nil {
+		if _, err := pool.Exec(t.Context(), "WITH workspace AS (INSERT INTO doctor_workspaces(created_at,updated_at,user_id,version) VALUES(now(),now(),$1,0) RETURNING id) INSERT INTO doctor_specialty_contexts(workspace_id,created_at,current_step_key,onboarding_completed,definition,updated_at,version,specialty_id) SELECT workspace.id,now(),'COMPLETE',true,'{}',now(),0,(SELECT min(id) FROM specialties) FROM workspace", user); err != nil {
 			t.Fatal(err)
 		}
 	}

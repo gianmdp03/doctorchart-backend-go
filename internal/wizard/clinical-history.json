@@ -2,14 +2,13 @@
   "key": "sys_clinical_history",
   "title": "Antecedentes clínicos",
   "enabled": true,
-  "system": true,
   "fields": [
-    {"key":"sys_allergyStatus","label":"Alergias conocidas","type":"SELECT","required":false,"system":true,"options":[{"value":"UNKNOWN","label":"Sin información / no revisado"},{"value":"NONE","label":"No refiere alergias conocidas"},{"value":"PRESENT","label":"Tiene alergias conocidas"}]},
-    {"key":"sys_allergies","label":"Alergias y reacciones","type":"TEXTAREA","required":false,"system":true,"placeholder":"Una alergia por línea. Incluí la reacción, si se conoce."},
-    {"key":"sys_conditionStatus","label":"Enfermedades o problemas actuales","type":"SELECT","required":false,"system":true,"options":[{"value":"UNKNOWN","label":"Sin información / no revisado"},{"value":"NONE","label":"No refiere enfermedades actuales"},{"value":"PRESENT","label":"Tiene enfermedades o problemas actuales"}]},
-    {"key":"sys_conditions","label":"Enfermedades y problemas de salud","type":"TEXTAREA","required":false,"system":true,"placeholder":"Un problema actual por línea. Ej.: asma en seguimiento."},
-    {"key":"sys_medicationStatus","label":"Medicación habitual","type":"SELECT","required":false,"system":true,"options":[{"value":"UNKNOWN","label":"Sin información / no revisado"},{"value":"NONE","label":"No utiliza medicación habitual"},{"value":"PRESENT","label":"Utiliza medicación habitual"}]},
-    {"key":"sys_medications","label":"Tratamiento habitual","type":"TEXTAREA","required":false,"system":true,"placeholder":"Un medicamento por línea, con dosis y frecuencia cuando se conozcan."},
-    {"key":"sys_historySource","label":"Origen de la información revisada","type":"SELECT","required":false,"system":true,"options":[{"value":"REPORTED","label":"Informado por el paciente o su familia"},{"value":"CONFIRMED","label":"Corroborado por el profesional"}]}
+    {"key":"sys_allergyStatus","label":"Alergias conocidas","type":"SELECT","required":false,"options":[{"value":"UNKNOWN","label":"Sin información / no revisado"},{"value":"NONE","label":"No refiere alergias conocidas"},{"value":"PRESENT","label":"Tiene alergias conocidas"}]},
+    {"key":"sys_allergies","label":"Alergias y reacciones","type":"TEXTAREA","required":false,"placeholder":"Una alergia por línea. Incluí la reacción, si se conoce."},
+    {"key":"sys_conditionStatus","label":"Enfermedades o problemas actuales","type":"SELECT","required":false,"options":[{"value":"UNKNOWN","label":"Sin información / no revisado"},{"value":"NONE","label":"No refiere enfermedades actuales"},{"value":"PRESENT","label":"Tiene enfermedades o problemas actuales"}]},
+    {"key":"sys_conditions","label":"Enfermedades y problemas de salud","type":"TEXTAREA","required":false,"placeholder":"Un problema actual por línea. Ej.: asma en seguimiento."},
+    {"key":"sys_medicationStatus","label":"Medicación habitual","type":"SELECT","required":false,"options":[{"value":"UNKNOWN","label":"Sin información / no revisado"},{"value":"NONE","label":"No utiliza medicación habitual"},{"value":"PRESENT","label":"Utiliza medicación habitual"}]},
+    {"key":"sys_medications","label":"Tratamiento habitual","type":"TEXTAREA","required":false,"placeholder":"Un medicamento por línea, con dosis y frecuencia cuando se conozcan."},
+    {"key":"sys_historySource","label":"Origen de la información revisada","type":"SELECT","required":false,"options":[{"value":"REPORTED","label":"Informado por el paciente o su familia"},{"value":"CONFIRMED","label":"Corroborado por el profesional"}]}
   ]
 }

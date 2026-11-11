@@ -10,10 +10,11 @@ import (
 func TestBookingsPostgresConcurrentCrossClinicExclusion(t *testing.T) {
 	f, c, start := bookingFixture(t)
 	second := scheduleClinicFixture(t, f)
+	copyScheduleDirect(t, f, c.ID, second.ID, 0)
 	results := make(chan error, 2)
 	for _, id := range []string{c.ID, second.ID} {
 		go func(id string) {
-			_, err := f.pool.Exec(t.Context(), "INSERT INTO bookings(workspace_id,clinic_id,start_at,end_at,contact_name) SELECT workspace_id,id,$2,$3,'Direct concurrent writer' FROM clinics WHERE id=$1", id, start, start.Add(30*time.Minute))
+			err := insertBookingDirect(t.Context(), f, id, id, nil, start, start.Add(30*time.Minute))
 			results <- err
 		}(id)
 	}

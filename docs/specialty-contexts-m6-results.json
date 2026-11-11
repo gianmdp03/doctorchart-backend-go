@@ -1,0 +1,231 @@
+{
+  "date": "2026-11-10",
+  "scope": "M6 only; no deployment",
+  "gates": {
+    "gofmtBuildVet": "PASS Linux Go 1.27.3",
+    "goFull": {
+      "postgres17": "PASS",
+      "postgres18": "PASS"
+    },
+    "goRace": {
+      "postgres17": "PASS",
+      "postgres18": "PASS"
+    },
+    "angular": {
+      "files": 103,
+      "passed": 851,
+      "failed": 0,
+      "runtime": "Node 26 with NODE_OPTIONS=--no-experimental-webstorage inherited by workers (jsdom browser storage)",
+      "nativeNodeStorageDiagnostic": {
+        "failed": 46,
+        "reason": "Node native WebStorage shadows jsdom localStorage; CLI-only flag not inherited by workers",
+        "resolvedBy": "NODE_OPTIONS in test process only"
+      }
+    },
+    "typescript": {
+      "app": "PASS",
+      "spec": "PASS"
+    },
+    "developmentBuild": "PASS",
+    "labBuild": "PASS",
+    "configTests": {
+      "passed": 7,
+      "failed": 0
+    },
+    "browserMocked": "PASS category C",
+    "productionBuild": {
+      "status": "BLOCKED",
+      "reason": "supabase.publishableKey: falta la clave pública."
+    },
+    "productionStaticSmoke": "BLOCKED without production artifact",
+    "fullExternalIntegration": "BLOCKED without authorized Supabase/Billing",
+    "optInGoTests": {
+      "status": "SKIP",
+      "count": 6,
+      "log": "doctorchart-m6-opt-in-skips.log"
+    }
+  },
+  "browser": {
+    "category": "D",
+    "services": {
+      "angular": "real",
+      "doctorchart": "real",
+      "gateway": "real",
+      "postgres": "real",
+      "converter": "real",
+      "smtp": "Mailpit",
+      "auth": "local test adapter",
+      "billing": "local test adapter"
+    },
+    "flows": [
+      "new doctor logs in through signed test Auth and real Gateway; pediatric wizard completes",
+      "pediatric patient created through dynamic Angular form; first and subsequent clinical visits persist",
+      "one-clinic/one-specialty flow auto-selects both without extra setup steps",
+      "Medicina General has its independent wizard/patient/visits; pending context leaves global administration available",
+      "Dermatología has its independent wizard/patient/visits; pending context leaves global administration available",
+      "same DNI remains three independent patients, searches, records and prescriptions; cross-context reads denied",
+      "real multipart images pass the converter and persist as independent studies; cross-context file downloads denied",
+      "real Mis horarios configures three clinics and three specialties with adjacent mixed-duration blocks",
+      "editing/removing preserves other block IDs; shared date-picker closure and preview work on desktop and mobile",
+      "cross-clinic/specialty overlap is rejected atomically without changing the saved schedule",
+      "global calendar keeps all specialties and independent filters; reprogramming, clinical link and historical snapshots use persisted context",
+      "two real tabs retain independent encounter drafts; saving never retargets an in-flight write; patient edits support save-first/cancel/discard",
+      "personalization draft preserves the effective wizard and readiness; another specialty remains unchanged",
+      "public visitor selects a persisted dermatology offer and confirms a real idempotent reservation without creating a clinical patient",
+      "one public offer auto-selects; unpublished profiles close new access while existing receipts remain valid",
+      "real staff activation/session/CSRF restricts one assigned clinic, manages bookings, and exposes no clinical IDs, files or search",
+      "final real database retains schema 15, one workspace, three contexts, independent clinical files, booking audit and notification outbox"
+    ],
+    "requests": 87,
+    "ids": {
+      "contexts": {
+        "pediatrics": 1,
+        "general_medicine": 2,
+        "dermatology": 3
+      },
+      "patients": {
+        "pediatrics": 1,
+        "general_medicine": 2,
+        "dermatology": 3
+      },
+      "clinics": [
+        "1",
+        "2",
+        "3"
+      ],
+      "pediatricFirst": 1
+    },
+    "catalog": {
+      "version": 15,
+      "workspaces": 1,
+      "contexts": 3,
+      "patients": 3,
+      "bookings": 4,
+      "studies": 3,
+      "outbox": 3
+    },
+    "result": "PASS"
+  },
+  "notificationObservation": {
+    "sent": 2,
+    "pendingFutureReminder": 1,
+    "delivery": "local Mailpit only"
+  },
+  "logs": [
+    {
+      "name": "doctorchart-m6-go-gates17.log",
+      "sha256": "704a7d8af770c026cfa3adb2b9459967041682a8e61fcbec43611750a53d79ca"
+    },
+    {
+      "name": "doctorchart-m6-go-gates18.log",
+      "sha256": "ddfdfee76b0ded3e9911c372feaadad3437da3214cd1ef66fa05de4b11f8bb97"
+    },
+    {
+      "name": "doctorchart-m6-race17.log",
+      "sha256": "14f8c906c6392b402339f6dc7a82838c2570b4276f4c29d980a5fee038458de5"
+    },
+    {
+      "name": "doctorchart-m6-race18.log",
+      "sha256": "3c68e35d2d985749b5f998fdcdb5db8b2f1de6ea0fefc8bfcc11a6b6d157caf5"
+    },
+    {
+      "name": "doctorchart-m6-angular.log",
+      "sha256": "46dafa8a0092929465b8d24ace92b9a67dcccfb6b3afeaa8cdb2b288917d6448"
+    },
+    {
+      "name": "doctorchart-m6-ts-app.log",
+      "sha256": "b16c56f9c722fca79cf80f451c783b0bbc76c627d59875b835860282c4c1571a"
+    },
+    {
+      "name": "doctorchart-m6-ts-spec.log",
+      "sha256": "c362ed58e8e5e42f29911b7e03a2ed55532fa3f3c8bbbb0250f18ca98b7aa5c4"
+    },
+    {
+      "name": "doctorchart-m6-dev-build.log",
+      "sha256": "fa2e16478cb31e46ebea5c2f28994c6ba91c41ccd18fc130445a9823595e7e23"
+    },
+    {
+      "name": "doctorchart-m6-lab-frontend-build.log",
+      "sha256": "5c735dc9eb00ecfe91c36d24ad471bf961912738ff543fddb9171f6b4d8567bf"
+    },
+    {
+      "name": "doctorchart-m6-config.log",
+      "sha256": "55e2efcd4d7c6159c60ef109ffea6d67b093b93382249f15c1b7648b54dcdb2a"
+    },
+    {
+      "name": "doctorchart-m6-production.log",
+      "sha256": "0c50d624a76611f1d5a95787277ac3ed9eb041bdf2fc00878a0c064c422fe015"
+    },
+    {
+      "name": "doctorchart-m6-mocked.log",
+      "sha256": "20d6e706c0fd480c8f586aff2b78d60113c44d7b43e2694e98e0a202d5e12431"
+    },
+    {
+      "name": "doctorchart-m6-real.log",
+      "sha256": "64f5710624122cc4d86b59a47ebf90cdaaf355662f9994e3dafd5c2e28ca678a"
+    },
+    {
+      "name": "doctorchart-m6-opt-in-skips.log",
+      "sha256": "008302d686b99ceaea3f7f44a1d73897d56c58915a49740fa9a4bec41fe5f549"
+    },
+    {
+      "name": "doctorchart-m6-angular-node26-native-storage.log",
+      "sha256": "6ff39884a3ed04372f10a048d0efc9c58b063c1c4f705dd5fcf7438e88d76533"
+    },
+    {
+      "name": "doctorchart-m6-angular-cli-only-flag.log",
+      "sha256": "8a2886c74ff4f4878aba1ebfe03e9d1af49b4cc927215a1ae75ae4bc9bb2522a"
+    },
+    {
+      "name": "doctorchart-m6-cleanup.log",
+      "sha256": "c1c7ee09a97fcf3cdfb11e00ebda0d11ebc7aca7e9735001f1368ba02b19e09f"
+    }
+  ],
+  "preservation": {
+    "immutableChanged": [],
+    "repositories": {
+      "backend": {
+        "headUnchanged": true,
+        "stagedUnchanged": true,
+        "priorFilesChanged": [],
+        "newDirtySincePreflight": [
+          "docs/specialty-contexts-m6-results.json",
+          "docs/specialty-contexts-m6.md",
+          "ops/testing/specialty-m6-lab.mjs"
+        ],
+        "totalDirty": 111,
+        "diffCheck": ""
+      },
+      "frontend": {
+        "headUnchanged": true,
+        "stagedUnchanged": true,
+        "priorFilesChanged": [
+          "src/app/core/services/clinical-navigation.service.ts"
+        ],
+        "newDirtySincePreflight": [
+          ".gitignore",
+          "angular.json",
+          "docs/conexion-entornos.md",
+          "src/app/core/guards/calendar.guard.spec.ts",
+          "src/app/core/guards/clinics.guard.spec.ts",
+          "src/app/core/guards/clinics.guard.ts",
+          "src/app/core/guards/public-appointments.guard.spec.ts",
+          "src/app/core/guards/schedules.guard.spec.ts",
+          "src/app/features/staff/staff.css",
+          "docs/specialty-contexts-m6.md",
+          "scripts/specialty-contexts-m6-real.cjs",
+          "src/app/core/services/clinical-navigation.service.spec.ts"
+        ],
+        "totalDirty": 124,
+        "diffCheck": ""
+      }
+    }
+  },
+  "cleanup": {
+    "ownedContainersRemaining": 0,
+    "ownedNetworksRemaining": 0,
+    "ownedVolumesRemaining": 0,
+    "generatedLabConfigRemoved": true,
+    "temporaryEvidenceRetained": true
+  }
+}

@@ -19,6 +19,7 @@ import (
 // EncounterSummary is the stored clinical form shared by list and detail responses.
 type EncounterSummary struct {
 	ID               int64             `json:"id"`
+	ContextID        int64             `json:"specialtyContextId"`
 	Version          int64             `json:"version"`
 	PatientID        int64             `json:"patientId"`
 	PatientName      string            `json:"patientFullName"`
@@ -52,26 +53,23 @@ type Encounter struct {
 	instant    time.Time
 }
 
-const encounterColumns = `e.id,e.version,e.patient_id,p.full_name,e.encounter_date,e.specialty_id,s.id,s.code,s.display_name,s.description,e.consultation_type,e.chief_complaint,e.primary_diagnosis_code,e.primary_diagnosis_description,e.vital_signs,e.prescriptions,e.history_of_present_illness,e.treatment_plan,e.follow_up_instructions,e.follow_up_date::text,e.weight_kg,e.height_cm,e.head_circumference_cm,e.form_values,e.formula_results,e.form_definition_snapshot,e.formula_context,e.workspace_version,e.physical_examination,e.secondary_diagnoses,e.clinical_impression,e.diagnostic_orders,p.user_id`
+const encounterColumns = `e.id,e.version,e.patient_id,p.full_name,e.encounter_date,e.specialty_id,s.id,s.code,s.display_name,s.description,e.consultation_type,e.chief_complaint,e.primary_diagnosis_code,e.primary_diagnosis_description,e.vital_signs,e.prescriptions,e.history_of_present_illness,e.treatment_plan,e.follow_up_instructions,e.follow_up_date::text,e.weight_kg,e.height_cm,e.head_circumference_cm,e.form_values,e.formula_results,e.form_definition_snapshot,e.formula_context,e.workspace_version,e.physical_examination,e.secondary_diagnoses,e.clinical_impression,e.diagnostic_orders,p.user_id,p.specialty_context_id`
 const encounterFrom = ` FROM clinical_encounters e JOIN patients p ON p.id=e.patient_id JOIN specialties s ON s.id=e.specialty_id `
 
 func scanEncounter(row pgx.Row, extra ...any) (Encounter, error) {
 	var e Encounter
-	dest := []any{&e.ID, &e.Version, &e.PatientID, &e.PatientName, &e.instant, &e.SpecialtyID, &e.Specialty.ID, &e.Specialty.Code, &e.Specialty.Name, &e.Specialty.Description, &e.Type, &e.Complaint, &e.DiagnosisCode, &e.Diagnosis, &e.VitalSigns, &e.Prescriptions, &e.History, &e.Treatment, &e.FollowUp, &e.FollowUpDate, &e.Measurements.Weight, &e.Measurements.Height, &e.Measurements.Head, &e.Values, &e.Results, &e.Snapshot, &e.Context, &e.WorkspaceVersion, &e.Physical, &e.Secondary, &e.Impression, &e.Orders, &e.owner}
+	dest := []any{&e.ID, &e.Version, &e.PatientID, &e.PatientName, &e.instant, &e.SpecialtyID, &e.Specialty.ID, &e.Specialty.Code, &e.Specialty.Name, &e.Specialty.Description, &e.Type, &e.Complaint, &e.DiagnosisCode, &e.Diagnosis, &e.VitalSigns, &e.Prescriptions, &e.History, &e.Treatment, &e.FollowUp, &e.FollowUpDate, &e.Measurements.Weight, &e.Measurements.Height, &e.Measurements.Head, &e.Values, &e.Results, &e.Snapshot, &e.Context, &e.WorkspaceVersion, &e.Physical, &e.Secondary, &e.Impression, &e.Orders, &e.owner, &e.ContextID}
 	err := row.Scan(append(dest, extra...)...)
 	e.Date = e.instant.UTC().Format(time.RFC3339Nano)
 	return e, err
 }
 func ownedEncounter(ctx context.Context, tx pgx.Tx, userID string, id int64) (Encounter, error) {
-	e, err := scanEncounter(tx.QueryRow(ctx, "SELECT "+encounterColumns+encounterFrom+"WHERE e.id=$1", id))
+	e, err := scanEncounter(tx.QueryRow(ctx, "SELECT "+encounterColumns+encounterFrom+"WHERE e.id=$1 AND p.user_id=$2 AND ($3::bigint=0 AND (SELECT count(*) FROM doctor_specialty_contexts scope_c JOIN doctor_workspaces scope_w ON scope_w.id=scope_c.workspace_id WHERE scope_w.user_id=$2)=1 OR p.specialty_context_id=$3)", id, userID, api.SpecialtyContextID(ctx)))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return e, api.Failure(404, "ENCOUNTER_NOT_FOUND", "No se encontró la consulta.")
 	}
 	if err != nil {
 		return e, err
-	}
-	if e.owner != userID {
-		return e, api.Failure(403, "FORBIDDEN", "No tenés permiso para acceder a este paciente.")
 	}
 	return e, nil
 }
@@ -255,7 +253,7 @@ func (s *Service) CreateEncounter(ctx context.Context, identity api.Identity, re
 		if err != nil {
 			return err
 		}
-		e := Encounter{EncounterSummary: EncounterSummary{PatientID: p.ID, PatientName: p.FullName, Date: date.Format(time.RFC3339Nano), SpecialtyID: setup.Specialty.ID, Specialty: setup.Specialty, Type: kind, Prescriptions: json.RawMessage("[]"), WorkspaceVersion: setup.Version}, Secondary: json.RawMessage("[]"), Orders: json.RawMessage("[]"), instant: date, owner: identity.UserID}
+		e := Encounter{EncounterSummary: EncounterSummary{ContextID: p.ContextID, PatientID: p.ID, PatientName: p.FullName, Date: date.Format(time.RFC3339Nano), SpecialtyID: setup.Specialty.ID, Specialty: setup.Specialty, Type: kind, Prescriptions: json.RawMessage("[]"), WorkspaceVersion: setup.Version}, Secondary: json.RawMessage("[]"), Orders: json.RawMessage("[]"), instant: date, owner: identity.UserID}
 		form = wizard.WithClinicalHistory(form)
 		e.Snapshot, err = json.Marshal(form)
 		if err != nil {
@@ -401,7 +399,7 @@ func clinicalReply(w http.ResponseWriter, value any, err error, status int) {
 	api.WriteJSON(w, status, value)
 }
 func (s *Service) EncounterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("POST /api/doctorchart/encounters", func(w http.ResponseWriter, r *http.Request) {
+	s.handle(mux, "POST /api/doctorchart/encounters", func(w http.ResponseWriter, r *http.Request) {
 		body, err := api.Decode(w, r)
 		if err != nil {
 			api.WriteError(w, err)
@@ -413,7 +411,7 @@ func (s *Service) EncounterRoutes(mux *http.ServeMux) {
 		}
 		clinicalReply(w, e, err, 201)
 	})
-	mux.HandleFunc("PUT /api/doctorchart/encounters/{id}", func(w http.ResponseWriter, r *http.Request) {
+	s.handle(mux, "PUT /api/doctorchart/encounters/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id, err := pathID(r, "id")
 		if err != nil {
 			api.WriteError(w, err)
@@ -427,7 +425,7 @@ func (s *Service) EncounterRoutes(mux *http.ServeMux) {
 		e, err := s.UpdateEncounter(r.Context(), api.User(r.Context()).UserID, id, body)
 		clinicalReply(w, e, err, 200)
 	})
-	mux.HandleFunc("GET /api/doctorchart/encounters/{id}", func(w http.ResponseWriter, r *http.Request) {
+	s.handle(mux, "GET /api/doctorchart/encounters/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id, err := pathID(r, "id")
 		var e Encounter
 		if err == nil {
@@ -439,7 +437,7 @@ func (s *Service) EncounterRoutes(mux *http.ServeMux) {
 		}
 		clinicalReply(w, e, err, 200)
 	})
-	mux.HandleFunc("DELETE /api/doctorchart/encounters/{id}", func(w http.ResponseWriter, r *http.Request) {
+	s.handle(mux, "DELETE /api/doctorchart/encounters/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id, err := pathID(r, "id")
 		if err == nil {
 			err = s.transaction(r.Context(), false, func(tx pgx.Tx) error {
@@ -482,7 +480,7 @@ func (s *Service) EncounterRoutes(mux *http.ServeMux) {
 		}
 		clinicalReply(w, result, err, 200)
 	}
-	mux.HandleFunc("GET /api/doctorchart/encounters/patient/{patientId}", byPatient)
-	mux.HandleFunc("GET /api/doctorchart/encounters/patient/{patientId}/specialty/{specialtyId}", byPatient)
+	s.handle(mux, "GET /api/doctorchart/encounters/patient/{patientId}", byPatient)
+	s.handle(mux, "GET /api/doctorchart/encounters/patient/{patientId}/specialty/{specialtyId}", byPatient)
 	s.encounterQueryRoutes(mux)
 }

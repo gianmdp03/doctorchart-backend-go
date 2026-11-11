@@ -49,7 +49,9 @@ func (s *Service) current(ctx context.Context, j job, m Message) (bool, error) {
 		case "BOOKING_CANCELLED":
 			required = "CANCELLED"
 		}
-		err = s.pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM bookings WHERE id=$1 AND version=$2 AND status=$3 AND ($4<>'BOOKING_REMINDER' OR start_at>clock_timestamp()))", *j.booking, *j.version, required, j.kind).Scan(&valid)
+		// Linking a clinical file changes no administrative message content. Keep
+		// pending confirmations/reminders valid without enqueueing duplicates.
+		err = s.pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM bookings b WHERE id=$1 AND version>=$2 AND status=$3 AND ($4<>'BOOKING_REMINDER' OR start_at>clock_timestamp()) AND (version=$2 OR ((SELECT count(*) FROM booking_events e WHERE e.booking_id=b.id AND e.version>$2)=b.version-$2 AND NOT EXISTS(SELECT 1 FROM booking_events e WHERE e.booking_id=b.id AND e.version>$2 AND e.kind<>'PATIENT_LINKED'))))", *j.booking, *j.version, required, j.kind).Scan(&valid)
 	} else if j.access != nil {
 		err = s.pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM staff_invitations i JOIN staff_access a ON a.id=i.access_id WHERE a.id=$1 AND a.active AND i.token_hash=$2 AND i.consumed_at IS NULL AND i.expires_at>clock_timestamp())", *j.access, Hash(m.Code)).Scan(&valid)
 	} else if j.recovery != nil {
@@ -92,6 +94,13 @@ func (s *Service) ProcessOne(ctx context.Context) (bool, error) {
 	if err != nil || json.Unmarshal(raw, &m) != nil {
 		state, code = "DEAD", "DECRYPTION_FAILED"
 	} else {
+		// Old encrypted outbox payloads predate the specialty field. Read the
+		// reservation's frozen classification, never the current public profile.
+		if j.booking != nil && m.Specialty == "" {
+			if err = s.pool.QueryRow(ctx, "SELECT specialty_snapshot->>'name' FROM bookings WHERE id=$1", *j.booking).Scan(&m.Specialty); err != nil {
+				return true, err
+			}
+		}
 		if j.booking != nil && m.Code != "" {
 			var usable bool
 			if e := s.pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM booking_confirmation_access WHERE booking_id=$1 AND token_hash=$2 AND revoked_at IS NULL AND expires_at>clock_timestamp())", *j.booking, Hash(m.Code)).Scan(&usable); e != nil {

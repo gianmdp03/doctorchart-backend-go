@@ -19,6 +19,7 @@ import (
 
 type PatientList struct {
 	ID         int64   `json:"id"`
+	ContextID  int64   `json:"specialtyContextId"`
 	Name       string  `json:"fullName"`
 	Birth      string  `json:"birthDate"`
 	NationalID *string `json:"nationalId"`
@@ -196,7 +197,7 @@ func (s *Service) ListPatients(ctx context.Context, userID string, query url.Val
 	// Read the authoritative specialty in the same snapshot as the directory.
 	// A growth-chart module does not make another specialty pediatric.
 	var pediatrics bool
-	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM doctor_workspaces w JOIN specialties s ON s.id=w.specialty_id WHERE w.user_id=$1 AND lower(s.code)='pediatrics')`, userID).Scan(&pediatrics); err != nil {
+	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM doctor_workspaces w JOIN doctor_specialty_contexts c ON c.workspace_id=w.id JOIN specialties s ON s.id=c.specialty_id WHERE w.user_id=$1 AND ($2::bigint=0 AND (SELECT count(*) FROM doctor_specialty_contexts scope_c JOIN doctor_workspaces scope_w ON scope_w.id=scope_c.workspace_id WHERE scope_w.user_id=$1)=1 OR c.id=$2) AND lower(s.code)='pediatrics')`, userID, api.SpecialtyContextID(ctx)).Scan(&pediatrics); err != nil {
 		return nil, err
 	}
 	var bounds pediatricAgeRange
@@ -219,13 +220,13 @@ func (s *Service) ListPatients(ctx context.Context, userID string, query url.Val
 	if category == "pending" {
 		category = pending
 	}
-	where := `$3::date IS NOT NULL AND p.user_id=$1 AND (lower(p.full_name) LIKE $2 ESCAPE '!' OR lower(p.national_id) LIKE $2 ESCAPE '!' OR lower(p.phone) LIKE $2 ESCAPE '!') AND (` + category + `) AND ($4::date IS NULL OR p.birth_date>$4::date) AND ($5::date IS NULL OR p.birth_date<=$5::date)`
+	where := `$3::date IS NOT NULL AND p.user_id=$1 AND ($6::bigint=0 AND (SELECT count(*) FROM doctor_specialty_contexts scope_c JOIN doctor_workspaces scope_w ON scope_w.id=scope_c.workspace_id WHERE scope_w.user_id=$1)=1 OR p.specialty_context_id=$6) AND (lower(p.full_name) LIKE $2 ESCAPE '!' OR lower(p.national_id) LIKE $2 ESCAPE '!' OR lower(p.phone) LIKE $2 ESCAPE '!') AND (` + category + `) AND ($4::date IS NULL OR p.birth_date>$4::date) AND ($5::date IS NULL OR p.birth_date<=$5::date)`
 	var total int64
-	err = tx.QueryRow(ctx, "SELECT count(*) FROM patients p WHERE "+where, userID, pattern, todayText, bounds.after, bounds.through).Scan(&total)
+	err = tx.QueryRow(ctx, "SELECT count(*) FROM patients p WHERE "+where, userID, pattern, todayText, bounds.after, bounds.through, api.SpecialtyContextID(ctx)).Scan(&total)
 	if err != nil {
 		return nil, err
 	}
-	rows, err := tx.Query(ctx, `SELECT p.id,p.full_name,p.birth_date::text,p.national_id,p.phone,p.gender,(SELECT count(*) FROM clinical_encounters e WHERE e.patient_id=p.id),(SELECT max(e.encounter_date) FROM clinical_encounters e WHERE e.patient_id=p.id),`+pending+` FROM patients p WHERE `+where+` ORDER BY `+page.order+` LIMIT $6 OFFSET $7`, userID, pattern, todayText, bounds.after, bounds.through, page.size, page.number*page.size)
+	rows, err := tx.Query(ctx, `SELECT p.specialty_context_id,p.id,p.full_name,p.birth_date::text,p.national_id,p.phone,p.gender,(SELECT count(*) FROM clinical_encounters e WHERE e.patient_id=p.id),(SELECT max(e.encounter_date) FROM clinical_encounters e WHERE e.patient_id=p.id),`+pending+` FROM patients p WHERE `+where+` ORDER BY `+page.order+` LIMIT $7 OFFSET $8`, userID, pattern, todayText, bounds.after, bounds.through, api.SpecialtyContextID(ctx), page.size, page.number*page.size)
 	if err != nil {
 		return nil, err
 	}
@@ -233,7 +234,7 @@ func (s *Service) ListPatients(ctx context.Context, userID string, query url.Val
 	for rows.Next() {
 		var item PatientList
 		var last *time.Time
-		if err := rows.Scan(&item.ID, &item.Name, &item.Birth, &item.NationalID, &item.Phone, &item.Gender, &item.Encounters, &last, &item.Pending); err != nil {
+		if err := rows.Scan(&item.ContextID, &item.ID, &item.Name, &item.Birth, &item.NationalID, &item.Phone, &item.Gender, &item.Encounters, &last, &item.Pending); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -268,7 +269,7 @@ func (s *Service) ListPatients(ctx context.Context, userID string, query url.Val
 	return map[string]any{"content": content, "page": map[string]any{"size": page.size, "number": page.number, "totalElements": total, "totalPages": pages}}, nil
 }
 func (s *Service) DirectoryRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/doctorchart/patients", func(w http.ResponseWriter, r *http.Request) {
+	s.handle(mux, "GET /api/doctorchart/patients", func(w http.ResponseWriter, r *http.Request) {
 		value, err := s.ListPatients(r.Context(), api.User(r.Context()).UserID, r.URL.Query())
 		if err != nil {
 			api.WriteError(w, err)

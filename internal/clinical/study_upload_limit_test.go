@@ -50,7 +50,7 @@ func TestStudyHTTPRejectsOversizedUploadsBeforePersistence(t *testing.T) {
 			if err := writer.Close(); err != nil {
 				t.Fatal(err)
 			}
-			req := httptest.NewRequest("POST", "/api/doctorchart/patients/1/studies", &body)
+			req := httptest.NewRequest("POST", "/api/doctorchart/patients/1/studies?specialtyContextId=1", &body)
 			req.Header.Set("Content-Type", writer.FormDataContentType())
 			req.Header.Set("X-Gateway-Secret", key)
 			req.Header.Set("X-User-Id", "fixture-owner")
@@ -99,7 +99,7 @@ func TestStudyAdmissionRejectsBeforeReadingMultipart(t *testing.T) {
 	key := strings.Repeat("g", 64)
 	handler := api.Gateway(key, api.Dispatch(mux))
 	body := &rejectedUploadBody{}
-	req := httptest.NewRequest("POST", "/api/doctorchart/patients/1/studies", body)
+	req := httptest.NewRequest("POST", "/api/doctorchart/patients/1/studies?specialtyContextId=1", body)
 	req.Header.Set("Content-Type", "multipart/form-data; boundary=fixture")
 	req.Header.Set("X-Gateway-Secret", key)
 	req.Header.Set("X-User-Id", "fixture-owner")

@@ -56,15 +56,15 @@ func TestGrowthHTTPPostgres(t *testing.T) {
 	}()
 	seed := []string{
 		`INSERT INTO specialties(id,active,code,created_at,display_name,navigation,patient_record_actions,patient_record_tabs,updated_at,version) VALUES(1,true,'PEDIATRICS',now(),'Pediatría','[]','[]','["GROWTH"]',now(),1)`,
-		`INSERT INTO doctor_workspaces(id,created_at,current_step_key,definition,onboarding_completed,updated_at,user_id,version,specialty_id) VALUES(1,now(),'COMPLETE','{"modulesConfig":{"GROWTH_CHARTS":true}}',true,now(),'owner',1,1),(2,now(),'COMPLETE','{"modulesConfig":{"GROWTH_CHARTS":false}}',true,now(),'disabled',1,1)`,
-		`INSERT INTO patients(id,version,full_name,birth_date,gender,form_values,formula_results,form_definition_snapshot,formula_context,workspace_version,user_id,updated_at,personal_history) VALUES
-		(1,0,'Fixture male','2024-05-10','MALE','{"sys_sex":"MALE"}','{}','{}','{}',1,'owner',now(),'{"birthMeasurements":{"weightKg":3.4,"heightCm":50,"headCircumferenceCm":35}}'),
-		(2,0,'Fixture female','2024-05-10','FEMALE','{"sys_sex":"FEMALE"}','{}','{}','{}',1,'owner',now(),null),
-		(3,0,'Legacy sex','2024-05-10','MALE','{}','{}','{}','{}',1,'owner',now(),null),
-		(4,0,'Other owner','2024-05-10','MALE','{"sys_sex":"MALE"}','{}','{}','{}',1,'other',now(),null),
-		(5,0,'Invalid date',current_date+1,'MALE','{"sys_sex":"MALE"}','{}','{}','{}',1,'owner',now(),null),
-		(6,0,'Adolescent','2011-05-10','FEMALE','{"sys_sex":"FEMALE"}','{}','{}','{}',1,'owner',now(),null),
-		(7,0,'Disabled module','2024-05-10','MALE','{"sys_sex":"MALE"}','{}','{}','{}',1,'disabled',now(),null)`,
+		`INSERT INTO doctor_workspaces(id,created_at,updated_at,user_id,version) VALUES(1,now(),now(),'owner',1),(2,now(),now(),'disabled',1),(3,now(),now(),'other',1); INSERT INTO doctor_specialty_contexts(workspace_id,created_at,current_step_key,definition,onboarding_completed,updated_at,version,specialty_id) VALUES(1,now(),'COMPLETE','{"modulesConfig":{"GROWTH_CHARTS":true}}',true,now(),1,1),(2,now(),'COMPLETE','{"modulesConfig":{"GROWTH_CHARTS":false}}',true,now(),1,1),(3,now(),'COMPLETE','{"modulesConfig":{"GROWTH_CHARTS":true}}',true,now(),1,1)`,
+		`INSERT INTO patients(id,version,full_name,birth_date,gender,form_values,formula_results,form_definition_snapshot,formula_context,workspace_version,user_id,updated_at,personal_history,workspace_id,specialty_context_id) VALUES
+		(1,0,'Fixture male','2024-05-10','MALE','{"sys_sex":"MALE"}','{}','{}','{}',1,'owner',now(),'{"birthMeasurements":{"weightKg":3.4,"heightCm":50,"headCircumferenceCm":35}}',1,1),
+		(2,0,'Fixture female','2024-05-10','FEMALE','{"sys_sex":"FEMALE"}','{}','{}','{}',1,'owner',now(),null,1,1),
+		(3,0,'Legacy sex','2024-05-10','MALE','{}','{}','{}','{}',1,'owner',now(),null,1,1),
+		(4,0,'Other owner','2024-05-10','MALE','{"sys_sex":"MALE"}','{}','{}','{}',1,'other',now(),null,3,3),
+		(5,0,'Invalid date',current_date+1,'MALE','{"sys_sex":"MALE"}','{}','{}','{}',1,'owner',now(),null,1,1),
+		(6,0,'Adolescent','2011-05-10','FEMALE','{"sys_sex":"FEMALE"}','{}','{}','{}',1,'owner',now(),null,1,1),
+		(7,0,'Disabled module','2024-05-10','MALE','{"sys_sex":"MALE"}','{}','{}','{}',1,'disabled',now(),null,2,2)`,
 		`INSERT INTO clinical_encounters(id,patient_id,specialty_id,version,workspace_version,consultation_type,encounter_date,updated_at,weight_kg,height_cm,head_circumference_cm,form_values,formula_results,form_definition_snapshot,formula_context) VALUES
 		(10,1,1,0,1,'ROUTINE_CHECKUP','2024-05-10 01:00Z',now(),3.3,49,34,'{}','{}','{}','{}'),
 		(11,1,1,0,1,'ROUTINE_CHECKUP','2024-05-10 04:00Z',now(),3.5,50,35,'{}','{}','{}','{}'),
@@ -101,6 +101,7 @@ func TestGrowthHTTPPostgres(t *testing.T) {
 		r := httptest.NewRequest("GET", path, nil)
 		if user != "" {
 			r.Header.Set("X-Gateway-Secret", secret)
+			bindFixtureContext(t, service.pool, r, user)
 			r.Header.Set("X-User-Id", user)
 			r.Header.Set("X-User-Role", "DOCTOR")
 			r.Header.Set("X-User-Plan", "PRO")
@@ -123,9 +124,9 @@ func TestGrowthHTTPPostgres(t *testing.T) {
 	}
 	base := "/api/doctorchart/patients/"
 	request(base+"1/growth", "", 401)
-	request(base+"4/growth", "owner", 403)
-	request(base+"4/measurements", "owner", 403)
-	request(base+"1/growth", "other", 403)
+	request(base+"4/growth", "owner", 404)
+	request(base+"4/measurements", "owner", 404)
+	request(base+"1/growth", "other", 404)
 	request(base+"999/growth", "owner", 404)
 	request(base+"7/growth", "disabled", 403)
 	request(base+"1/growth?referenceSex=UNKNOWN", "owner", 400)

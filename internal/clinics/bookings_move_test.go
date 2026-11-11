@@ -24,6 +24,13 @@ func TestBookingsMoveBetweenClinicsAndConcurrentCancelledMove(t *testing.T) {
 	if moved.ID != b.ID || moved.ClinicID != destination.ID || !moved.Start.Equal(target) || moved.ContactName != b.ContactName || moved.Version != "2" {
 		t.Fatal(moved)
 	}
+	if moved.ContextID != b.ContextID || moved.Specialty != b.Specialty || moved.Provenance.BlockID == b.Provenance.BlockID || moved.ClinicSnapshot.Name != destination.Name {
+		t.Fatal("move lost context or destination provenance", moved)
+	}
+	var beforeBlock, afterBlock string
+	if err := f.pool.QueryRow(t.Context(), "SELECT before_document->'provenance'->>'blockId',after_document->'provenance'->>'blockId' FROM booking_events WHERE booking_id=$1 AND kind='RESCHEDULED'", b.ID).Scan(&beforeBlock, &afterBlock); err != nil || beforeBlock != b.Provenance.BlockID || afterBlock != moved.Provenance.BlockID {
+		t.Fatal("reschedule history lost original block", err)
+	}
 	assertCode(t, bookingRequestFixture(f, "POST", "/bookings/"+b.ID+"/reschedule", owner, key, moveBody), 200, "")
 	// The original clinic slot is really free after the atomic move.
 	assertCode(t, bookingRequestFixture(f, "POST", "/bookings", owner, newBookingKey(), createBookingBody(c.ID, start)), 201, "")

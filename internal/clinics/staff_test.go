@@ -134,6 +134,12 @@ func TestStaffDelegationUsesM4AndNeverExposesPatientIDs(t *testing.T) {
 	w := staffReq(f, client, "POST", base+"/bookings", body)
 	assertCode(t, w, 201, "")
 	b := booked(t, w)
+	if b.ContextID == "" || b.Specialty.Name == "" || b.ClinicSnapshot.Name == "" {
+		t.Fatal("staff booking lacks persisted context", b)
+	}
+	if strings.Contains(w.Body.String(), "provenance") || strings.Contains(w.Body.String(), "publicAddress") || strings.Contains(w.Body.String(), `"address"`) {
+		t.Fatal("staff received unnecessary provenance/private address", w.Body.String())
+	}
 	if strings.Contains(w.Body.String(), "patientId") {
 		t.Fatal("clinical ID exposed")
 	}

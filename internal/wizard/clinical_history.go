@@ -3,7 +3,6 @@ package wizard
 import (
 	_ "embed"
 	"encoding/json"
-	"reflect"
 	"strings"
 
 	"github.com/syntah/doctorchart-backend-go/internal/api"
@@ -12,25 +11,38 @@ import (
 //go:embed clinical-history.json
 var clinicalHistoryJSON []byte
 
-// WithClinicalHistory adds the code-owned block without mutating a saved form.
-// Existing fields/snapshots retain their definitions. Missing blocks in older
-// configurations are supplemented in memory, never by a bootstrap data rewrite.
+// WithClinicalHistory makes the former system history block specialty-owned.
+// It never adds missing categories or fields: a deliberate removal stays removed.
+// Stored snapshots and values are left intact.
 func WithClinicalHistory(form map[string]any) map[string]any {
 	next := make(map[string]any, len(form)+1)
 	for k, v := range form {
 		next[k] = v
 	}
 	categories := append([]any{}, list(form["categories"])...)
-	for _, c := range categories {
-		if object(c)["key"] == "sys_clinical_history" {
-			return next
+	for i, raw := range categories {
+		category := object(raw)
+		if category["key"] != "sys_clinical_history" {
+			continue
 		}
+		copyCategory := make(map[string]any, len(category))
+		for k, v := range category {
+			copyCategory[k] = v
+		}
+		delete(copyCategory, "system")
+		fields := make([]any, 0, len(list(category["fields"])))
+		for _, rawField := range list(category["fields"]) {
+			copyField := make(map[string]any)
+			for k, v := range object(rawField) {
+				copyField[k] = v
+			}
+			delete(copyField, "system")
+			fields = append(fields, copyField)
+		}
+		copyCategory["fields"] = fields
+		categories[i] = copyCategory
 	}
-	category, err := Decode(clinicalHistoryJSON)
-	if err != nil {
-		panic("invalid embedded clinical history definition")
-	}
-	next["categories"] = append(categories, category)
+	next["categories"] = categories
 	return next
 }
 
@@ -48,11 +60,6 @@ func WithSystemHistory(raw json.RawMessage) (json.RawMessage, error) {
 		}
 	}
 	return json.Marshal(definition)
-}
-
-func validClinicalHistory(category map[string]any) bool {
-	expected, err := Decode(clinicalHistoryJSON)
-	return err == nil && reflect.DeepEqual(expected, category)
 }
 
 func ClinicalHistoryGroups() [3]struct{ Status, Details, Kind string } {
@@ -85,9 +92,22 @@ func RetainUnreviewedHistory(previous, next map[string]any) {
 	}
 }
 
-func clinicalHistoryErrors(values map[string]any) []api.FieldError {
+func clinicalHistoryErrors(form, values map[string]any) []api.FieldError {
 	issues := []api.FieldError{}
+	active := map[string]bool{}
+	for _, raw := range list(form["categories"]) {
+		category := object(raw)
+		if !flag(category["enabled"]) {
+			continue
+		}
+		for _, f := range list(category["fields"]) {
+			active[text(object(f)["key"])] = true
+		}
+	}
 	for _, group := range ClinicalHistoryGroups() {
+		if !active[group.Status] || !active[group.Details] {
+			continue
+		}
 		status, _ := values[group.Status].(string)
 		details, _ := values[group.Details].(string)
 		code := ""

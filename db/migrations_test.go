@@ -81,7 +81,7 @@ SELECT nextval('patients_id_seq');
 
 func dataSnapshot(t *testing.T, pool *sql.DB) map[string]string {
 	t.Helper()
-	rows, err := pool.Query("SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename NOT IN ('app_schema_state','app_schema_migrations','clinics','clinic_entitlement_epoch','clinic_schedules','bookings','booking_events','booking_idempotency','booking_publications','clinic_publications','booking_public_details','public_booking_rate_windows','staff_accounts','staff_access','staff_access_clinics','staff_invitations','staff_sessions','staff_rate_windows','staff_security_events','booking_confirmation_access','staff_email_recovery','notification_outbox') ORDER BY tablename")
+	rows, err := pool.Query("SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename NOT IN ('app_schema_state','app_schema_migrations','clinics','clinic_entitlement_epoch','clinic_schedules','bookings','booking_events','booking_idempotency','booking_publications','clinic_publications','booking_public_details','public_booking_rate_windows','staff_accounts','staff_access','staff_access_clinics','staff_invitations','staff_sessions','staff_rate_windows','staff_security_events','booking_confirmation_access','staff_email_recovery','notification_outbox','doctor_specialty_contexts','schedule_exceptions','schedule_blocks','specialty_context_preferences','publication_specialty_contexts') ORDER BY tablename")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +101,14 @@ func dataSnapshot(t *testing.T, pool *sql.DB) map[string]string {
 	}
 	snapshot := make(map[string]string, len(names))
 	for _, name := range names {
-		snapshot[name] = readString(t, pool, "SELECT COALESCE(jsonb_agg(to_jsonb(r) ORDER BY to_jsonb(r)::text),'[]'::jsonb)::text FROM "+pgx.Identifier{"public", name}.Sanitize()+" r")
+		query := "SELECT COALESCE(jsonb_agg(to_jsonb(r) ORDER BY to_jsonb(r)::text),'[]'::jsonb)::text FROM " + pgx.Identifier{"public", name}.Sanitize() + " r"
+		if name == "patients" {
+			query = "SELECT COALESCE(jsonb_agg(to_jsonb(r)-'workspace_id'-'specialty_context_id' ORDER BY to_jsonb(r)::text),'[]'::jsonb)::text FROM public.patients r"
+		}
+		if name == "doctor_workspaces" && readString(t, pool, "SELECT (to_regclass('public.doctor_specialty_contexts') IS NOT NULL)::text") == "true" {
+			query = "SELECT COALESCE(jsonb_agg(r ORDER BY r::text),'[]'::jsonb)::text FROM (SELECT to_jsonb(w) || (to_jsonb(c)-'id'-'workspace_id'-'created_at'-'updated_at'-'version') r FROM doctor_workspaces w JOIN doctor_specialty_contexts c ON c.workspace_id=w.id) projected"
+		}
+		snapshot[name] = readString(t, pool, query)
 	}
 	return snapshot
 }
@@ -148,6 +155,31 @@ func TestMigrationConvergesAndPreservesClinicalData(t *testing.T) {
 		index[obj.Kind+":"+obj.Name+":"+string(obj.Definition)]++
 	}
 	for _, obj := range oldObjects {
+		// Migration 11 intentionally transfers these fields/constraints.
+		if strings.HasPrefix(obj.Name, "public.doctor_workspaces.") {
+			// PostgreSQL 18 catalogs NOT NULL as constraints as well. These
+			// three required columns moved to the context, not to nullable fields.
+			if obj.Kind == "constraint" {
+				var constraint struct {
+					Definition string `json:"definition"`
+				}
+				if err := json.Unmarshal(obj.Definition, &constraint); err != nil {
+					t.Fatal(err)
+				}
+				switch constraint.Definition {
+				case "NOT NULL current_step_key", "NOT NULL onboarding_completed", "NOT NULL specialty_id":
+					continue
+				}
+			}
+			moved := strings.TrimPrefix(obj.Name, "public.doctor_workspaces.")
+			if strings.HasPrefix(moved, "doctor_workspaces_source_wizard_") || strings.HasPrefix(moved, "doctor_workspaces_draft_source_wizard_") {
+				continue
+			}
+			switch moved {
+			case "specialty_id", "definition", "draft_definition", "source_wizard_version", "draft_source_wizard_version", "current_step_key", "onboarding_completed", "doctor_workspaces_check", "doctor_workspaces_source_wizard_version_check", "doctor_workspaces_draft_source_wizard_", "doctor_workspaces_source_wizard_", "doctor_workspaces_draft_source_wizard_version_check", "fkb371cb0htr0w4a4xmce283gmg":
+				continue
+			}
+		}
 		key := obj.Kind + ":" + obj.Name + ":" + string(obj.Definition)
 		if index[key] == 0 {
 			t.Fatalf("upgrade changed a baseline object: %s %s", obj.Kind, obj.Name)
@@ -161,7 +193,7 @@ func TestMigrationConvergesAndPreservesClinicalData(t *testing.T) {
 	if readString(t, fresh, catalogSQL, []string{}) != newCatalog {
 		t.Fatal("empty installation and conservative upgrade diverged")
 	}
-	if readString(t, upgraded, "SELECT baseline_version::text FROM app_schema_state") != "10" {
+	if readString(t, upgraded, "SELECT baseline_version::text FROM app_schema_state") != "15" {
 		t.Fatal("old binaries would not reject the upgraded schema version")
 	}
 }
@@ -203,7 +235,7 @@ func TestM2UpgradeFromPublishedSchemaTwoPreservesDataAndRollsBack(t *testing.T) 
 	if !reflect.DeepEqual(before, dataSnapshot(t, pool)) {
 		t.Fatal("2->3 modified clinical data")
 	}
-	if digest(readString(t, pool, catalogSQL, []string{})) != pins.notifications {
+	if digest(readString(t, pool, catalogSQL, []string{})) != pins.multipleContexts {
 		t.Fatal("2->3 catalog diverged")
 	}
 }
@@ -359,7 +391,7 @@ func TestMigrationConcurrentUpgradeAndCancellation(t *testing.T) {
 			t.Error(err)
 		}
 	}
-	if readString(t, pool, "SELECT count(*)::text FROM app_schema_migrations") != "9" {
+	if readString(t, pool, "SELECT count(*)::text FROM app_schema_migrations") != "14" {
 		t.Fatal("migration applied more than once")
 	}
 }

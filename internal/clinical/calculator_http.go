@@ -74,7 +74,7 @@ func (s *Service) calculatorPreferences(ctx context.Context, tx pgx.Tx, user str
 		return nil, err
 	}
 	var workspaceID, specialtyID int64
-	err := tx.QueryRow(ctx, "SELECT id,specialty_id FROM doctor_workspaces WHERE user_id=$1 FOR UPDATE", user).Scan(&workspaceID, &specialtyID)
+	err := tx.QueryRow(ctx, "SELECT w.id,c.specialty_id FROM doctor_workspaces w JOIN doctor_specialty_contexts c ON c.workspace_id=w.id WHERE w.user_id=$1 AND ($2::bigint=0 AND (SELECT count(*) FROM doctor_specialty_contexts scope_c JOIN doctor_workspaces scope_w ON scope_w.id=scope_c.workspace_id WHERE scope_w.user_id=$1)=1 OR c.id=$2) FOR UPDATE OF w", user, api.SpecialtyContextID(ctx)).Scan(&workspaceID, &specialtyID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, api.Failure(409, "WORKSPACE_REQUIRED", "Configurá tu especialidad antes de elegir calculadoras.")
 	}
@@ -170,7 +170,7 @@ func (s *Service) calculatorPreferences(ctx context.Context, tx pgx.Tx, user str
 	return map[string]any{"userId": user, "favoriteCalculationCodes": codes, "updatedAt": api.FormatInstant(updated)}, nil
 }
 func (s *Service) CalculatorRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("POST /api/doctorchart/calculators/preview", func(w http.ResponseWriter, r *http.Request) {
+	s.handle(mux, "POST /api/doctorchart/calculators/preview", func(w http.ResponseWriter, r *http.Request) {
 		request, err := calculatorRequest(w, r, false)
 		var result calculationResult
 		if err == nil {
@@ -181,7 +181,7 @@ func (s *Service) CalculatorRoutes(mux *http.ServeMux) {
 		}
 		clinicalReply(w, result, err, 200)
 	})
-	mux.HandleFunc("POST /api/doctorchart/calculators/execute", func(w http.ResponseWriter, r *http.Request) {
+	s.handle(mux, "POST /api/doctorchart/calculators/execute", func(w http.ResponseWriter, r *http.Request) {
 		request, err := calculatorRequest(w, r, true)
 		var log calculationLog
 		if err == nil {
@@ -237,7 +237,7 @@ func (s *Service) CalculatorRoutes(mux *http.ServeMux) {
 		}
 		clinicalReply(w, log, err, 201)
 	})
-	mux.HandleFunc("GET /api/doctorchart/calculators/catalog", func(w http.ResponseWriter, r *http.Request) {
+	s.handle(mux, "GET /api/doctorchart/calculators/catalog", func(w http.ResponseWriter, r *http.Request) {
 		catalog := []map[string]any{}
 		err := s.transaction(r.Context(), true, func(tx pgx.Tx) error {
 			if err := s.workspaces.Feature(r.Context(), tx, api.User(r.Context()).UserID, "CALCULATORS"); err != nil {
@@ -301,10 +301,10 @@ func (s *Service) CalculatorRoutes(mux *http.ServeMux) {
 		}
 		clinicalReply(w, result, err, 200)
 	}
-	mux.HandleFunc("GET /api/doctorchart/calculators/preferences", preferences)
-	mux.HandleFunc("PUT /api/doctorchart/calculators/preferences", preferences)
-	mux.HandleFunc("POST /api/doctorchart/calculators/preferences/reset", preferences)
-	mux.HandleFunc("GET /api/doctorchart/calculators/patients/{patientId}/history", func(w http.ResponseWriter, r *http.Request) {
+	s.handle(mux, "GET /api/doctorchart/calculators/preferences", preferences)
+	s.handle(mux, "PUT /api/doctorchart/calculators/preferences", preferences)
+	s.handle(mux, "POST /api/doctorchart/calculators/preferences/reset", preferences)
+	s.handle(mux, "GET /api/doctorchart/calculators/patients/{patientId}/history", func(w http.ResponseWriter, r *http.Request) {
 		id, err := pathID(r, "patientId")
 		result := []calculationLog{}
 		var from, to *time.Time
@@ -349,7 +349,7 @@ func (s *Service) CalculatorRoutes(mux *http.ServeMux) {
 		}
 		clinicalReply(w, result, err, 200)
 	})
-	mux.HandleFunc("GET /api/doctorchart/calculators/patients/{patientId}/autofill", func(w http.ResponseWriter, r *http.Request) {
+	s.handle(mux, "GET /api/doctorchart/calculators/patients/{patientId}/autofill", func(w http.ResponseWriter, r *http.Request) {
 		id, err := pathID(r, "patientId")
 		var result map[string]any
 		if err == nil {

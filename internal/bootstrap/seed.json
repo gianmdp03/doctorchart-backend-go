@@ -28,6 +28,54 @@
         "VIEW_GROWTH",
         "PRINT_DOCUMENT"
       ]
+    },
+    {
+      "id": 2,
+      "code": "general_medicine",
+      "active": true,
+      "version": 1,
+      "navigation": [
+        "DASHBOARD",
+        "PATIENTS",
+        "WIZARD"
+      ],
+      "description": "Atención médica integral, prevención, diagnóstico y seguimiento de enfermedades.",
+      "display_name": "Medicina General",
+      "patient_record_tabs": [
+        "SUMMARY",
+        "ENCOUNTERS",
+        "PRESCRIPTIONS",
+        "STUDIES"
+      ],
+      "patient_record_actions": [
+        "EDIT_PATIENT",
+        "NEW_ENCOUNTER",
+        "PRINT_DOCUMENT"
+      ]
+    },
+    {
+      "id": 3,
+      "code": "dermatology",
+      "active": true,
+      "version": 1,
+      "navigation": [
+        "DASHBOARD",
+        "PATIENTS",
+        "WIZARD"
+      ],
+      "description": "Diagnóstico, tratamiento y seguimiento de enfermedades de la piel, cabello y uñas.",
+      "display_name": "Dermatología",
+      "patient_record_tabs": [
+        "SUMMARY",
+        "ENCOUNTERS",
+        "PRESCRIPTIONS",
+        "STUDIES"
+      ],
+      "patient_record_actions": [
+        "EDIT_PATIENT",
+        "NEW_ENCOUNTER",
+        "PRINT_DOCUMENT"
+      ]
     }
   ],
   "wizard_defaults": [
@@ -771,6 +819,1948 @@
           "MEDICATION_CATALOG": true
         },
         "schemaVersion": 1
+      }
+    },
+    {
+      "id": 2,
+      "version": 0,
+      "specialty_id": 2,
+      "published_version": 1,
+      "draft_definition": {
+        "schemaVersion": 1,
+        "patientForm": {
+          "categories": [
+            {
+              "key": "sys_patient_profile",
+              "title": "Datos Personales",
+              "fields": [
+                {
+                  "key": "sys_firstName",
+                  "type": "TEXT",
+                  "label": "Nombre",
+                  "system": true,
+                  "required": true
+                },
+                {
+                  "key": "sys_lastName",
+                  "type": "TEXT",
+                  "label": "Apellido",
+                  "system": true,
+                  "required": true
+                },
+                {
+                  "key": "sys_dni",
+                  "type": "TEXT",
+                  "label": "DNI",
+                  "system": true,
+                  "required": true
+                },
+                {
+                  "key": "sys_dob",
+                  "type": "DATE",
+                  "label": "Fecha de nacimiento",
+                  "system": true,
+                  "required": true
+                },
+                {
+                  "key": "sys_sex",
+                  "type": "SELECT",
+                  "label": "Sexo",
+                  "system": true,
+                  "options": [
+                    {
+                      "label": "Masculino",
+                      "value": "MALE"
+                    },
+                    {
+                      "label": "Femenino",
+                      "value": "FEMALE"
+                    },
+                    {
+                      "label": "Otro",
+                      "value": "OTHER"
+                    },
+                    {
+                      "label": "Sin información",
+                      "value": "UNKNOWN"
+                    }
+                  ],
+                  "required": true
+                },
+                {
+                  "key": "sys_phone",
+                  "type": "TEXT",
+                  "label": "Teléfono",
+                  "system": true,
+                  "required": false
+                },
+                {
+                  "key": "sys_email",
+                  "type": "TEXT",
+                  "label": "Email",
+                  "system": true,
+                  "required": false
+                },
+                {
+                  "key": "sys_insurance",
+                  "type": "TEXT",
+                  "label": "Obra social / Cobertura",
+                  "system": true,
+                  "required": false
+                },
+                {
+                  "key": "address",
+                  "type": "TEXT",
+                  "label": "Dirección",
+                  "required": false
+                }
+              ],
+              "system": true,
+              "enabled": true
+            },
+            {
+              "key": "sys_clinical_history",
+              "title": "Antecedentes clínicos",
+              "enabled": true,
+              "fields": [
+                {
+                  "key": "sys_allergyStatus",
+                  "label": "Alergias conocidas",
+                  "type": "SELECT",
+                  "required": false,
+                  "options": [
+                    {
+                      "value": "UNKNOWN",
+                      "label": "Sin información / no revisado"
+                    },
+                    {
+                      "value": "NONE",
+                      "label": "No refiere alergias conocidas"
+                    },
+                    {
+                      "value": "PRESENT",
+                      "label": "Tiene alergias conocidas"
+                    }
+                  ]
+                },
+                {
+                  "key": "sys_allergies",
+                  "label": "Alergias y reacciones",
+                  "type": "TEXTAREA",
+                  "required": false,
+                  "placeholder": "Una alergia por línea. Incluí la reacción, si se conoce."
+                },
+                {
+                  "key": "sys_conditionStatus",
+                  "label": "Enfermedades o problemas actuales",
+                  "type": "SELECT",
+                  "required": false,
+                  "options": [
+                    {
+                      "value": "UNKNOWN",
+                      "label": "Sin información / no revisado"
+                    },
+                    {
+                      "value": "NONE",
+                      "label": "No refiere enfermedades actuales"
+                    },
+                    {
+                      "value": "PRESENT",
+                      "label": "Tiene enfermedades o problemas actuales"
+                    }
+                  ]
+                },
+                {
+                  "key": "sys_conditions",
+                  "label": "Enfermedades y problemas de salud",
+                  "type": "TEXTAREA",
+                  "required": false,
+                  "placeholder": "Un problema actual por línea. Ej.: asma en seguimiento."
+                },
+                {
+                  "key": "sys_medicationStatus",
+                  "label": "Medicación habitual",
+                  "type": "SELECT",
+                  "required": false,
+                  "options": [
+                    {
+                      "value": "UNKNOWN",
+                      "label": "Sin información / no revisado"
+                    },
+                    {
+                      "value": "NONE",
+                      "label": "No utiliza medicación habitual"
+                    },
+                    {
+                      "value": "PRESENT",
+                      "label": "Utiliza medicación habitual"
+                    }
+                  ]
+                },
+                {
+                  "key": "sys_medications",
+                  "label": "Tratamiento habitual",
+                  "type": "TEXTAREA",
+                  "required": false,
+                  "placeholder": "Un medicamento por línea, con dosis y frecuencia cuando se conozcan."
+                },
+                {
+                  "key": "sys_historySource",
+                  "label": "Origen de la información revisada",
+                  "type": "SELECT",
+                  "required": false,
+                  "options": [
+                    {
+                      "value": "REPORTED",
+                      "label": "Informado por el paciente o su familia"
+                    },
+                    {
+                      "value": "CONFIRMED",
+                      "label": "Corroborado por el profesional"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "key": "clinical_background",
+              "title": "Antecedentes clínicos",
+              "enabled": true,
+              "fields": [
+                {
+                  "key": "surgicalHistory",
+                  "label": "Antecedentes quirúrgicos",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "hospitalizations",
+                  "label": "Internaciones anteriores",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "familyHistory",
+                  "label": "Antecedentes familiares",
+                  "type": "TEXTAREA",
+                  "required": false
+                }
+              ]
+            },
+            {
+              "key": "habits",
+              "title": "Hábitos",
+              "enabled": true,
+              "fields": [
+                {
+                  "key": "smoking",
+                  "label": "Tabaquismo",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "alcohol",
+                  "label": "Consumo de alcohol",
+                  "type": "TEXTAREA",
+                  "required": false
+                }
+              ]
+            },
+            {
+              "key": "prevention",
+              "title": "Hábitos y prevención adicionales",
+              "enabled": false,
+              "fields": [
+                {
+                  "key": "physicalActivity",
+                  "label": "Actividad física",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "nutrition",
+                  "label": "Alimentación",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "sleep",
+                  "label": "Sueño",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "vaccinationHistory",
+                  "label": "Antecedentes de vacunación",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "preventiveCare",
+                  "label": "Controles médicos preventivos",
+                  "type": "TEXTAREA",
+                  "required": false
+                }
+              ]
+            }
+          ]
+        },
+        "encounterForm": {
+          "categories": [
+            {
+              "key": "reason",
+              "title": "Motivo y evolución",
+              "enabled": true,
+              "fields": [
+                {
+                  "key": "chiefComplaint",
+                  "label": "Motivo de consulta",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "presentIllness",
+                  "label": "Enfermedad actual y evolución",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "relevantHistory",
+                  "label": "Antecedentes relevantes",
+                  "type": "TEXTAREA",
+                  "required": false
+                }
+              ]
+            },
+            {
+              "key": "vitals",
+              "title": "Signos vitales",
+              "enabled": true,
+              "fields": [
+                {
+                  "key": "bloodPressure",
+                  "label": "Presión arterial",
+                  "type": "TEXT",
+                  "required": false
+                },
+                {
+                  "key": "heartRate",
+                  "label": "Frecuencia cardíaca",
+                  "type": "NUMBER",
+                  "required": false,
+                  "minimum": 0,
+                  "unit": "lpm"
+                },
+                {
+                  "key": "temperature",
+                  "label": "Temperatura corporal",
+                  "type": "NUMBER",
+                  "required": false,
+                  "minimum": 0,
+                  "unit": "°C"
+                },
+                {
+                  "key": "oxygenSaturation",
+                  "label": "Saturación de oxígeno",
+                  "type": "NUMBER",
+                  "required": false,
+                  "minimum": 0,
+                  "unit": "%"
+                },
+                {
+                  "key": "weightKg",
+                  "label": "Peso",
+                  "type": "NUMBER",
+                  "required": false,
+                  "minimum": 0,
+                  "unit": "kg"
+                },
+                {
+                  "key": "heightCm",
+                  "label": "Talla",
+                  "type": "NUMBER",
+                  "required": false,
+                  "minimum": 0,
+                  "unit": "cm"
+                }
+              ]
+            },
+            {
+              "key": "assessment",
+              "title": "Examen y evaluación",
+              "enabled": true,
+              "fields": [
+                {
+                  "key": "physicalExam",
+                  "label": "Examen físico",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "assessment",
+                  "label": "Evaluación e impresión diagnóstica",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "diagnosis",
+                  "label": "Diagnóstico",
+                  "type": "TEXTAREA",
+                  "required": false
+                }
+              ]
+            },
+            {
+              "key": "plan",
+              "title": "Tratamiento y seguimiento",
+              "enabled": true,
+              "fields": [
+                {
+                  "key": "treatment",
+                  "label": "Tratamiento e indicaciones",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "studies",
+                  "label": "Solicitud de estudios",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "referrals",
+                  "label": "Derivaciones",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "followUp",
+                  "label": "Seguimiento",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "followUpDate",
+                  "label": "Próximo control",
+                  "type": "DATE",
+                  "required": false
+                }
+              ]
+            }
+          ]
+        },
+        "modulesConfig": {
+          "MEDICATION_CATALOG": true,
+          "AI_ASSISTANT": true,
+          "GROWTH_CHARTS": false
+        }
+      },
+      "published_definition": {
+        "schemaVersion": 1,
+        "patientForm": {
+          "categories": [
+            {
+              "key": "sys_patient_profile",
+              "title": "Datos Personales",
+              "fields": [
+                {
+                  "key": "sys_firstName",
+                  "type": "TEXT",
+                  "label": "Nombre",
+                  "system": true,
+                  "required": true
+                },
+                {
+                  "key": "sys_lastName",
+                  "type": "TEXT",
+                  "label": "Apellido",
+                  "system": true,
+                  "required": true
+                },
+                {
+                  "key": "sys_dni",
+                  "type": "TEXT",
+                  "label": "DNI",
+                  "system": true,
+                  "required": true
+                },
+                {
+                  "key": "sys_dob",
+                  "type": "DATE",
+                  "label": "Fecha de nacimiento",
+                  "system": true,
+                  "required": true
+                },
+                {
+                  "key": "sys_sex",
+                  "type": "SELECT",
+                  "label": "Sexo",
+                  "system": true,
+                  "options": [
+                    {
+                      "label": "Masculino",
+                      "value": "MALE"
+                    },
+                    {
+                      "label": "Femenino",
+                      "value": "FEMALE"
+                    },
+                    {
+                      "label": "Otro",
+                      "value": "OTHER"
+                    },
+                    {
+                      "label": "Sin información",
+                      "value": "UNKNOWN"
+                    }
+                  ],
+                  "required": true
+                },
+                {
+                  "key": "sys_phone",
+                  "type": "TEXT",
+                  "label": "Teléfono",
+                  "system": true,
+                  "required": false
+                },
+                {
+                  "key": "sys_email",
+                  "type": "TEXT",
+                  "label": "Email",
+                  "system": true,
+                  "required": false
+                },
+                {
+                  "key": "sys_insurance",
+                  "type": "TEXT",
+                  "label": "Obra social / Cobertura",
+                  "system": true,
+                  "required": false
+                },
+                {
+                  "key": "address",
+                  "type": "TEXT",
+                  "label": "Dirección",
+                  "required": false
+                }
+              ],
+              "system": true,
+              "enabled": true
+            },
+            {
+              "key": "sys_clinical_history",
+              "title": "Antecedentes clínicos",
+              "enabled": true,
+              "fields": [
+                {
+                  "key": "sys_allergyStatus",
+                  "label": "Alergias conocidas",
+                  "type": "SELECT",
+                  "required": false,
+                  "options": [
+                    {
+                      "value": "UNKNOWN",
+                      "label": "Sin información / no revisado"
+                    },
+                    {
+                      "value": "NONE",
+                      "label": "No refiere alergias conocidas"
+                    },
+                    {
+                      "value": "PRESENT",
+                      "label": "Tiene alergias conocidas"
+                    }
+                  ]
+                },
+                {
+                  "key": "sys_allergies",
+                  "label": "Alergias y reacciones",
+                  "type": "TEXTAREA",
+                  "required": false,
+                  "placeholder": "Una alergia por línea. Incluí la reacción, si se conoce."
+                },
+                {
+                  "key": "sys_conditionStatus",
+                  "label": "Enfermedades o problemas actuales",
+                  "type": "SELECT",
+                  "required": false,
+                  "options": [
+                    {
+                      "value": "UNKNOWN",
+                      "label": "Sin información / no revisado"
+                    },
+                    {
+                      "value": "NONE",
+                      "label": "No refiere enfermedades actuales"
+                    },
+                    {
+                      "value": "PRESENT",
+                      "label": "Tiene enfermedades o problemas actuales"
+                    }
+                  ]
+                },
+                {
+                  "key": "sys_conditions",
+                  "label": "Enfermedades y problemas de salud",
+                  "type": "TEXTAREA",
+                  "required": false,
+                  "placeholder": "Un problema actual por línea. Ej.: asma en seguimiento."
+                },
+                {
+                  "key": "sys_medicationStatus",
+                  "label": "Medicación habitual",
+                  "type": "SELECT",
+                  "required": false,
+                  "options": [
+                    {
+                      "value": "UNKNOWN",
+                      "label": "Sin información / no revisado"
+                    },
+                    {
+                      "value": "NONE",
+                      "label": "No utiliza medicación habitual"
+                    },
+                    {
+                      "value": "PRESENT",
+                      "label": "Utiliza medicación habitual"
+                    }
+                  ]
+                },
+                {
+                  "key": "sys_medications",
+                  "label": "Tratamiento habitual",
+                  "type": "TEXTAREA",
+                  "required": false,
+                  "placeholder": "Un medicamento por línea, con dosis y frecuencia cuando se conozcan."
+                },
+                {
+                  "key": "sys_historySource",
+                  "label": "Origen de la información revisada",
+                  "type": "SELECT",
+                  "required": false,
+                  "options": [
+                    {
+                      "value": "REPORTED",
+                      "label": "Informado por el paciente o su familia"
+                    },
+                    {
+                      "value": "CONFIRMED",
+                      "label": "Corroborado por el profesional"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "key": "clinical_background",
+              "title": "Antecedentes clínicos",
+              "enabled": true,
+              "fields": [
+                {
+                  "key": "surgicalHistory",
+                  "label": "Antecedentes quirúrgicos",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "hospitalizations",
+                  "label": "Internaciones anteriores",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "familyHistory",
+                  "label": "Antecedentes familiares",
+                  "type": "TEXTAREA",
+                  "required": false
+                }
+              ]
+            },
+            {
+              "key": "habits",
+              "title": "Hábitos",
+              "enabled": true,
+              "fields": [
+                {
+                  "key": "smoking",
+                  "label": "Tabaquismo",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "alcohol",
+                  "label": "Consumo de alcohol",
+                  "type": "TEXTAREA",
+                  "required": false
+                }
+              ]
+            },
+            {
+              "key": "prevention",
+              "title": "Hábitos y prevención adicionales",
+              "enabled": false,
+              "fields": [
+                {
+                  "key": "physicalActivity",
+                  "label": "Actividad física",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "nutrition",
+                  "label": "Alimentación",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "sleep",
+                  "label": "Sueño",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "vaccinationHistory",
+                  "label": "Antecedentes de vacunación",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "preventiveCare",
+                  "label": "Controles médicos preventivos",
+                  "type": "TEXTAREA",
+                  "required": false
+                }
+              ]
+            }
+          ]
+        },
+        "encounterForm": {
+          "categories": [
+            {
+              "key": "reason",
+              "title": "Motivo y evolución",
+              "enabled": true,
+              "fields": [
+                {
+                  "key": "chiefComplaint",
+                  "label": "Motivo de consulta",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "presentIllness",
+                  "label": "Enfermedad actual y evolución",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "relevantHistory",
+                  "label": "Antecedentes relevantes",
+                  "type": "TEXTAREA",
+                  "required": false
+                }
+              ]
+            },
+            {
+              "key": "vitals",
+              "title": "Signos vitales",
+              "enabled": true,
+              "fields": [
+                {
+                  "key": "bloodPressure",
+                  "label": "Presión arterial",
+                  "type": "TEXT",
+                  "required": false
+                },
+                {
+                  "key": "heartRate",
+                  "label": "Frecuencia cardíaca",
+                  "type": "NUMBER",
+                  "required": false,
+                  "minimum": 0,
+                  "unit": "lpm"
+                },
+                {
+                  "key": "temperature",
+                  "label": "Temperatura corporal",
+                  "type": "NUMBER",
+                  "required": false,
+                  "minimum": 0,
+                  "unit": "°C"
+                },
+                {
+                  "key": "oxygenSaturation",
+                  "label": "Saturación de oxígeno",
+                  "type": "NUMBER",
+                  "required": false,
+                  "minimum": 0,
+                  "unit": "%"
+                },
+                {
+                  "key": "weightKg",
+                  "label": "Peso",
+                  "type": "NUMBER",
+                  "required": false,
+                  "minimum": 0,
+                  "unit": "kg"
+                },
+                {
+                  "key": "heightCm",
+                  "label": "Talla",
+                  "type": "NUMBER",
+                  "required": false,
+                  "minimum": 0,
+                  "unit": "cm"
+                }
+              ]
+            },
+            {
+              "key": "assessment",
+              "title": "Examen y evaluación",
+              "enabled": true,
+              "fields": [
+                {
+                  "key": "physicalExam",
+                  "label": "Examen físico",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "assessment",
+                  "label": "Evaluación e impresión diagnóstica",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "diagnosis",
+                  "label": "Diagnóstico",
+                  "type": "TEXTAREA",
+                  "required": false
+                }
+              ]
+            },
+            {
+              "key": "plan",
+              "title": "Tratamiento y seguimiento",
+              "enabled": true,
+              "fields": [
+                {
+                  "key": "treatment",
+                  "label": "Tratamiento e indicaciones",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "studies",
+                  "label": "Solicitud de estudios",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "referrals",
+                  "label": "Derivaciones",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "followUp",
+                  "label": "Seguimiento",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "followUpDate",
+                  "label": "Próximo control",
+                  "type": "DATE",
+                  "required": false
+                }
+              ]
+            }
+          ]
+        },
+        "modulesConfig": {
+          "MEDICATION_CATALOG": true,
+          "AI_ASSISTANT": true,
+          "GROWTH_CHARTS": false
+        }
+      }
+    },
+    {
+      "id": 3,
+      "version": 0,
+      "specialty_id": 3,
+      "published_version": 1,
+      "draft_definition": {
+        "schemaVersion": 1,
+        "patientForm": {
+          "categories": [
+            {
+              "key": "sys_patient_profile",
+              "title": "Datos Personales",
+              "fields": [
+                {
+                  "key": "sys_firstName",
+                  "type": "TEXT",
+                  "label": "Nombre",
+                  "system": true,
+                  "required": true
+                },
+                {
+                  "key": "sys_lastName",
+                  "type": "TEXT",
+                  "label": "Apellido",
+                  "system": true,
+                  "required": true
+                },
+                {
+                  "key": "sys_dni",
+                  "type": "TEXT",
+                  "label": "DNI",
+                  "system": true,
+                  "required": true
+                },
+                {
+                  "key": "sys_dob",
+                  "type": "DATE",
+                  "label": "Fecha de nacimiento",
+                  "system": true,
+                  "required": true
+                },
+                {
+                  "key": "sys_sex",
+                  "type": "SELECT",
+                  "label": "Sexo",
+                  "system": true,
+                  "options": [
+                    {
+                      "label": "Masculino",
+                      "value": "MALE"
+                    },
+                    {
+                      "label": "Femenino",
+                      "value": "FEMALE"
+                    },
+                    {
+                      "label": "Otro",
+                      "value": "OTHER"
+                    },
+                    {
+                      "label": "Sin información",
+                      "value": "UNKNOWN"
+                    }
+                  ],
+                  "required": true
+                },
+                {
+                  "key": "sys_phone",
+                  "type": "TEXT",
+                  "label": "Teléfono",
+                  "system": true,
+                  "required": false
+                },
+                {
+                  "key": "sys_email",
+                  "type": "TEXT",
+                  "label": "Email",
+                  "system": true,
+                  "required": false
+                },
+                {
+                  "key": "sys_insurance",
+                  "type": "TEXT",
+                  "label": "Obra social / Cobertura",
+                  "system": true,
+                  "required": false
+                },
+                {
+                  "key": "address",
+                  "type": "TEXT",
+                  "label": "Dirección",
+                  "required": false
+                }
+              ],
+              "system": true,
+              "enabled": true
+            },
+            {
+              "key": "sys_clinical_history",
+              "title": "Antecedentes clínicos",
+              "enabled": true,
+              "fields": [
+                {
+                  "key": "sys_allergyStatus",
+                  "label": "Alergias conocidas",
+                  "type": "SELECT",
+                  "required": false,
+                  "options": [
+                    {
+                      "value": "UNKNOWN",
+                      "label": "Sin información / no revisado"
+                    },
+                    {
+                      "value": "NONE",
+                      "label": "No refiere alergias conocidas"
+                    },
+                    {
+                      "value": "PRESENT",
+                      "label": "Tiene alergias conocidas"
+                    }
+                  ]
+                },
+                {
+                  "key": "sys_allergies",
+                  "label": "Alergias y reacciones",
+                  "type": "TEXTAREA",
+                  "required": false,
+                  "placeholder": "Una alergia por línea. Incluí la reacción, si se conoce."
+                },
+                {
+                  "key": "sys_conditionStatus",
+                  "label": "Enfermedades o problemas actuales",
+                  "type": "SELECT",
+                  "required": false,
+                  "options": [
+                    {
+                      "value": "UNKNOWN",
+                      "label": "Sin información / no revisado"
+                    },
+                    {
+                      "value": "NONE",
+                      "label": "No refiere enfermedades actuales"
+                    },
+                    {
+                      "value": "PRESENT",
+                      "label": "Tiene enfermedades o problemas actuales"
+                    }
+                  ]
+                },
+                {
+                  "key": "sys_conditions",
+                  "label": "Enfermedades y problemas de salud",
+                  "type": "TEXTAREA",
+                  "required": false,
+                  "placeholder": "Un problema actual por línea. Ej.: asma en seguimiento."
+                },
+                {
+                  "key": "sys_medicationStatus",
+                  "label": "Medicación habitual",
+                  "type": "SELECT",
+                  "required": false,
+                  "options": [
+                    {
+                      "value": "UNKNOWN",
+                      "label": "Sin información / no revisado"
+                    },
+                    {
+                      "value": "NONE",
+                      "label": "No utiliza medicación habitual"
+                    },
+                    {
+                      "value": "PRESENT",
+                      "label": "Utiliza medicación habitual"
+                    }
+                  ]
+                },
+                {
+                  "key": "sys_medications",
+                  "label": "Tratamiento habitual",
+                  "type": "TEXTAREA",
+                  "required": false,
+                  "placeholder": "Un medicamento por línea, con dosis y frecuencia cuando se conozcan."
+                },
+                {
+                  "key": "sys_historySource",
+                  "label": "Origen de la información revisada",
+                  "type": "SELECT",
+                  "required": false,
+                  "options": [
+                    {
+                      "value": "REPORTED",
+                      "label": "Informado por el paciente o su familia"
+                    },
+                    {
+                      "value": "CONFIRMED",
+                      "label": "Corroborado por el profesional"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "key": "dermatologic_history",
+              "title": "Antecedentes dermatológicos",
+              "enabled": true,
+              "fields": [
+                {
+                  "key": "skinDiseaseHistory",
+                  "label": "Enfermedades dermatológicas previas",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "previousSkinTreatments",
+                  "label": "Tratamientos dermatológicos anteriores",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "personalSkinCancer",
+                  "label": "Antecedentes personales de cáncer de piel",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "familySkinCancer",
+                  "label": "Antecedentes familiares de cáncer de piel",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "sunExposure",
+                  "label": "Exposición solar",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "sunburnHistory",
+                  "label": "Antecedentes de quemaduras solares",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "immunosuppression",
+                  "label": "Inmunosupresión",
+                  "type": "TEXTAREA",
+                  "required": false
+                }
+              ]
+            },
+            {
+              "key": "phototype",
+              "title": "Fototipo cutáneo de Fitzpatrick",
+              "enabled": false,
+              "fields": [
+                {
+                  "key": "fitzpatrick",
+                  "label": "Fototipo cutáneo de Fitzpatrick",
+                  "type": "SELECT",
+                  "required": false,
+                  "options": [
+                    {
+                      "value": "I",
+                      "label": "I"
+                    },
+                    {
+                      "value": "II",
+                      "label": "II"
+                    },
+                    {
+                      "value": "III",
+                      "label": "III"
+                    },
+                    {
+                      "value": "IV",
+                      "label": "IV"
+                    },
+                    {
+                      "value": "V",
+                      "label": "V"
+                    },
+                    {
+                      "value": "VI",
+                      "label": "VI"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "encounterForm": {
+          "categories": [
+            {
+              "key": "reason",
+              "title": "Motivo y síntomas",
+              "enabled": true,
+              "fields": [
+                {
+                  "key": "chiefComplaint",
+                  "label": "Motivo de consulta",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "symptomOnset",
+                  "label": "Inicio de los síntomas",
+                  "type": "DATE",
+                  "required": false
+                },
+                {
+                  "key": "presentIllness",
+                  "label": "Duración y evolución",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "symptoms",
+                  "label": "Picazón, dolor u otros síntomas",
+                  "type": "TEXTAREA",
+                  "required": false
+                }
+              ]
+            },
+            {
+              "key": "lesion_evaluation",
+              "title": "Evaluación de lesiones",
+              "enabled": true,
+              "fields": [
+                {
+                  "key": "anatomicLocation",
+                  "label": "Localización anatómica",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "lesionCount",
+                  "label": "Cantidad de lesiones",
+                  "type": "NUMBER",
+                  "required": false,
+                  "minimum": 0
+                },
+                {
+                  "key": "distribution",
+                  "label": "Distribución",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "morphology",
+                  "label": "Tipo y morfología",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "lesionSize",
+                  "label": "Tamaño",
+                  "type": "TEXT",
+                  "required": false
+                },
+                {
+                  "key": "lesionColor",
+                  "label": "Color",
+                  "type": "TEXT",
+                  "required": false
+                },
+                {
+                  "key": "lesionBorders",
+                  "label": "Bordes",
+                  "type": "TEXT",
+                  "required": false
+                },
+                {
+                  "key": "lesionChanges",
+                  "label": "Cambios observados",
+                  "type": "TEXTAREA",
+                  "required": false
+                }
+              ]
+            },
+            {
+              "key": "assessment",
+              "title": "Examen dermatológico",
+              "enabled": true,
+              "fields": [
+                {
+                  "key": "skinExam",
+                  "label": "Examen dermatológico",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "assessment",
+                  "label": "Impresión diagnóstica",
+                  "type": "TEXTAREA",
+                  "required": false
+                }
+              ]
+            },
+            {
+              "key": "additional_evaluation",
+              "title": "Evaluación adicional",
+              "enabled": false,
+              "fields": [
+                {
+                  "key": "dermoscopy",
+                  "label": "Hallazgos dermatoscópicos",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "individualLesions",
+                  "label": "Registro individual de lesiones (texto)",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "clinicalNotes",
+                  "label": "Observaciones clínicas libres",
+                  "type": "TEXTAREA",
+                  "required": false
+                }
+              ]
+            },
+            {
+              "key": "plan",
+              "title": "Tratamientos y seguimiento",
+              "enabled": true,
+              "fields": [
+                {
+                  "key": "diagnosis",
+                  "label": "Diagnóstico",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "treatment",
+                  "label": "Tratamiento indicado",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "topicalTreatment",
+                  "label": "Tratamientos tópicos",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "systemicTreatment",
+                  "label": "Tratamientos sistémicos",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "patientInstructions",
+                  "label": "Indicaciones al paciente",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "studies",
+                  "label": "Estudios complementarios",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "followUpDate",
+                  "label": "Próximo control",
+                  "type": "DATE",
+                  "required": false
+                }
+              ]
+            },
+            {
+              "key": "photography_notes",
+              "title": "Fotografías clínicas (registro textual)",
+              "enabled": false,
+              "fields": [
+                {
+                  "key": "clinicalPhotoNotes",
+                  "label": "Registro de fotografías clínicas (referencia textual)",
+                  "type": "TEXTAREA",
+                  "required": false,
+                  "placeholder": "Sólo documentación textual; no permite cargar ni visualizar fotografías."
+                },
+                {
+                  "key": "photoConsent",
+                  "label": "Consentimiento para fotografías (documentación)",
+                  "type": "TEXTAREA",
+                  "required": false,
+                  "placeholder": "Registrar el consentimiento documentado; este campo no gestiona firmas ni autorizaciones."
+                }
+              ]
+            },
+            {
+              "key": "procedures",
+              "title": "Procedimientos dermatológicos",
+              "enabled": false,
+              "fields": [
+                {
+                  "key": "procedures",
+                  "label": "Procedimientos dermatológicos",
+                  "type": "TEXTAREA",
+                  "required": false
+                }
+              ]
+            },
+            {
+              "key": "biopsies",
+              "title": "Biopsias",
+              "enabled": false,
+              "fields": [
+                {
+                  "key": "biopsies",
+                  "label": "Biopsias",
+                  "type": "TEXTAREA",
+                  "required": false
+                }
+              ]
+            },
+            {
+              "key": "lesion_follow_up",
+              "title": "Evolución de lesiones",
+              "enabled": false,
+              "fields": [
+                {
+                  "key": "lesionFollowUp",
+                  "label": "Evolución de lesiones (texto)",
+                  "type": "TEXTAREA",
+                  "required": false
+                }
+              ]
+            }
+          ]
+        },
+        "modulesConfig": {
+          "MEDICATION_CATALOG": true,
+          "AI_ASSISTANT": true,
+          "GROWTH_CHARTS": false
+        }
+      },
+      "published_definition": {
+        "schemaVersion": 1,
+        "patientForm": {
+          "categories": [
+            {
+              "key": "sys_patient_profile",
+              "title": "Datos Personales",
+              "fields": [
+                {
+                  "key": "sys_firstName",
+                  "type": "TEXT",
+                  "label": "Nombre",
+                  "system": true,
+                  "required": true
+                },
+                {
+                  "key": "sys_lastName",
+                  "type": "TEXT",
+                  "label": "Apellido",
+                  "system": true,
+                  "required": true
+                },
+                {
+                  "key": "sys_dni",
+                  "type": "TEXT",
+                  "label": "DNI",
+                  "system": true,
+                  "required": true
+                },
+                {
+                  "key": "sys_dob",
+                  "type": "DATE",
+                  "label": "Fecha de nacimiento",
+                  "system": true,
+                  "required": true
+                },
+                {
+                  "key": "sys_sex",
+                  "type": "SELECT",
+                  "label": "Sexo",
+                  "system": true,
+                  "options": [
+                    {
+                      "label": "Masculino",
+                      "value": "MALE"
+                    },
+                    {
+                      "label": "Femenino",
+                      "value": "FEMALE"
+                    },
+                    {
+                      "label": "Otro",
+                      "value": "OTHER"
+                    },
+                    {
+                      "label": "Sin información",
+                      "value": "UNKNOWN"
+                    }
+                  ],
+                  "required": true
+                },
+                {
+                  "key": "sys_phone",
+                  "type": "TEXT",
+                  "label": "Teléfono",
+                  "system": true,
+                  "required": false
+                },
+                {
+                  "key": "sys_email",
+                  "type": "TEXT",
+                  "label": "Email",
+                  "system": true,
+                  "required": false
+                },
+                {
+                  "key": "sys_insurance",
+                  "type": "TEXT",
+                  "label": "Obra social / Cobertura",
+                  "system": true,
+                  "required": false
+                },
+                {
+                  "key": "address",
+                  "type": "TEXT",
+                  "label": "Dirección",
+                  "required": false
+                }
+              ],
+              "system": true,
+              "enabled": true
+            },
+            {
+              "key": "sys_clinical_history",
+              "title": "Antecedentes clínicos",
+              "enabled": true,
+              "fields": [
+                {
+                  "key": "sys_allergyStatus",
+                  "label": "Alergias conocidas",
+                  "type": "SELECT",
+                  "required": false,
+                  "options": [
+                    {
+                      "value": "UNKNOWN",
+                      "label": "Sin información / no revisado"
+                    },
+                    {
+                      "value": "NONE",
+                      "label": "No refiere alergias conocidas"
+                    },
+                    {
+                      "value": "PRESENT",
+                      "label": "Tiene alergias conocidas"
+                    }
+                  ]
+                },
+                {
+                  "key": "sys_allergies",
+                  "label": "Alergias y reacciones",
+                  "type": "TEXTAREA",
+                  "required": false,
+                  "placeholder": "Una alergia por línea. Incluí la reacción, si se conoce."
+                },
+                {
+                  "key": "sys_conditionStatus",
+                  "label": "Enfermedades o problemas actuales",
+                  "type": "SELECT",
+                  "required": false,
+                  "options": [
+                    {
+                      "value": "UNKNOWN",
+                      "label": "Sin información / no revisado"
+                    },
+                    {
+                      "value": "NONE",
+                      "label": "No refiere enfermedades actuales"
+                    },
+                    {
+                      "value": "PRESENT",
+                      "label": "Tiene enfermedades o problemas actuales"
+                    }
+                  ]
+                },
+                {
+                  "key": "sys_conditions",
+                  "label": "Enfermedades y problemas de salud",
+                  "type": "TEXTAREA",
+                  "required": false,
+                  "placeholder": "Un problema actual por línea. Ej.: asma en seguimiento."
+                },
+                {
+                  "key": "sys_medicationStatus",
+                  "label": "Medicación habitual",
+                  "type": "SELECT",
+                  "required": false,
+                  "options": [
+                    {
+                      "value": "UNKNOWN",
+                      "label": "Sin información / no revisado"
+                    },
+                    {
+                      "value": "NONE",
+                      "label": "No utiliza medicación habitual"
+                    },
+                    {
+                      "value": "PRESENT",
+                      "label": "Utiliza medicación habitual"
+                    }
+                  ]
+                },
+                {
+                  "key": "sys_medications",
+                  "label": "Tratamiento habitual",
+                  "type": "TEXTAREA",
+                  "required": false,
+                  "placeholder": "Un medicamento por línea, con dosis y frecuencia cuando se conozcan."
+                },
+                {
+                  "key": "sys_historySource",
+                  "label": "Origen de la información revisada",
+                  "type": "SELECT",
+                  "required": false,
+                  "options": [
+                    {
+                      "value": "REPORTED",
+                      "label": "Informado por el paciente o su familia"
+                    },
+                    {
+                      "value": "CONFIRMED",
+                      "label": "Corroborado por el profesional"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "key": "dermatologic_history",
+              "title": "Antecedentes dermatológicos",
+              "enabled": true,
+              "fields": [
+                {
+                  "key": "skinDiseaseHistory",
+                  "label": "Enfermedades dermatológicas previas",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "previousSkinTreatments",
+                  "label": "Tratamientos dermatológicos anteriores",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "personalSkinCancer",
+                  "label": "Antecedentes personales de cáncer de piel",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "familySkinCancer",
+                  "label": "Antecedentes familiares de cáncer de piel",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "sunExposure",
+                  "label": "Exposición solar",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "sunburnHistory",
+                  "label": "Antecedentes de quemaduras solares",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "immunosuppression",
+                  "label": "Inmunosupresión",
+                  "type": "TEXTAREA",
+                  "required": false
+                }
+              ]
+            },
+            {
+              "key": "phototype",
+              "title": "Fototipo cutáneo de Fitzpatrick",
+              "enabled": false,
+              "fields": [
+                {
+                  "key": "fitzpatrick",
+                  "label": "Fototipo cutáneo de Fitzpatrick",
+                  "type": "SELECT",
+                  "required": false,
+                  "options": [
+                    {
+                      "value": "I",
+                      "label": "I"
+                    },
+                    {
+                      "value": "II",
+                      "label": "II"
+                    },
+                    {
+                      "value": "III",
+                      "label": "III"
+                    },
+                    {
+                      "value": "IV",
+                      "label": "IV"
+                    },
+                    {
+                      "value": "V",
+                      "label": "V"
+                    },
+                    {
+                      "value": "VI",
+                      "label": "VI"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "encounterForm": {
+          "categories": [
+            {
+              "key": "reason",
+              "title": "Motivo y síntomas",
+              "enabled": true,
+              "fields": [
+                {
+                  "key": "chiefComplaint",
+                  "label": "Motivo de consulta",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "symptomOnset",
+                  "label": "Inicio de los síntomas",
+                  "type": "DATE",
+                  "required": false
+                },
+                {
+                  "key": "presentIllness",
+                  "label": "Duración y evolución",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "symptoms",
+                  "label": "Picazón, dolor u otros síntomas",
+                  "type": "TEXTAREA",
+                  "required": false
+                }
+              ]
+            },
+            {
+              "key": "lesion_evaluation",
+              "title": "Evaluación de lesiones",
+              "enabled": true,
+              "fields": [
+                {
+                  "key": "anatomicLocation",
+                  "label": "Localización anatómica",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "lesionCount",
+                  "label": "Cantidad de lesiones",
+                  "type": "NUMBER",
+                  "required": false,
+                  "minimum": 0
+                },
+                {
+                  "key": "distribution",
+                  "label": "Distribución",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "morphology",
+                  "label": "Tipo y morfología",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "lesionSize",
+                  "label": "Tamaño",
+                  "type": "TEXT",
+                  "required": false
+                },
+                {
+                  "key": "lesionColor",
+                  "label": "Color",
+                  "type": "TEXT",
+                  "required": false
+                },
+                {
+                  "key": "lesionBorders",
+                  "label": "Bordes",
+                  "type": "TEXT",
+                  "required": false
+                },
+                {
+                  "key": "lesionChanges",
+                  "label": "Cambios observados",
+                  "type": "TEXTAREA",
+                  "required": false
+                }
+              ]
+            },
+            {
+              "key": "assessment",
+              "title": "Examen dermatológico",
+              "enabled": true,
+              "fields": [
+                {
+                  "key": "skinExam",
+                  "label": "Examen dermatológico",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "assessment",
+                  "label": "Impresión diagnóstica",
+                  "type": "TEXTAREA",
+                  "required": false
+                }
+              ]
+            },
+            {
+              "key": "additional_evaluation",
+              "title": "Evaluación adicional",
+              "enabled": false,
+              "fields": [
+                {
+                  "key": "dermoscopy",
+                  "label": "Hallazgos dermatoscópicos",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "individualLesions",
+                  "label": "Registro individual de lesiones (texto)",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "clinicalNotes",
+                  "label": "Observaciones clínicas libres",
+                  "type": "TEXTAREA",
+                  "required": false
+                }
+              ]
+            },
+            {
+              "key": "plan",
+              "title": "Tratamientos y seguimiento",
+              "enabled": true,
+              "fields": [
+                {
+                  "key": "diagnosis",
+                  "label": "Diagnóstico",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "treatment",
+                  "label": "Tratamiento indicado",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "topicalTreatment",
+                  "label": "Tratamientos tópicos",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "systemicTreatment",
+                  "label": "Tratamientos sistémicos",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "patientInstructions",
+                  "label": "Indicaciones al paciente",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "studies",
+                  "label": "Estudios complementarios",
+                  "type": "TEXTAREA",
+                  "required": false
+                },
+                {
+                  "key": "followUpDate",
+                  "label": "Próximo control",
+                  "type": "DATE",
+                  "required": false
+                }
+              ]
+            },
+            {
+              "key": "photography_notes",
+              "title": "Fotografías clínicas (registro textual)",
+              "enabled": false,
+              "fields": [
+                {
+                  "key": "clinicalPhotoNotes",
+                  "label": "Registro de fotografías clínicas (referencia textual)",
+                  "type": "TEXTAREA",
+                  "required": false,
+                  "placeholder": "Sólo documentación textual; no permite cargar ni visualizar fotografías."
+                },
+                {
+                  "key": "photoConsent",
+                  "label": "Consentimiento para fotografías (documentación)",
+                  "type": "TEXTAREA",
+                  "required": false,
+                  "placeholder": "Registrar el consentimiento documentado; este campo no gestiona firmas ni autorizaciones."
+                }
+              ]
+            },
+            {
+              "key": "procedures",
+              "title": "Procedimientos dermatológicos",
+              "enabled": false,
+              "fields": [
+                {
+                  "key": "procedures",
+                  "label": "Procedimientos dermatológicos",
+                  "type": "TEXTAREA",
+                  "required": false
+                }
+              ]
+            },
+            {
+              "key": "biopsies",
+              "title": "Biopsias",
+              "enabled": false,
+              "fields": [
+                {
+                  "key": "biopsies",
+                  "label": "Biopsias",
+                  "type": "TEXTAREA",
+                  "required": false
+                }
+              ]
+            },
+            {
+              "key": "lesion_follow_up",
+              "title": "Evolución de lesiones",
+              "enabled": false,
+              "fields": [
+                {
+                  "key": "lesionFollowUp",
+                  "label": "Evolución de lesiones (texto)",
+                  "type": "TEXTAREA",
+                  "required": false
+                }
+              ]
+            }
+          ]
+        },
+        "modulesConfig": {
+          "MEDICATION_CATALOG": true,
+          "AI_ASSISTANT": true,
+          "GROWTH_CHARTS": false
+        }
       }
     }
   ],

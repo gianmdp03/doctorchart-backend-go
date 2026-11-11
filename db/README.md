@@ -1,3 +1,61 @@
+# M5 de especialidades: esquema 15
+
+`0015_multiple_specialty_contexts.sql` retira la unicidad transitoria por workspace,
+conservando la unicidad workspace/especialidad. Separa preferencias clínicas y
+selección pública por contexto; conserva valores históricos y exige configuración
+efectiva para reservas nuevas/reprogramadas. 49 tablas/61 FK. Baseline y 0002–0014
+intactos; runner, locks, checksums y catálogos uniformes conservados.
+Ver [contratos, pruebas y handoff M5](../docs/specialty-contexts-m5.md).
+El arranque aplicaría 15: no iniciar contra una base real sin autorización.
+
+---
+
+# M4 de especialidades: esquema 14
+
+`0014_booking_contexts.sql` conserva el contexto y snapshots de especialidad,
+consultorio y bloque autorizado de las reservas. Las anteriores se clasifican
+por contexto único con origen histórico de bloque desconocido, sin inventarlo.
+Vinculación posterior explícita de paciente con FK contextual, versión y evento.
+47 tablas/58 FK. Baseline y 0002–0013 intactos.
+Ver [modelo, política histórica, contratos y handoff](../docs/specialty-contexts-m4.md).
+El arranque aplicaría 14: no iniciar contra una base real sin autorización.
+
+---
+
+# M3 de especialidades: esquema 13
+
+`0013_schedule_blocks.sql` conserva la raíz por consultorio y traslada franjas
+y excepciones a bloques relacionales con identidad, contexto y duración propios.
+Conserva cierres, etiquetas, versiones y reservas; rechaza inconsistencias y
+revierte sin reparar datos. 47 tablas/56 FK. Baseline y 0002–0012 intactos.
+Ver [modelo, contrato, pruebas y handoff](../docs/specialty-contexts-m3.md).
+El arranque aplicaría 13: no iniciar contra una base real sin autorización.
+
+---
+
+# M2 de especialidades: esquema 12
+
+`0012_patient_specialty_contexts.sql` incorpora pertenencia obligatoria e
+inmutable de pacientes, FK compuestas de propietario/contexto e integridad de
+recursos clínicos. Conserva datos y referencias; rechaza inconsistencias sin
+repararlas. 45 tablas/51 FK. Baseline y 0002–0011 intactos. Ver
+[modelo, contrato y handoff](../docs/specialty-contexts-m2.md).
+El arranque aplicaría 12: no iniciar contra una base real sin autorización.
+
+---
+
+# M1 de especialidades: esquema 11
+
+`0011_specialty_contexts.sql` separa el workspace administrativo del único
+contexto clínico de M1, conserva datos/identidades y elimina las columnas
+clínicas transferidas del workspace. Baseline y 0002–0010 inmutables. Resultado:
+45 tablas y 46 FK. Ver [modelo, contratos y validación](../docs/specialty-contexts-m1.md).
+El runner existente aplica 11 al arrancar: no iniciar este binario contra una
+base real sin autorización explícita. La M1 de especialidades es distinta de
+las etapas históricas de consultorios y agenda que siguen documentadas abajo.
+
+---
+
 # M8: esquema10 en desarrolloaislado
 
 Migración0010_notifications.sql;44tablas/45FK. Baseline/0002..0009inmutables. Outboxdurable, accesoaconstancias y recuperaciónemailstaff; sin pacientes/clínica modificados. Fresh/upgrade9→10 y fallosSQL/drift/seed/rollback/reintento probados enPG17/18descartables. No ejecutar en basesreales. Binarioprevio rechaza10; recuperación con binariocompatible o respaldo autorizado, nunca bajar marcador.

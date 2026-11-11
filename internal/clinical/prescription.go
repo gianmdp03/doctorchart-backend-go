@@ -225,7 +225,7 @@ func prescriptionRole(r *http.Request) error {
 	return api.Failure(403, "FORBIDDEN", "No tenés permiso para esta operación.")
 }
 func (s *Service) PrescriptionRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("POST /api/doctorchart/patients/{patientId}/prescriptions", func(w http.ResponseWriter, r *http.Request) {
+	s.handle(mux, "POST /api/doctorchart/patients/{patientId}/prescriptions", func(w http.ResponseWriter, r *http.Request) {
 		id, err := pathID(r, "patientId")
 		if err == nil {
 			err = prescriptionRole(r)
@@ -245,7 +245,7 @@ func (s *Service) PrescriptionRoutes(mux *http.ServeMux) {
 		}
 		clinicalReply(w, p, err, 201)
 	})
-	mux.HandleFunc("GET /api/doctorchart/patients/{patientId}/prescriptions", func(w http.ResponseWriter, r *http.Request) {
+	s.handle(mux, "GET /api/doctorchart/patients/{patientId}/prescriptions", func(w http.ResponseWriter, r *http.Request) {
 		id, err := pathID(r, "patientId")
 		if err == nil {
 			err = prescriptionRole(r)
@@ -328,6 +328,6 @@ func (s *Service) PrescriptionRoutes(mux *http.ServeMux) {
 		}
 		clinicalReply(w, p, err, status)
 	}
-	mux.HandleFunc("GET /api/doctorchart/patients/{patientId}/prescriptions/{recordId}", readOrDelete)
-	mux.HandleFunc("DELETE /api/doctorchart/patients/{patientId}/prescriptions/{recordId}", readOrDelete)
+	s.handle(mux, "GET /api/doctorchart/patients/{patientId}/prescriptions/{recordId}", readOrDelete)
+	s.handle(mux, "DELETE /api/doctorchart/patients/{patientId}/prescriptions/{recordId}", readOrDelete)
 }

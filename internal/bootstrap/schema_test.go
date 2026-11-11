@@ -60,6 +60,16 @@ func initializeFixture(t *testing.T, pool *pgxpool.Pool) {
 	}
 }
 
+func fixturePatientOwner(t *testing.T, pool *pgxpool.Pool) {
+	t.Helper()
+	if _, err := pool.Exec(t.Context(), `WITH w AS (
+ INSERT INTO doctor_workspaces(user_id,version,created_at,updated_at) VALUES('fixture-owner',0,now(),now()) RETURNING id)
+ INSERT INTO doctor_specialty_contexts(workspace_id,specialty_id,version,current_step_key,onboarding_completed,created_at,updated_at)
+ SELECT id,(SELECT min(id) FROM specialties),0,'completed',true,now(),now() FROM w`); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func assertFixtureReady(t *testing.T, pool *pgxpool.Pool) {
 	t.Helper()
 	var tables, constraints, specialties, calendars int
@@ -75,7 +85,7 @@ func assertFixtureReady(t *testing.T, pool *pgxpool.Pool) {
 	if err := pool.QueryRow(context.Background(), "SELECT count(*) FROM vaccination_calendars").Scan(&calendars); err != nil {
 		t.Fatal(err)
 	}
-	if tables != 44 || constraints != 45 || specialties == 0 || calendars != 1 {
+	if tables != 49 || constraints != 61 || specialties == 0 || calendars != 1 {
 		t.Fatalf("startup produced %d tables, %d foreign keys, %d specialties and %d calendars", tables, constraints, specialties, calendars)
 	}
 	var expected map[string][]json.RawMessage
@@ -101,8 +111,9 @@ func TestEmptySchemaAndRestartPreserveData(t *testing.T) {
 	assertFixtureReady(t, pool)
 	ctx := context.Background()
 	var patientID int64
-	err := pool.QueryRow(ctx, `INSERT INTO patients(birth_date,form_definition_snapshot,form_values,formula_context,formula_results,full_name,updated_at,user_id,version,workspace_version)
-		VALUES('1990-01-01','{}','{}','{}','{}','Preserved fixture patient',now(),'fixture-owner',0,0) RETURNING id`).Scan(&patientID)
+	fixturePatientOwner(t, pool)
+	err := pool.QueryRow(ctx, `INSERT INTO patients(birth_date,form_definition_snapshot,form_values,formula_context,formula_results,full_name,updated_at,user_id,version,workspace_version,workspace_id,specialty_context_id)
+		VALUES('1990-01-01','{}','{}','{}','{}','Preserved fixture patient',now(),'fixture-owner',0,0,(SELECT id FROM doctor_workspaces WHERE user_id='fixture-owner'),(SELECT c.id FROM doctor_specialty_contexts c JOIN doctor_workspaces w ON w.id=c.workspace_id WHERE w.user_id='fixture-owner')) RETURNING id`).Scan(&patientID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -270,7 +281,8 @@ func TestFirstVisitIndexDriftRejectedWithoutChanges(t *testing.T) {
 			initializeFixture(t, pool)
 			ctx := context.Background()
 			var patientID int64
-			if err := pool.QueryRow(ctx, `INSERT INTO patients(birth_date,form_definition_snapshot,form_values,formula_context,formula_results,full_name,updated_at,user_id,version,workspace_version) VALUES('1990-01-01','{}','{}','{}','{}','Preserved duplicate fixture',now(),'fixture-owner',0,0) RETURNING id`).Scan(&patientID); err != nil {
+			fixturePatientOwner(t, pool)
+			if err := pool.QueryRow(ctx, `INSERT INTO patients(birth_date,form_definition_snapshot,form_values,formula_context,formula_results,full_name,updated_at,user_id,version,workspace_version,workspace_id,specialty_context_id) VALUES('1990-01-01','{}','{}','{}','{}','Preserved duplicate fixture',now(),'fixture-owner',0,0,(SELECT id FROM doctor_workspaces WHERE user_id='fixture-owner'),(SELECT c.id FROM doctor_specialty_contexts c JOIN doctor_workspaces w ON w.id=c.workspace_id WHERE w.user_id='fixture-owner')) RETURNING id`).Scan(&patientID); err != nil {
 				t.Fatal(err)
 			}
 			insertEncounter := `INSERT INTO clinical_encounters(patient_id,specialty_id,encounter_date,consultation_type,version,workspace_version,form_values,formula_results,form_definition_snapshot,formula_context,updated_at) VALUES($1,(SELECT min(id) FROM specialties),now(),'FIRST_VISIT',0,0,'{}','{}','{}','{}',now())`

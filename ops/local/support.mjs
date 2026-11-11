@@ -11,6 +11,7 @@ const key=createPrivateKey(readFileSync(keyPath));
 const jwk={...createPublicKey(key).export({format:'jwk'}),kid:'doctorchart-local',alg:'RS256',use:'sig'};
 const user={id:'11111111-1111-4111-8111-111111111111',aud:'authenticated',role:'authenticated',email:config.email,created_at:'2026-01-01T00:00:00Z',updated_at:'2026-01-01T00:00:00Z',email_confirmed_at:'2026-01-01T00:00:00Z',identities:[],user_metadata:{full_name:'Dra. Desarrollo Local',license:'MN LOCAL',clinic_name:'Consultorio local'},app_metadata:{role:'COMPANY',app_modules:{doctorchart:{active:true,tier:'UNLIMITED',expires_at:'2099-01-01T00:00:00Z'}}}};
 const accounts=[{user,password:config.password,refresh:config.refresh}];
+for(const doctor of config.doctors||[])accounts.push({user:{...user,id:doctor.id,email:doctor.email,user_metadata:{full_name:doctor.name,license:'MN LOCAL',clinic_name:'Consultorio local'}},password:doctor.password,refresh:doctor.refresh});
 if(config.admin)accounts.push({user:{...user,id:'22222222-2222-4222-8222-222222222222',email:config.admin.email,user_metadata:{full_name:'Administración Local'},app_metadata:{role:'SUPER_ADMIN',app_modules:{}}},password:config.admin.password,refresh:config.admin.refresh});
 function session(account){
  const user=account.user;

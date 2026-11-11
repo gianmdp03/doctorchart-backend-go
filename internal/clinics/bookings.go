@@ -19,25 +19,39 @@ import (
 )
 
 type Booking struct {
-	ID           string    `json:"id"`
-	ClinicID     string    `json:"clinicId"`
-	PatientID    *string   `json:"patientId"`
-	Start        time.Time `json:"start"`
-	End          time.Time `json:"end"`
-	Status       string    `json:"status"`
-	Version      string    `json:"version"`
-	AttendeeName string    `json:"attendeeName"`
-	ContactName  string    `json:"contactName"`
-	ContactPhone string    `json:"contactPhone"`
-	CreatedAt    time.Time `json:"createdAt"`
-	UpdatedAt    time.Time `json:"updatedAt"`
+	ID             string            `json:"id"`
+	ClinicID       string            `json:"clinicId"`
+	PatientID      *string           `json:"patientId"`
+	Start          time.Time         `json:"start"`
+	End            time.Time         `json:"end"`
+	Status         string            `json:"status"`
+	Version        string            `json:"version"`
+	AttendeeName   string            `json:"attendeeName"`
+	ContactName    string            `json:"contactName"`
+	ContactPhone   string            `json:"contactPhone"`
+	CreatedAt      time.Time         `json:"createdAt"`
+	UpdatedAt      time.Time         `json:"updatedAt"`
+	ContextID      string            `json:"specialtyContextId"`
+	Specialty      BookingSpecialty  `json:"specialty"`
+	ClinicSnapshot BookingClinic     `json:"clinicSnapshot"`
+	Provenance     BookingProvenance `json:"provenance"`
 }
 
-const bookingColumns = "b.id::text,b.clinic_id::text,b.patient_id::text,b.start_at,b.end_at,b.status,b.version::text,COALESCE(b.attendee_name,b.contact_name),b.contact_name,b.contact_phone,b.created_at,b.updated_at"
+const bookingColumns = "b.id::text,b.clinic_id::text,b.patient_id::text,b.start_at,b.end_at,b.status,b.version::text,COALESCE(b.attendee_name,b.contact_name),b.contact_name,b.contact_phone,b.created_at,b.updated_at,b.specialty_context_id::text,b.specialty_snapshot,b.clinic_snapshot,b.provenance"
 
 func scanBooking(row scanner) (Booking, error) {
 	var b Booking
-	err := row.Scan(&b.ID, &b.ClinicID, &b.PatientID, &b.Start, &b.End, &b.Status, &b.Version, &b.AttendeeName, &b.ContactName, &b.ContactPhone, &b.CreatedAt, &b.UpdatedAt)
+	var specialty, clinic, provenance []byte
+	err := row.Scan(&b.ID, &b.ClinicID, &b.PatientID, &b.Start, &b.End, &b.Status, &b.Version, &b.AttendeeName, &b.ContactName, &b.ContactPhone, &b.CreatedAt, &b.UpdatedAt, &b.ContextID, &specialty, &clinic, &provenance)
+	if err == nil {
+		err = json.Unmarshal(specialty, &b.Specialty)
+	}
+	if err == nil {
+		err = json.Unmarshal(clinic, &b.ClinicSnapshot)
+	}
+	if err == nil {
+		err = json.Unmarshal(provenance, &b.Provenance)
+	}
 	b.Start, b.End, b.CreatedAt, b.UpdatedAt = b.Start.UTC(), b.End.UTC(), b.CreatedAt.UTC(), b.UpdatedAt.UTC()
 	return b, err
 }
@@ -87,6 +101,7 @@ func (s *Service) bookingRoutes(mux *http.ServeMux, wrap func(func(http.Response
 		return nil
 	}))
 	mux.HandleFunc("GET /api/doctorchart/bookings/{id}/events", wrap(s.bookingEvents))
+	mux.HandleFunc("PUT /api/doctorchart/bookings/{id}/patient", wrap(func(w http.ResponseWriter, r *http.Request, u string) error { return s.mutateBooking(w, r, u, "link") }))
 }
 func (s *Service) bookingEvents(w http.ResponseWriter, r *http.Request, user string) error {
 	b, err := ownedBooking(r.Context(), s.pool, user, r.PathValue("id"))
@@ -199,6 +214,7 @@ type bookingRequest struct {
 	ContactName     string  `json:"contactName"`
 	ContactPhone    string  `json:"contactPhone"`
 	Status          string  `json:"status"`
+	ContextID       string  `json:"specialtyContextId,omitempty"`
 }
 
 var idempotencyPattern = regexp.MustCompile(`^[A-Za-z0-9._:-]{16,128}$`)
@@ -216,11 +232,16 @@ func decodeBooking(w http.ResponseWriter, r *http.Request, op string) (bookingRe
 	allowed := []string{"expectedVersion", "status"}
 	required := []string{"expectedVersion", "status"}
 	if op == "create" {
-		allowed = []string{"clinicId", "start", "patientId", "contactName", "contactPhone", "attendeeName"}
+		allowed = []string{"clinicId", "start", "patientId", "contactName", "contactPhone", "attendeeName", "specialtyContextId"}
 		required = []string{"clinicId", "start", "contactName"}
 	}
 	if op == "reschedule" {
 		allowed = []string{"expectedVersion", "clinicId", "start"}
+		required = allowed
+		allowed = append(allowed, "specialtyContextId")
+	}
+	if op == "link" {
+		allowed = []string{"expectedVersion", "patientId"}
 		required = allowed
 	}
 	if err = api.Only(body, allowed...); err != nil {
@@ -252,12 +273,25 @@ func decodeBooking(w http.ResponseWriter, r *http.Request, op string) (bookingRe
 			return request, "", "", field("expectedVersion", "INVALID_VERSION")
 		}
 	}
-	if op != "status" {
+	if op == "create" || op == "reschedule" {
 		if _, err = decimal(request.ClinicID, true); err != nil {
 			return request, "", "", field("clinicId", "INVALID_ID")
 		}
 		if _, err = bookingInstant(request.Start); err != nil {
 			return request, "", "", err
+		}
+	}
+	if request.ContextID != "" {
+		if _, err = decimal(request.ContextID, true); err != nil {
+			return request, "", "", field("specialtyContextId", "INVALID_ID")
+		}
+	}
+	if op == "link" {
+		if request.PatientID == nil {
+			return request, "", "", field("patientId", "REQUIRED")
+		}
+		if _, err = decimal(*request.PatientID, true); err != nil {
+			return request, "", "", field("patientId", "INVALID_ID")
 		}
 	}
 	if op == "create" {
@@ -317,7 +351,7 @@ func (s *Service) mutateBooking(w http.ResponseWriter, r *http.Request, user, op
 	if err != nil {
 		return err
 	}
-	if op != "status" {
+	if op == "create" || op == "reschedule" {
 		id, _ := strconv.ParseInt(request.ClinicID, 10, 64)
 		if _, err = s.owned(r.Context(), user, id); err != nil {
 			return err
@@ -397,6 +431,7 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 		if err = public.check(ctx, tx, s, workspace, snapshot); err != nil {
 			return err
 		}
+		request.ContextID = public.contextID
 	}
 	if !snapshot.ClinicManagement {
 		return api.Failure(403, "CLINIC_MANAGEMENT_DISABLED", "Tu cobertura no habilita la gestión de reservas.")
@@ -409,7 +444,7 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 		return unavailable()
 	}
 	// Cancelling or closing an existing booking must remain possible during a downgrade.
-	if op != "status" && *snapshot.MaxClinics != -1 && count > *snapshot.MaxClinics {
+	if (op == "create" || op == "reschedule") && *snapshot.MaxClinics != -1 && count > *snapshot.MaxClinics {
 		if public != nil {
 			return publicDenied()
 		}
@@ -424,9 +459,12 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 			return api.Failure(409, "VERSION_CONFLICT", "La reserva cambió. Recargá su versión antes de modificarla.")
 		}
 	}
-	if request.PatientID != nil {
+	if op == "link" && (staff != nil || public != nil) {
+		return api.Failure(403, "PATIENT_LINK_FORBIDDEN", "Sólo el médico puede vincular la ficha clínica.")
+	}
+	if request.PatientID != nil && op == "link" {
 		var valid bool
-		if err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM patients WHERE id=$1 AND user_id=$2)", *request.PatientID, user).Scan(&valid); err != nil {
+		if err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM patients WHERE id=$1 AND user_id=$2 AND specialty_context_id=$3 AND workspace_id=$4)", *request.PatientID, user, previous.ContextID, workspace).Scan(&valid); err != nil {
 			return err
 		}
 		if !valid {
@@ -436,7 +474,13 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 	var result Booking
 	kind := "CREATED"
 	status = 200
-	if op == "status" {
+	if op == "link" {
+		if previous.PatientID != nil {
+			return api.Failure(409, "BOOKING_PATIENT_ALREADY_LINKED", "El turno ya tiene una ficha clínica vinculada. No se reemplazó el vínculo.")
+		}
+		result, err = scanBooking(tx.QueryRow(ctx, "UPDATE bookings b SET patient_id=$1,version=version+1,updated_at=clock_timestamp() WHERE id=$2 RETURNING "+bookingColumns, request.PatientID, previous.ID))
+		kind = "PATIENT_LINKED"
+	} else if op == "status" {
 		if !bookingTransition(previous.Status, request.Status) {
 			return bookingState()
 		}
@@ -479,9 +523,26 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 			}
 			return agendaErr
 		}
-		var end time.Time
-		end, err = scheduleSlotEnd(ctx, tx, clinic, start, time.Now().UTC(), false)
+		var slot AvailableSlot
+		slot, err = resolveBookingSlot(ctx, tx, clinic, start, time.Now().UTC())
 		if err != nil {
+			return err
+		}
+		end := slot.End
+		if (request.ContextID != "" && request.ContextID != slot.contextID) || (op == "reschedule" && previous.ContextID != slot.contextID) {
+			return bookingContextConflict()
+		}
+		if request.PatientID != nil {
+			var valid bool
+			if err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM patients WHERE id=$1 AND workspace_id=$2 AND specialty_context_id=$3)", *request.PatientID, workspace, slot.contextID).Scan(&valid); err != nil {
+				return err
+			}
+			if !valid {
+				return api.Failure(404, "PATIENT_NOT_FOUND", "No se encontró una ficha clínica de esta especialidad.")
+			}
+		}
+		var specialty, clinicSnapshot, provenance []byte
+		if err = tx.QueryRow(ctx, `SELECT jsonb_build_object('id',s.id::text,'code',s.code,'name',s.display_name),public.booking_clinic_snapshot($2),public.booking_block_snapshot($3) FROM doctor_specialty_contexts c JOIN specialties s ON s.id=c.specialty_id WHERE c.id=$1 AND c.workspace_id=$4`, slot.contextID, clinic.ID, slot.blockID, workspace).Scan(&specialty, &clinicSnapshot, &provenance); err != nil {
 			return err
 		}
 		var occupied bool
@@ -497,10 +558,10 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 		}
 		if op == "create" {
 			status = 201
-			result, err = scanBooking(tx.QueryRow(ctx, "INSERT INTO bookings AS b(workspace_id,clinic_id,patient_id,start_at,end_at,contact_name,contact_phone,attendee_name) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING "+bookingColumns, workspace, clinic.ID, request.PatientID, start, end, request.ContactName, request.ContactPhone, request.AttendeeName))
+			result, err = scanBooking(tx.QueryRow(ctx, "INSERT INTO bookings AS b(workspace_id,clinic_id,patient_id,start_at,end_at,contact_name,contact_phone,attendee_name,specialty_context_id,specialty_snapshot,clinic_snapshot,provenance) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING "+bookingColumns, workspace, clinic.ID, request.PatientID, start, end, request.ContactName, request.ContactPhone, request.AttendeeName, slot.contextID, json.RawMessage(specialty), json.RawMessage(clinicSnapshot), json.RawMessage(provenance)))
 		} else {
 			kind = "RESCHEDULED"
-			result, err = scanBooking(tx.QueryRow(ctx, "UPDATE bookings b SET clinic_id=$1,start_at=$2,end_at=$3,version=version+1,updated_at=clock_timestamp() WHERE id=$4 RETURNING "+bookingColumns, clinic.ID, start, end, previous.ID))
+			result, err = scanBooking(tx.QueryRow(ctx, "UPDATE bookings b SET clinic_id=$1,start_at=$2,end_at=$3,clinic_snapshot=$5,provenance=$6,version=version+1,updated_at=clock_timestamp() WHERE id=$4 RETURNING "+bookingColumns, clinic.ID, start, end, previous.ID, json.RawMessage(clinicSnapshot), json.RawMessage(provenance)))
 		}
 	}
 	if err != nil {
@@ -531,7 +592,7 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 			}
 			before = json.RawMessage(raw)
 		}
-		if s.notices != nil {
+		if s.notices != nil && op != "link" {
 			if err = s.notices.BookingChanged(ctx, tx, result.ID, result.Version, kind); err != nil {
 				return err
 			}

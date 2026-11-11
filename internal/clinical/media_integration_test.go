@@ -36,7 +36,7 @@ func TestManagedStudyHTTPRecoveryAndRetention(t *testing.T) {
 	}
 	t.Cleanup(constrainedPool.Close)
 	service.pool = constrainedPool
-	if _, err := pool.Exec(ctx, `UPDATE specialties SET patient_record_tabs=patient_record_tabs || '["STUDIES"]'::jsonb WHERE id=(SELECT specialty_id FROM doctor_workspaces WHERE user_id='integrity-owner') AND NOT patient_record_tabs @> '["STUDIES"]'::jsonb`); err != nil {
+	if _, err := pool.Exec(ctx, `UPDATE specialties SET patient_record_tabs=patient_record_tabs || '["STUDIES"]'::jsonb WHERE id=(SELECT c.specialty_id FROM doctor_specialty_contexts c JOIN doctor_workspaces w ON w.id=c.workspace_id WHERE w.user_id='integrity-owner') AND NOT patient_record_tabs @> '["STUDIES"]'::jsonb`); err != nil {
 		t.Fatal(err)
 	}
 	patient := integrityPatient(t, service)
@@ -95,6 +95,7 @@ func TestManagedStudyHTTPRecoveryAndRetention(t *testing.T) {
 	request := func(method, path, owner string, body io.Reader, contentType string) *httptest.ResponseRecorder {
 		r := httptest.NewRequest(method, path, body).WithContext(ctx)
 		r.Header.Set("X-Gateway-Secret", secret)
+		bindFixtureContext(t, service.pool, r, owner)
 		r.Header.Set("X-User-Id", owner)
 		r.Header.Set("X-User-Role", "DOCTOR")
 		r.Header.Set("X-User-Plan", "PRO")
@@ -150,7 +151,7 @@ func TestManagedStudyHTTPRecoveryAndRetention(t *testing.T) {
 	if response.Code != 200 || !bytes.Equal(response.Body.Bytes(), original) || response.Header().Get("Cache-Control") != "no-store" {
 		t.Fatalf("private download: %d %s", response.Code, response.Body.String())
 	}
-	if response := request("GET", filePath, "integrity-other", nil, ""); response.Code != 403 {
+	if response := request("GET", filePath, "integrity-other", nil, ""); response.Code != 404 {
 		t.Fatalf("other owner accessed clinical file: %d", response.Code)
 	}
 	response = request("DELETE", fmt.Sprintf("%s/%d", base, first.ID), "integrity-owner", nil, "")

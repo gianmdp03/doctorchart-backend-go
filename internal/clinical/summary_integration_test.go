@@ -31,13 +31,13 @@ func TestClinicalSummaryPersistenceOwnershipAndConflicts(t *testing.T) {
 	if _, err := s.ClinicalSummary(ctx, "integrity-other", p.ID); err == nil {
 		t.Fatal("cross-owner summary exposed")
 	} else {
-		integrityError(t, err, 403, "FORBIDDEN")
+		integrityError(t, err, 404, "PATIENT_NOT_FOUND")
 	}
 	request["expectedVersion"] = json.Number(fmt.Sprint(saved.Version))
 	if _, err := s.SaveClinicalProfile(ctx, "integrity-other", p.ID, request); err == nil {
 		t.Fatal("cross-owner write accepted")
 	} else {
-		integrityError(t, err, 403, "FORBIDDEN")
+		integrityError(t, err, 404, "PATIENT_NOT_FOUND")
 	}
 	result, err := services[1].ClinicalSummary(ctx, "integrity-owner", p.ID)
 	if err != nil {
@@ -75,9 +75,19 @@ func TestClinicalSummaryPersistenceOwnershipAndConflicts(t *testing.T) {
 }
 
 func TestSummaryDerivesHistoryFromPatientAndEncounters(t *testing.T) {
-	services, _ := integrityFixture(t, 100, 100)
+	services, pool := integrityFixture(t, 100, 100)
 	s := services[0]
 	ctx := context.Background()
+	// Clinical history is now an explicit specialty choice, not a forced block.
+	if _, err := pool.Exec(ctx, `WITH history AS (
+ SELECT w.published_definition->'patientForm'->'categories'->1 AS category
+ FROM wizard_defaults w JOIN specialties s ON s.id=w.specialty_id WHERE s.code='general_medicine'
+) UPDATE doctor_specialty_contexts SET definition=jsonb_set(jsonb_set(definition,
+ '{patientForm,categories}',(definition->'patientForm'->'categories') || jsonb_build_array(history.category)),
+ '{encounterForm,categories}',(definition->'encounterForm'->'categories') || jsonb_build_array(history.category))
+ FROM history WHERE workspace_id=(SELECT id FROM doctor_workspaces WHERE user_id='integrity-owner')`); err != nil {
+		t.Fatal(err)
+	}
 	owner := api.Identity{UserID: "integrity-owner", Plan: "BASIC"}
 	request := integrityPatientRequest()
 	values := request["values"].(map[string]any)
@@ -133,5 +143,17 @@ func TestSummaryDerivesHistoryFromPatientAndEncounters(t *testing.T) {
 	result, err = s.ClinicalSummary(ctx, owner.UserID, patient.ID)
 	if err != nil || result.History["ALLERGY"].Status != "NONE" || result.History["ALLERGY"].SourceID != reviewed.ID {
 		t.Fatal("negative review did not override earlier data", err)
+	}
+	// Removing it from future consultations preserves already recorded history.
+	if _, err := pool.Exec(ctx, `UPDATE doctor_specialty_contexts SET definition=jsonb_set(definition,'{encounterForm,categories}',
+ (SELECT jsonb_agg(c) FROM jsonb_array_elements(definition->'encounterForm'->'categories') c WHERE c->>'key'<>'sys_clinical_history')) WHERE workspace_id=(SELECT id FROM doctor_workspaces WHERE user_id='integrity-owner')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateEncounter(ctx, owner, integrityEncounterRequest(patient.ID, "FOLLOW_UP")); err != nil {
+		t.Fatal(err)
+	}
+	result, err = s.ClinicalSummary(ctx, owner.UserID, patient.ID)
+	if err != nil || result.History["ALLERGY"].SourceID != reviewed.ID || result.History["PROBLEM"].Items[0] != "Asma" {
+		t.Fatal("removing history configuration changed saved clinical answers", err)
 	}
 }

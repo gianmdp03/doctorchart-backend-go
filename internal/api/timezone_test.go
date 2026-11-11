@@ -11,9 +11,13 @@ import (
 func TestTimeZoneRequestValidation(t *testing.T) {
 	for _, name := range []string{"Europe/Madrid", "America/Argentina/Buenos_Aires", "America/Buenos_Aires", "UTC", "Asia/Kathmandu"} {
 		called := false
+		expected := name
+		if name == "America/Buenos_Aires" {
+			expected = "America/Argentina/Buenos_Aires"
+		}
 		handler := WithTimeZone(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			called = true
-			if TimeZone(r.Context()) == nil || TimeZone(r.Context()).String() != name {
+			if TimeZone(r.Context()) == nil || TimeZone(r.Context()).String() != expected {
 				t.Fatal("lost request zone")
 			}
 		}))

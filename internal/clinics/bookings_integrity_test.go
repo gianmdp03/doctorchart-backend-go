@@ -17,12 +17,12 @@ import (
 func TestBookingsPatientOwnershipAndClinicalPreservation(t *testing.T) {
 	f, c, start := bookingFixture(t)
 	for i, user := range []string{owner, other} {
-		_, err := f.pool.Exec(t.Context(), "INSERT INTO patients(id,user_id,full_name,birth_date,form_definition_snapshot,form_values,formula_context,formula_results,updated_at,version,workspace_version,personal_history) VALUES($1,$2,'Historia sintética','1990-01-01','{}','{}','{}','{}',clock_timestamp(),7,0,'{\"preservar\":true}')", i+1, user)
+		_, err := f.pool.Exec(t.Context(), "INSERT INTO patients(id,user_id,full_name,birth_date,form_definition_snapshot,form_values,formula_context,formula_results,updated_at,version,workspace_version,personal_history,workspace_id,specialty_context_id) VALUES($1,$2,'Historia sintética','1990-01-01','{}','{}','{}','{}',clock_timestamp(),7,0,'{\"preservar\":true}',(SELECT id FROM doctor_workspaces WHERE user_id=$2::varchar(100)),(SELECT c.id FROM doctor_specialty_contexts c JOIN doctor_workspaces w ON w.id=c.workspace_id WHERE w.user_id=$2::varchar(100)))", i+1, user)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
-	if _, err := f.pool.Exec(t.Context(), "INSERT INTO clinical_encounters(consultation_type,encounter_date,form_definition_snapshot,form_values,formula_context,formula_results,updated_at,version,workspace_version,patient_id,specialty_id) SELECT 'FIRST_VISIT',now(),'{}','{}','{}','{}',now(),3,0,1,specialty_id FROM doctor_workspaces WHERE user_id=$1", owner); err != nil {
+	if _, err := f.pool.Exec(t.Context(), "INSERT INTO clinical_encounters(consultation_type,encounter_date,form_definition_snapshot,form_values,formula_context,formula_results,updated_at,version,workspace_version,patient_id,specialty_id) SELECT 'FIRST_VISIT',now(),'{}','{}','{}','{}',now(),3,0,1,c.specialty_id FROM doctor_workspaces w JOIN doctor_specialty_contexts c ON c.workspace_id=w.id WHERE w.user_id=$1", owner); err != nil {
 		t.Fatal(err)
 	}
 	snapshot := func() string {
@@ -68,8 +68,11 @@ func TestBookingsPatientOwnershipAndClinicalPreservation(t *testing.T) {
 func TestBookingsDatabaseExclusionAndOwnerGuards(t *testing.T) {
 	f, c, start := bookingFixture(t)
 	second := scheduleClinicFixture(t, f)
-	b := booked(t, bookingRequestFixture(f, "POST", "/bookings", owner, newBookingKey(), createBookingBody(c.ID, start)))
-	_, err := f.pool.Exec(t.Context(), "INSERT INTO bookings(workspace_id,clinic_id,start_at,end_at,contact_name) SELECT workspace_id,$1,$2,$3,'SQL bypass attempt' FROM clinics WHERE id=$4", second.ID, start.Add(15*time.Minute), start.Add(45*time.Minute), c.ID)
+	reply := bookingRequestFixture(f, "POST", "/bookings", owner, newBookingKey(), createBookingBody(c.ID, start))
+	assertCode(t, reply, 201, "")
+	b := booked(t, reply)
+	copyScheduleDirect(t, f, c.ID, second.ID, 15)
+	err := insertBookingDirect(t.Context(), f, second.ID, c.ID, nil, start.Add(15*time.Minute), start.Add(45*time.Minute))
 	var failure *pgconn.PgError
 	if !errors.As(err, &failure) || failure.Code != "23P01" {
 		t.Fatal("SQL exclusion did not protect cross-clinic owner interval", err)
@@ -78,19 +81,21 @@ func TestBookingsDatabaseExclusionAndOwnerGuards(t *testing.T) {
 	otherClinicReply := f.request("POST", "/clinics", other, createBody)
 	assertCode(t, otherClinicReply, 201, "")
 	otherClinic := clinic(t, otherClinicReply)
-	if _, err = f.pool.Exec(t.Context(), "INSERT INTO bookings(workspace_id,clinic_id,start_at,end_at,contact_name) SELECT workspace_id,id,$2,$3,'Other physician' FROM clinics WHERE id=$1", otherClinic.ID, start, b.End); err != nil {
+	assertCode(t, f.request("PATCH", "/clinics/"+otherClinic.ID, other, `{"expectedVersion":"0","timezone":"UTC"}`), 200, "")
+	assertCode(t, f.request("PUT", "/clinics/"+otherClinic.ID+"/schedule", other, scheduleBody("0", (int(start.Weekday())+6)%7+1, "09:00", "12:00")), 200, "")
+	if err = insertBookingDirect(t.Context(), f, otherClinic.ID, otherClinic.ID, nil, start, b.End); err != nil {
 		t.Fatal("different doctor incorrectly blocked", err)
 	}
 	// Composite FK protects clinic/workspace mismatches even outside Go.
-	_, err = f.pool.Exec(t.Context(), "INSERT INTO bookings(workspace_id,clinic_id,start_at,end_at,contact_name) SELECT workspace_id,$1,$2,$3,'Wrong clinic' FROM clinics WHERE id=$4", otherClinic.ID, start.Add(2*time.Hour), b.End.Add(2*time.Hour), c.ID)
-	if !errors.As(err, &failure) || failure.Code != "23503" {
+	err = insertBookingDirect(t.Context(), f, otherClinic.ID, c.ID, nil, start.Add(2*time.Hour), b.End.Add(2*time.Hour))
+	if !errors.As(err, &failure) || failure.Code != "23514" {
 		t.Fatal("SQL clinic ownership guard", err)
 	}
-	if _, err = f.pool.Exec(t.Context(), "INSERT INTO patients(id,user_id,full_name,birth_date,form_definition_snapshot,form_values,formula_context,formula_results,updated_at,version,workspace_version) VALUES(100,$1,'Other patient','1990-01-01','{}','{}','{}','{}',now(),0,0)", other); err != nil {
+	if _, err = f.pool.Exec(t.Context(), "INSERT INTO patients(id,user_id,full_name,birth_date,form_definition_snapshot,form_values,formula_context,formula_results,updated_at,version,workspace_version,workspace_id,specialty_context_id) VALUES(100,$1,'Other patient','1990-01-01','{}','{}','{}','{}',now(),0,0,(SELECT id FROM doctor_workspaces WHERE user_id=$1::varchar(100)),(SELECT c.id FROM doctor_specialty_contexts c JOIN doctor_workspaces w ON w.id=c.workspace_id WHERE w.user_id=$1::varchar(100)))", other); err != nil {
 		t.Fatal(err)
 	}
-	_, err = f.pool.Exec(t.Context(), "INSERT INTO bookings(workspace_id,clinic_id,patient_id,start_at,end_at,contact_name) SELECT workspace_id,id,100,$2,$3,'Wrong patient' FROM clinics WHERE id=$1", c.ID, start.Add(2*time.Hour), b.End.Add(2*time.Hour))
-	if !errors.As(err, &failure) || failure.Code != "23514" || failure.ConstraintName != "bookings_patient_owner_check" {
+	err = insertBookingDirect(t.Context(), f, c.ID, c.ID, "100", start.Add(2*time.Hour), b.End.Add(2*time.Hour))
+	if !errors.As(err, &failure) || failure.Code != "23514" || failure.ConstraintName != "bookings_patient_context_fkey" {
 		t.Fatal("SQL patient ownership guard", err)
 	}
 	// Terminal or skipped status changes are constrained in PostgreSQL too.

@@ -27,7 +27,13 @@ func WithTimeZone(next http.Handler) http.Handler {
 			WriteError(w, Invalid("La zona horaria no es válida."))
 			return
 		}
-		zone, err := time.LoadLocation(values[0])
+		name := values[0]
+		// Chromium may send this legacy IANA alias. Go's embedded tzdata accepts
+		// it, but PostgreSQL installations can omit backward-compatibility links.
+		if name == "America/Buenos_Aires" {
+			name = "America/Argentina/Buenos_Aires"
+		}
+		zone, err := time.LoadLocation(name)
 		if err != nil {
 			WriteError(w, Invalid("La zona horaria no es válida."))
 			return

@@ -23,7 +23,7 @@ func TestStudyNamePersistenceAndAccess(t *testing.T) {
 	services, pool := integrityFixture(t, 10, 10)
 	service := services[0]
 	ctx := t.Context()
-	if _, err := pool.Exec(ctx, `UPDATE specialties SET patient_record_tabs=patient_record_tabs || '["STUDIES"]'::jsonb WHERE id=(SELECT specialty_id FROM doctor_workspaces WHERE user_id='integrity-owner') AND NOT patient_record_tabs @> '["STUDIES"]'::jsonb`); err != nil {
+	if _, err := pool.Exec(ctx, `UPDATE specialties SET patient_record_tabs=patient_record_tabs || '["STUDIES"]'::jsonb WHERE id=(SELECT c.specialty_id FROM doctor_specialty_contexts c JOIN doctor_workspaces w ON w.id=c.workspace_id WHERE w.user_id='integrity-owner') AND NOT patient_record_tabs @> '["STUDIES"]'::jsonb`); err != nil {
 		t.Fatal(err)
 	}
 	patient := integrityPatient(t, service)
@@ -40,6 +40,7 @@ func TestStudyNamePersistenceAndAccess(t *testing.T) {
 	request := func(method, path, user, contentType string, body io.Reader) *httptest.ResponseRecorder {
 		r := httptest.NewRequest(method, path, body)
 		r.Header.Set("X-Gateway-Secret", gatewayKey)
+		bindFixtureContext(t, service.pool, r, user)
 		r.Header.Set("X-User-Id", user)
 		r.Header.Set("X-User-Role", "DOCTOR")
 		r.Header.Set("X-User-Plan", "BASIC")
@@ -114,7 +115,7 @@ func TestStudyNamePersistenceAndAccess(t *testing.T) {
 		t.Fatalf("attachment changed: %d %s", response.Code, response.Header())
 	}
 	for _, path := range []string{base, detail, detail + "/file"} {
-		if denied := request("GET", path, "integrity-other", "", nil); denied.Code != 403 {
+		if denied := request("GET", path, "integrity-other", "", nil); denied.Code != 404 {
 			t.Fatalf("cross-owner access: %d %s", denied.Code, denied.Body.String())
 		}
 	}

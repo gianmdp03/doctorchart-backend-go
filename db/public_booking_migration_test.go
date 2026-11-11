@@ -34,7 +34,7 @@ func TestPublicBookingMigrationFromM5PreservesClinicalAndReservations(t *testing
 			if _, err = pool.Exec("INSERT INTO bookings(workspace_id,clinic_id,patient_id,start_at,end_at,contact_name,attendee_name) SELECT 1,id,1,'2030-01-01 09:00Z','2030-01-01 09:30Z','Requester preserved','Attendee preserved' FROM clinics LIMIT 1"); err != nil {
 				t.Fatal(err)
 			}
-			before := readString(t, pool, "SELECT json_build_object('bookings',(SELECT jsonb_agg(to_jsonb(b)) FROM bookings b),'patients',(SELECT jsonb_agg(to_jsonb(p)) FROM patients p),'agendas',(SELECT jsonb_agg(to_jsonb(c)) FROM clinic_schedules c))::text")
+			before := readString(t, pool, "SELECT json_build_object('bookings',(SELECT jsonb_agg((to_jsonb(b)-'specialty_context_id'-'specialty_snapshot'-'clinic_snapshot'-'provenance')) FROM bookings b),'patients',(SELECT jsonb_agg((to_jsonb(p)-'workspace_id'-'specialty_context_id')) FROM patients p),'agendas',(SELECT jsonb_agg((to_jsonb(c)-'slot_minutes'-'weekly'-'exceptions'-'workspace_id')) FROM clinic_schedules c))::text")
 			original := publicBookingMigration
 			t.Cleanup(func() { publicBookingMigration = original })
 			var seed func(context.Context, pgx.Tx) error
@@ -58,7 +58,7 @@ func TestPublicBookingMigrationFromM5PreservesClinicalAndReservations(t *testing
 			} else if err != nil {
 				t.Fatal(err)
 			}
-			after := readString(t, pool, "SELECT json_build_object('bookings',(SELECT jsonb_agg(to_jsonb(b)) FROM bookings b),'patients',(SELECT jsonb_agg(to_jsonb(p)) FROM patients p),'agendas',(SELECT jsonb_agg(to_jsonb(c)) FROM clinic_schedules c))::text")
+			after := readString(t, pool, "SELECT json_build_object('bookings',(SELECT jsonb_agg((to_jsonb(b)-'specialty_context_id'-'specialty_snapshot'-'clinic_snapshot'-'provenance')) FROM bookings b),'patients',(SELECT jsonb_agg((to_jsonb(p)-'workspace_id'-'specialty_context_id')) FROM patients p),'agendas',(SELECT jsonb_agg((to_jsonb(c)-'slot_minutes'-'weekly'-'exceptions'-'workspace_id')) FROM clinic_schedules c))::text")
 			if before != after {
 				t.Fatal("M5/clinical data changed")
 			}

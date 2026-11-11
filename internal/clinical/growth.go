@@ -223,7 +223,7 @@ func (s *Service) GrowthMeasurements(ctx context.Context, user string, id int64)
 }
 
 func (s *Service) GrowthRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/doctorchart/patients/{id}/growth", func(w http.ResponseWriter, r *http.Request) {
+	s.handle(mux, "GET /api/doctorchart/patients/{id}/growth", func(w http.ResponseWriter, r *http.Request) {
 		id, err := pathID(r, "id")
 		var result patientGrowth
 		var options growthOptions
@@ -235,7 +235,7 @@ func (s *Service) GrowthRoutes(mux *http.ServeMux) {
 		}
 		clinicalReply(w, result, err, 200)
 	})
-	mux.HandleFunc("GET /api/doctorchart/patients/{id}/measurements", func(w http.ResponseWriter, r *http.Request) {
+	s.handle(mux, "GET /api/doctorchart/patients/{id}/measurements", func(w http.ResponseWriter, r *http.Request) {
 		id, err := pathID(r, "id")
 		var result []growthMeasurement
 		if err == nil {

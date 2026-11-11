@@ -30,6 +30,9 @@ func (s *Store) CreateSpecialty(ctx context.Context, request map[string]any) (Sp
 	if !codePattern.MatchString(code) {
 		return result, api.Invalid("El código de especialidad debe estar en minúsculas y usar caracteres válidos.")
 	}
+	if !supportedSpecialty(code) {
+		return result, api.Failure(409, "SPECIALTY_CATALOG_LOCKED", "No se pueden incorporar nuevas especialidades en esta etapa.")
+	}
 	name, err := api.Text(request, "name", 120)
 	if err != nil {
 		return result, err

@@ -11,6 +11,10 @@ type handler func(http.ResponseWriter, *http.Request) (any, int, error)
 
 func register(mux *http.ServeMux, route string, fn handler) {
 	mux.HandleFunc(route, func(w http.ResponseWriter, r *http.Request) {
+		if err := bindContextQuery(r); err != nil {
+			api.WriteError(w, err)
+			return
+		}
 		value, status, err := fn(w, r)
 		if err != nil {
 			api.WriteError(w, err)
@@ -32,6 +36,18 @@ func pathID(r *http.Request) (int64, error) {
 }
 
 func (s *Store) Routes(mux *http.ServeMux) {
+	register(mux, "GET /api/doctorchart/workspace/contexts", func(w http.ResponseWriter, r *http.Request) (any, int, error) {
+		values, err := s.Contexts(r.Context(), api.User(r.Context()).UserID)
+		return values, 200, err
+	})
+	register(mux, "POST /api/doctorchart/workspace/contexts", func(w http.ResponseWriter, r *http.Request) (any, int, error) {
+		body, err := api.Decode(w, r)
+		if err != nil {
+			return nil, 0, err
+		}
+		value, err := s.AddContext(r.Context(), api.User(r.Context()).UserID, body)
+		return value, 201, err
+	})
 	register(mux, "GET /api/doctorchart/specialties", func(w http.ResponseWriter, r *http.Request) (any, int, error) {
 		values, err := s.Specialties(r.Context(), false)
 		summaries := []Summary{}
