@@ -56,7 +56,7 @@ func TestNotificationSpanishAdministrativeTemplatesAndStableMessageID(t *testing
 	s.origin = "https://doctorchart.example"
 	// DST uses the clinic's zone at the reservation instant, not the process zone.
 	m := Message{Date: time.Date(2030, 3, 10, 7, 0, 0, 0, time.UTC), To: "recipient@example.invalid", Doctor: "Profesional", Clinic: "Consultorio", Timezone: "America/New_York", Start: time.Date(2030, 3, 10, 7, 30, 0, 0, time.UTC), Reference: "opaque-reference", Code: Token()}
-	for _, kind := range []string{"BOOKING_CONFIRMED", "BOOKING_CANCELLED", "BOOKING_RESCHEDULED", "BOOKING_REMINDER", "STAFF_INVITATION", "STAFF_RECOVERY"} {
+	for _, kind := range []string{"BOOKING_CONFIRMED", "BOOKING_CANCELLED", "BOOKING_RESCHEDULED", "BOOKING_REMINDER", "STAFF_RECOVERY"} {
 		t.Run(kind, func(t *testing.T) {
 			a, err := s.render(kind, "stable-job", m)
 			if err != nil {

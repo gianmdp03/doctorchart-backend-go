@@ -57,6 +57,7 @@ const secret = "fixture-billing-secret-with-64-characters-aaaaaaaaaaaaaaaaaaaaaa
 
 type fixture struct {
 	pool    *pgxpool.Pool
+	runtime *pgxpool.Pool
 	handler http.Handler
 	rights  *billing.Entitlements
 	mode    atomic.Int32
@@ -99,7 +100,15 @@ func newFixture(t *testing.T) *fixture {
 			t.Fatal(err)
 		}
 	}
-	f := &fixture{pool: pool}
+	runtimeConfig := config.Copy()
+	runtimeConfig.ConnConfig.User = "doctorchart_app"
+	runtimeConfig.ConnConfig.Password = os.Getenv("DOCTORCHART_TEST_APP_PASSWORD")
+	runtime, err := pgxpool.NewWithConfig(t.Context(), runtimeConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(runtime.Close)
+	f := &fixture{pool: pool, runtime: runtime}
 	f.limit.Store(1)
 	remote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		f.calls.Add(1)
@@ -151,9 +160,9 @@ func newFixture(t *testing.T) *fixture {
 		w.Write(body)
 	}))
 	t.Cleanup(remote.Close)
-	f.rights = billing.NewEntitlements(pool, remote.URL, secret)
+	f.rights = billing.NewEntitlements(runtime, remote.URL, secret)
 	mux := http.NewServeMux()
-	New(pool, f.rights).Routes(mux)
+	New(runtime, f.rights).Routes(mux)
 	f.handler = api.Gateway("gateway-fixture", api.Dispatch(mux))
 	return f
 }

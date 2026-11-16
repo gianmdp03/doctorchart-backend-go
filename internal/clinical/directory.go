@@ -185,12 +185,12 @@ func (s *Service) ListPatients(ctx context.Context, userID string, query url.Val
 	if err != nil {
 		return nil, err
 	}
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
+	tx, err := s.beginClinicalTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
 	if err != nil {
 		return nil, err
 	}
 	defer func() {
-		if err := tx.Rollback(ctx); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
+		if err := rollbackClinicalTx(ctx, tx); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 			slog.Warn("directory rollback failed")
 		}
 	}()

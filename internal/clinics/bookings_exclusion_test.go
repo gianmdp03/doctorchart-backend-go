@@ -8,8 +8,22 @@ import (
 )
 
 func TestBookingsPostgresConcurrentCrossClinicExclusion(t *testing.T) {
+	for _, modality := range []string{inPerson, teleconsultation} {
+		t.Run(modality, func(t *testing.T) {
+			testPostgresConcurrentExclusion(t, modality)
+		})
+	}
+}
+
+func testPostgresConcurrentExclusion(t *testing.T, modality string) {
+	t.Helper()
 	f, c, start := bookingFixture(t)
-	second := scheduleClinicFixture(t, f)
+	var second Clinic
+	if modality == teleconsultation {
+		second = virtualClinic(t, f)
+	} else {
+		second = scheduleClinicFixture(t, f)
+	}
 	copyScheduleDirect(t, f, c.ID, second.ID, 0)
 	results := make(chan error, 2)
 	for _, id := range []string{c.ID, second.ID} {

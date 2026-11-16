@@ -1,11 +1,33 @@
 package clinical
 
 import (
+	"context"
 	"net/http"
 	"strconv"
+	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/syntah/doctorchart-backend-go/db"
 	"github.com/syntah/doctorchart-backend-go/internal/api"
 )
+
+func (s *Service) beginClinicalTx(ctx context.Context, options pgx.TxOptions) (pgx.Tx, error) {
+	tx, err := s.pool.BeginTx(ctx, options)
+	if err != nil {
+		return nil, err
+	}
+	if err := db.BindClinicalScope(ctx, tx, api.User(ctx).UserID, api.SpecialtyContextID(ctx)); err != nil {
+		_ = rollbackClinicalTx(ctx, tx)
+		return nil, err
+	}
+	return tx, nil
+}
+
+func rollbackClinicalTx(ctx context.Context, tx pgx.Tx) error {
+	cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	return tx.Rollback(cleanup)
+}
 
 // Every clinical HTTP entry point binds an explicit immutable request scope.
 // Query context also works for multipart/files/PDF without new CORS headers.

@@ -1,4 +1,4 @@
-import {existsSync,mkdirSync,readFileSync,writeFileSync,openSync,closeSync} from 'node:fs';
+import {existsSync,mkdirSync,readFileSync,writeFileSync,openSync,closeSync,renameSync} from 'node:fs';
 import {resolve,dirname,join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {execFileSync,spawn} from 'node:child_process';
@@ -20,7 +20,32 @@ function background(args,cwd,log){
  const fd=openSync(log,'a');
  const child=spawn(process.execPath,args,{cwd,detached:true,windowsHide:true,stdio:['ignore',fd,fd]});child.unref();closeSync(fd);return child.pid;
 }
-function compose(v,...args){run('docker',['compose','-p',`doctorchart-local-${v.name}`,'-f',join(root,v.name,'compose.json'),...args]);}
+const composeArgs=v=>['compose','-p',`doctorchart-local-${v.name}`,'-f',join(root,v.name,'compose.json')];
+function compose(v,...args){run('docker',[...composeArgs(v),...args]);}
+function localSQL(v,sql){
+ try{
+  return execFileSync('docker',[...composeArgs(v),'exec','-T','postgres','psql','-XqAt','-v','ON_ERROR_STOP=1','-U','doctorchart','-d','doctorchart'],{input:sql,encoding:'utf8',stdio:['pipe','pipe','pipe'],windowsHide:true}).trim();
+ }catch{throw Error('Falló la preparación de PostgreSQL local. Revisá la versión y los permisos.');}
+}
+function prepareDatabase(v,settings){
+ const project=`doctorchart-local-${v.name}`;
+ const [pg]=JSON.parse(capture('docker',['inspect',`${project}-postgres-1`]));
+ const port=pg.HostConfig?.PortBindings?.['5432/tcp']?.[0];
+ if(pg.Config.Labels?.['com.docker.compose.project']!==project||
+    pg.Config.Labels?.['com.doctorchart.local.owner']!=='doctorchart-dual-local'||
+    !pg.Mounts.some(m=>m.Name===project+'_postgres-data'&&m.Destination==='/var/lib/postgresql/data')||
+    port?.HostIp!=='127.0.0.1'||port?.HostPort!==String(v.db))throw Error('El contenedor PostgreSQL no coincide con la instancia local.');
+ const version=localSQL(v,`SELECT CASE WHEN to_regclass('public.app_schema_state') IS NULL THEN 'SELECT 0'
+  ELSE 'SELECT baseline_version FROM public.app_schema_state WHERE id=1' END \\gexec\n`);
+ if(version==='16')return;
+ if(version!=='0'||localSQL(v,"SELECT count(*) FROM pg_tables WHERE schemaname='public';")!=='0')
+  throw Error('El esquema local requiere una actualización autorizada. Se conservaron la base y el binario anteriores.');
+ for(const [role,password] of [['doctorchart_app',settings.databaseApp],['doctorchart_media',settings.databaseMedia]]){
+  if(!/^[a-f0-9]{48}$/.test(password??''))throw Error('Ejecutar prepare para configurar las credenciales locales.');
+  localSQL(v,`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='${role}') THEN
+    CREATE ROLE ${role} LOGIN PASSWORD '${password}'; END IF; END $$;\n`);
+ }
+}
 function localPassword(role){
  for(const v of variants){
   const path=join(root,v.name,'settings.json');
@@ -53,9 +78,12 @@ async function wait(url,ca){
  }
  throw Error(`No responde ${url}; revisar logs en ${root}`);
 }
-function request(url,{ca,method='GET',body,token}={}){
+function request(url,{ca,method='GET',body,token,parseJSON=true}={}){
  return new Promise((ok,fail)=>{
-  const req=https.request(url,{ca,method,headers:{...(body?{'Content-Type':'application/json'}:{}),...(token?{Authorization:`Bearer ${token}`}:{})}},res=>{let data='';res.on('data',b=>data+=b);res.on('end',()=>res.statusCode>=200&&res.statusCode<300?ok(data?JSON.parse(data):null):fail(Error(`${url}: ${res.statusCode} ${data.slice(0,300)}`)));});req.setTimeout(5000,()=>req.destroy(Error('timeout')));req.on('error',fail);req.end(body?JSON.stringify(body):undefined);
+  const req=https.request(url,{ca,method,headers:{...(body?{'Content-Type':'application/json'}:{}),...(token?{Authorization:`Bearer ${token}`}:{})}},res=>{let data='';res.on('data',b=>data+=b);res.on('end',()=>{
+   if(res.statusCode<200||res.statusCode>=300){fail(Error(`${url}: ${res.statusCode} ${data.slice(0,300)}`));return;}
+   try{ok(parseJSON?(data?JSON.parse(data):null):data);}catch(error){fail(error);}
+  });});req.setTimeout(5000,()=>req.destroy(Error('timeout')));req.on('error',fail);req.end(body?JSON.stringify(body):undefined);
  });
 }
 if(command==='prepare'){
@@ -68,8 +96,12 @@ if(command==='prepare'){
   writeFileSync(join(dir,'dependencies-smoke.mjs'),readFileSync(join(script,'dependencies-smoke.mjs')));
   const settingsPath=join(dir,'settings.json');
   if(!existsSync(settingsPath))json(settingsPath,{email:'doctor@local.test',password:localPassword('doctor'),refresh:randomBytes(32).toString('hex'),gateway:randomBytes(32).toString('hex'),billing:randomBytes(32).toString('hex'),image:randomBytes(32).toString('hex'),database:randomBytes(24).toString('hex'),notifications:randomBytes(32).toString('base64'),origin:`https://localhost:${v.port}`});
-  ensureAdmin(v);
-  const s=JSON.parse(readFileSync(settingsPath));
+  const s=ensureAdmin(v);
+  if(!s.databaseApp||!s.databaseMedia){
+   s.databaseApp??=randomBytes(24).toString('hex');
+   s.databaseMedia??=randomBytes(24).toString('hex');
+   json(settingsPath,s);
+  }
   const localConfig=join(v.front,'config','local.public.json');mkdirSync(dirname(localConfig),{recursive:true});
   if(existsSync(localConfig)&&!existsSync(join(dir,'original-local.public.json')))writeFileSync(join(dir,'original-local.public.json'),readFileSync(localConfig));
   json(localConfig,{publicSiteUrl:s.origin,apiGatewayOrigin:s.origin,applicationUrls:{bycode:s.origin,pointly:s.origin,doctorchart:s.origin},supabase:{url:`https://localhost:${v.auth}`,publishableKey:'sb_publishable_doctorchart_local_only'}});
@@ -80,7 +112,7 @@ if(command==='prepare'){
   const services={
    postgres:{image:'postgres:17',environment:{POSTGRES_DB:'doctorchart',POSTGRES_USER:'doctorchart',POSTGRES_PASSWORD:s.database},ports:[`127.0.0.1:${v.db}:5432`],volumes:['postgres-data:/var/lib/postgresql/data'],healthcheck:{test:['CMD-SHELL','pg_isready -U doctorchart -d doctorchart'],interval:'2s',timeout:'3s',retries:30}},
    'local-support':{image:'node:24.20.0',command:['node','/support.mjs'],ports:[`127.0.0.1:${v.auth}:9443`],volumes:[`${script.replaceAll('\\','/')}/support.mjs:/support.mjs:ro`,`${dir.replaceAll('\\','/')}:/local`,certs]},
-   backend:{image:'golang:1.27.3',command:['/app/backend'],volumes,depends_on:{postgres:{condition:'service_healthy'},'local-support':{condition:'service_started'}},environment:{PORT:'8083',DATABASE_URL:`postgresql://doctorchart:${s.database}@postgres:5432/doctorchart`,GATEWAY_SHARED_SECRET:s.gateway,SERVICES_BILLING_SHARED_SECRET:s.billing,SERVICES_BILLING_URL:'http://local-support:9000',STORAGE_TYPE:'local',STUDIES_STORAGE_DIR:'/data/studies',MEDIA_PROVIDER:'local',MEDIA_ENVIRONMENT:'development',MEDIA_LOCAL_DIR:'/data/media',MEDIA_RECOVERY_LOCAL_DIR:'/data/recovery',IMAGE_CONVERTER_URL:'http://converter:8086',IMAGE_CONVERTER_API_KEY:s.image,STUDIES_ALLOW_IMAGE_TRANSFORM:'true',...(v.name==='turnos'?{SCHEDULES_ENABLED:'true',BOOKINGS_ENABLED:'true',PUBLIC_BOOKINGS_ENABLED:'true',STAFF_ENABLED:'true',STAFF_ORIGIN:s.origin,NOTIFICATIONS_ENABLED:'true',NOTIFICATIONS_KEY:s.notifications,NOTIFICATIONS_PUBLIC_ORIGIN:s.origin,NOTIFICATIONS_SMTP_HOST:'mailpit',NOTIFICATIONS_SMTP_PORT:'1025',NOTIFICATIONS_SMTP_FROM:'turnos@doctorchart.local',NOTIFICATIONS_SMTP_TLS:'starttls',SSL_CERT_FILE:'/certs/cert.pem'}:{})}},
+   backend:{image:'golang:1.27.3',command:['/app/backend'],volumes,depends_on:{postgres:{condition:'service_healthy'},'local-support':{condition:'service_started'}},environment:{PORT:'8083',DATABASE_URL:`postgresql://doctorchart_app:${s.databaseApp}@postgres:5432/doctorchart`,MEDIA_DATABASE_URL:`postgresql://doctorchart_media:${s.databaseMedia}@postgres:5432/doctorchart`,GATEWAY_SHARED_SECRET:s.gateway,SERVICES_BILLING_SHARED_SECRET:s.billing,SERVICES_BILLING_URL:'http://local-support:9000',STORAGE_TYPE:'local',STUDIES_STORAGE_DIR:'/data/studies',MEDIA_PROVIDER:'local',MEDIA_ENVIRONMENT:'development',MEDIA_LOCAL_DIR:'/data/media',MEDIA_RECOVERY_LOCAL_DIR:'/data/recovery',IMAGE_CONVERTER_URL:'http://converter:8086',IMAGE_CONVERTER_API_KEY:s.image,STUDIES_ALLOW_IMAGE_TRANSFORM:'true',...(v.name==='turnos'?{SCHEDULES_ENABLED:'true',BOOKINGS_ENABLED:'true',PUBLIC_BOOKINGS_ENABLED:'true',STAFF_ENABLED:'true',STAFF_ORIGIN:s.origin,NOTIFICATIONS_ENABLED:'true',NOTIFICATIONS_KEY:s.notifications,NOTIFICATIONS_PUBLIC_ORIGIN:s.origin,NOTIFICATIONS_SMTP_HOST:'mailpit',NOTIFICATIONS_SMTP_PORT:'1025',NOTIFICATIONS_SMTP_FROM:'turnos@doctorchart.local',NOTIFICATIONS_SMTP_TLS:'starttls',SSL_CERT_FILE:'/certs/cert.pem'}:{})}},
    gateway:{image:'golang:1.27.3',command:['/app/gateway'],ports:[`127.0.0.1:${v.api}:8000`],volumes:[volumes[0],certs],environment:{PORT:'8000',GATEWAY_SHARED_SECRET:s.gateway,POINTLY_SERVICE_URL:'http://local-support:9000',BILLING_SERVICE_URL:'http://local-support:9000',DOCTORCHART_SERVICE_URL:'http://backend:8083',SUPABASE_JWT_ISSUER:'https://local-support:9443/auth/v1',SUPABASE_JWKS_URL:'https://local-support:9443/auth/v1/.well-known/jwks.json',SUPABASE_JWT_AUDIENCE:'authenticated',CORS_ALLOWED_ORIGINS:s.origin,SSL_CERT_FILE:'/certs/cert.pem'},depends_on:['backend','local-support']},
    converter:{image:'bycode/image-email:local',environment:{LISTEN_ADDR:':8086',APPLICATIONS:'doctorchart',PROFILES:'doctorchart-study,avatar',APP_DOCTORCHART_API_KEY:s.image,APP_DOCTORCHART_PROFILES:'doctorchart-study,avatar',PROFILE_DOCTORCHART_STUDY_MODE:'transform',PROFILE_DOCTORCHART_STUDY_FORMAT:'webp',PROFILE_DOCTORCHART_STUDY_QUALITY:'75',PROFILE_DOCTORCHART_STUDY_MAX_WIDTH:'2048',PROFILE_DOCTORCHART_STUDY_MAX_HEIGHT:'2048',MAIL_ENABLED:'false'}}
   };
@@ -103,13 +135,27 @@ if(command==='prepare'){
 }else if(command==='start'){
  for(const v of selected){
   const dir=join(root,v.name);if(!existsSync(join(dir,'compose.json')))throw Error('Ejecutar prepare primero');
-  // Compile current files on every start; persistent data is never recreated.
-  run('go',['build','-mod=readonly','-o',join(dir,'bin','backend'),'./cmd/api'],v.backend,{GOOS:'linux',GOARCH:'amd64',CGO_ENABLED:'0'});
+  const config=JSON.parse(readFileSync(join(dir,'compose.json')));
+  if(!config.services.backend.environment.MEDIA_DATABASE_URL)
+   throw Error('La instancia usa la configuración anterior a RLS. La base actual requiere una actualización autorizada.');
+  const settings=JSON.parse(readFileSync(join(dir,'settings.json')));
+  compose(v,'up','-d','--wait','postgres');
+  prepareDatabase(v,settings);
+  // Install the binary only after the separately authenticated bootstrap passes.
+  const staged=join(dir,'bin','backend-next');
+  run('go',['build','-mod=readonly','-o',staged,'./cmd/api'],v.backend,{GOOS:'linux',GOARCH:'amd64',CGO_ENABLED:'0'});
+  const owner=`postgresql://doctorchart:${encodeURIComponent(settings.database)}@postgres:5432/doctorchart`;
+  run('docker',[...composeArgs(v),'run','--rm','--no-deps','-e','DATABASE_URL','--entrypoint','/app/backend-next','backend','init-db'],backend,{DATABASE_URL:owner});
+  // Windows cannot replace binaries still opened through the Docker bind mount.
+  compose(v,'stop','gateway','backend');
+  renameSync(staged,join(dir,'bin','backend'));
   run('go',['build','-mod=readonly','-o',join(dir,'bin','gateway'),'.'],v.gateway,{GOOS:'linux',GOARCH:'amd64',CGO_ENABLED:'0'});
   compose(v,'up','-d');
+  compose(v,'up','-d','--force-recreate','backend','gateway');
   const ca=readFileSync(join(root,'certs','cert.pem'));
   await wait(`https://localhost:${v.auth}/health`,ca);
-  let running=false;try{await request(`https://localhost:${v.port}/api/doctorchart/health`,{ca});running=true;}catch{}
+  // Check Angular itself while the freshly recreated backend becomes ready.
+  let running=false;try{await request(`https://localhost:${v.port}/`,{ca,parseJSON:false});running=true;}catch{}
   if(!running){
    const pid=background([join(front,'node_modules/@angular/cli/bin/ng.js'),'serve','--host','127.0.0.1','--port',String(v.port),'--ssl','--ssl-cert',join(root,'certs','cert.pem'),'--ssl-key',join(root,'certs','key.pem'),'--proxy-config',join(dir,'proxy.json')],v.front,join(dir,'frontend.log'));
    json(join(dir,'frontend-process.json'),{pid,createdAt:new Date().toISOString(),cwd:v.front});

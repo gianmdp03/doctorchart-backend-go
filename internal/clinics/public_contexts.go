@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/jackc/pgx/v5"
 	"github.com/syntah/doctorchart-backend-go/internal/api"
+	"strings"
 )
 
 type PublicContext struct {
@@ -48,7 +49,7 @@ func choosePublicContext(d PublicDoctor, id string) (string, error) {
 	return "", publicMissing()
 }
 func readPublicContexts(ctx context.Context, q scheduleReader, workspace int64) ([]PublicContext, error) {
-	rows, err := q.Query(ctx, `SELECT cctx.id::text,s.code,s.display_name,cp.public_id::text,c.name,c.country,c.province,c.city,cp.address,c.timezone
+	rows, err := q.Query(ctx, `SELECT cctx.id::text,s.code,s.display_name,cp.public_id::text,c.name,c.country,c.province,c.city,cp.address,c.timezone,c.modality
  FROM publication_specialty_contexts pc JOIN doctor_specialty_contexts cctx ON cctx.id=pc.specialty_context_id AND cctx.workspace_id=pc.workspace_id
  JOIN specialties s ON s.id=cctx.specialty_id JOIN clinic_publications cp ON cp.workspace_id=pc.workspace_id JOIN clinics c ON c.id=cp.clinic_id
  WHERE pc.workspace_id=$1 AND cctx.onboarding_completed AND cctx.definition IS NOT NULL AND s.active AND cp.enabled AND c.status='ACTIVE' AND `+publicOfferExists+` ORDER BY s.display_name,cctx.id,c.name,c.id`, workspace)
@@ -61,7 +62,7 @@ func readPublicContexts(ctx context.Context, q scheduleReader, workspace int64) 
 	for rows.Next() {
 		var s PublicContext
 		var c PublicClinic
-		if err = rows.Scan(&s.ID, &s.Code, &s.Name, &c.ID, &c.Name, &c.Country, &c.Province, &c.City, &c.Address, &c.Timezone); err != nil {
+		if err = rows.Scan(&s.ID, &s.Code, &s.Name, &c.ID, &c.Name, &c.Country, &c.Province, &c.City, &c.Address, &c.Timezone, &c.Modality); err != nil {
 			return nil, err
 		}
 		i, ok := index[s.ID]
@@ -75,6 +76,43 @@ func readPublicContexts(ctx context.Context, q scheduleReader, workspace int64) 
 	}
 	return items, rows.Err()
 }
+func filterPublicOffers(d *PublicDoctor, modality, specialty, country, province, city string) {
+	contains := func(value, filter string) bool {
+		return strings.Contains(strings.ToLower(value), strings.ToLower(filter))
+	}
+	d.Clinics = []PublicClinic{}
+	contexts := []PublicContext{}
+	seen := map[string]bool{}
+	for _, c := range d.Specialties {
+		if !contains(c.Name, specialty) && !strings.EqualFold(c.Code, specialty) {
+			continue
+		}
+		clinics := []PublicClinic{}
+		for _, offer := range c.Clinics {
+			if modality != "" && offer.Modality != modality {
+				continue
+			}
+			if offer.Modality != teleconsultation && !(contains(offer.Country, country) && contains(offer.Province, province) && contains(offer.City, city)) {
+				continue
+			}
+			clinics = append(clinics, offer)
+			if !seen[offer.ID] {
+				d.Clinics = append(d.Clinics, offer)
+				seen[offer.ID] = true
+			}
+		}
+		if len(clinics) > 0 {
+			c.Clinics = clinics
+			contexts = append(contexts, c)
+		}
+	}
+	d.Specialties = contexts
+	d.Specialty, d.SpecialtyCode = "", ""
+	if len(contexts) == 1 {
+		d.Specialty, d.SpecialtyCode = contexts[0].Name, contexts[0].Code
+	}
+}
+
 func publicationContexts(ctx context.Context, tx pgx.Tx, workspace int64, ids []string) error {
 	if ids == nil {
 		rows, err := tx.Query(ctx, "SELECT specialty_context_id::text FROM publication_specialty_contexts WHERE workspace_id=$1 ORDER BY specialty_context_id", workspace)

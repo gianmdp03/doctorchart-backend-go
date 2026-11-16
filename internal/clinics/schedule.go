@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
-	"sort"
 	"strconv"
 	"time"
 
@@ -22,111 +20,19 @@ type clinicSchedule struct {
 	ScheduleConfig
 }
 type agendaRecord struct {
-	id, zone, name string
-	config         ScheduleConfig
+	id, zone, name, modality string
+	config                   ScheduleConfig
 }
 type scheduleReader interface {
 	Query(context.Context, string, ...any) (pgx.Rows, error)
 	QueryRow(context.Context, string, ...any) pgx.Row
 }
 
-type agendaWindow struct {
-	start, end         time.Time
-	clinic, name, zone string
-}
-
-func agendaWindows(ctx context.Context, a agendaRecord, first time.Time, days int) ([]agendaWindow, error) {
-	loc, err := time.LoadLocation(a.zone)
-	if err != nil {
-		return nil, err
-	}
-	result := []agendaWindow{}
-	for n := 0; n < days; n++ {
-		date := first.AddDate(0, 0, n)
-		ranges := a.config.rangesOn(date)
-		if len(ranges) == 0 {
-			continue
-		}
-		bounds := make([][2]int, 0, len(ranges))
-		for _, r := range ranges {
-			start, _ := wallMinute(r.Start, false)
-			end, _ := wallMinute(r.End, true)
-			bounds = append(bounds, [2]int{start, end})
-		}
-		var active *agendaWindow
-		err = civilMinutes(ctx, date, loc, func(instant time.Time, minute int) {
-			open := false
-			for _, bound := range bounds {
-				begin, end := bound[0], bound[1]
-				if minute >= begin && minute < end {
-					open = true
-					break
-				}
-			}
-			if !open {
-				return
-			}
-			if active != nil && active.end.Equal(instant) {
-				active.end = instant.Add(time.Minute)
-				return
-			}
-			result = append(result, agendaWindow{start: instant, end: instant.Add(time.Minute), clinic: a.id, name: a.name, zone: a.zone})
-			active = &result[len(result)-1]
-		})
-		if err != nil {
-			return nil, err
-		}
-	}
-	return result, nil
-}
-func checkAgendaConflicts(ctx context.Context, agendas []agendaRecord, first time.Time, days int) error {
-	if len(agendas) < 2 {
-		return nil
-	}
-	windows := []agendaWindow{}
-	for _, a := range agendas {
-		part, err := agendaWindows(ctx, a, first, days)
-		if err != nil {
-			return err
-		}
-		windows = append(windows, part...)
-	}
-	sort.Slice(windows, func(i, j int) bool { return windows[i].start.Before(windows[j].start) })
-	// Keep all intervals still open; adjacent half-open intervals do not conflict.
-	active := []agendaWindow{}
-	for _, w := range windows {
-		next := active[:0]
-		for _, prior := range active {
-			if !prior.end.After(w.start) {
-				continue
-			}
-			if prior.clinic != w.clinic {
-				loc, err := time.LoadLocation(prior.zone)
-				if err != nil {
-					return err
-				}
-				return api.Failure(409, "SCHEDULE_CONFLICT", fmt.Sprintf("Tu atención en %s se superpone con %s el %s de %s a %s (%s). Revisá los bloques o excepciones.", w.name, prior.name, prior.start.In(loc).Format("02/01/2006"), prior.start.In(loc).Format("15:04"), prior.end.In(loc).Format("15:04"), prior.zone))
-			}
-			next = append(next, prior)
-		}
-		active = append(next, w)
-	}
-	return nil
-}
-func (s *Service) validateSchedules(ctx context.Context, tx pgx.Tx, workspace int64, now time.Time) error {
-	agendas, err := readAgendas(ctx, tx, workspace)
-	if err != nil {
-		return err
-	}
-	date := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-	if err := checkAgendaConflicts(ctx, agendas, date.AddDate(0, 0, -1), 369); err != nil {
-		return err
-	}
-	return validateBookedSchedules(ctx, tx, workspace, now)
-}
 func (s *Service) scheduleRoutes(mux *http.ServeMux, wrap func(func(http.ResponseWriter, *http.Request, string) error) http.HandlerFunc) {
 	mux.HandleFunc("GET /api/doctorchart/clinics/{id}/schedule", wrap(s.getSchedule))
+	mux.HandleFunc("GET /api/doctorchart/clinics/{id}/schedule/occupied", wrap(s.occupiedSchedule))
 	mux.HandleFunc("PUT /api/doctorchart/clinics/{id}/schedule", wrap(s.putSchedule))
+	mux.HandleFunc("POST /api/doctorchart/clinics/{id}/schedule/validate", wrap(s.validateScheduleDraft))
 	mux.HandleFunc("GET /api/doctorchart/clinics/{id}/availability", wrap(s.availability))
 }
 func (s *Service) scheduleClinic(r *http.Request, user string) (Clinic, error) {
@@ -165,6 +71,14 @@ func (s *Service) getSchedule(w http.ResponseWriter, r *http.Request, user strin
 	return nil
 }
 func (s *Service) putSchedule(w http.ResponseWriter, r *http.Request, user string) error {
+	return s.updateSchedule(w, r, user, false)
+}
+
+func (s *Service) validateScheduleDraft(w http.ResponseWriter, r *http.Request, user string) error {
+	return s.updateSchedule(w, r, user, true)
+}
+
+func (s *Service) updateSchedule(w http.ResponseWriter, r *http.Request, user string, validateOnly bool) error {
 	clinic, err := s.scheduleClinic(r, user)
 	if err != nil {
 		return err
@@ -209,6 +123,9 @@ func (s *Service) putSchedule(w http.ResponseWriter, r *http.Request, user strin
 		return api.Invalid("Revisá los tipos y los campos de la agenda.")
 	}
 	if err = request.Validate(); err != nil {
+		if overlap, ok := err.(*localRangeConflict); ok {
+			return localScheduleConflict(clinic, overlap)
+		}
 		return api.Invalid(err.Error())
 	}
 	snapshot, err := s.rights.Resolve(r.Context(), user)
@@ -249,13 +166,13 @@ func (s *Service) putSchedule(w http.ResponseWriter, r *http.Request, user strin
 		return api.Failure(403, "CLINIC_MANAGEMENT_DISABLED", "Tu cobertura no habilita la gestión de consultorios.")
 	}
 	var count int64
-	if err = tx.QueryRow(ctx, "SELECT count(*) FROM clinics WHERE workspace_id=$1 AND status<>'ARCHIVED'", workspace).Scan(&count); err != nil {
+	if err = tx.QueryRow(ctx, "SELECT count(*) FROM clinics WHERE workspace_id=$1 AND status<>'ARCHIVED' AND modality='IN_PERSON'", workspace).Scan(&count); err != nil {
 		return err
 	}
 	if snapshot.MaxClinics == nil {
 		return unavailable()
 	}
-	if *snapshot.MaxClinics != -1 && count > *snapshot.MaxClinics {
+	if current.Modality != teleconsultation && *snapshot.MaxClinics != -1 && count > *snapshot.MaxClinics {
 		return api.Failure(409, "CLINIC_LIMIT_REACHED", "Regularizá el cupo de consultorios antes de modificar agendas.")
 	}
 	previous, err := readAgenda(ctx, tx, current.ID)
@@ -265,13 +182,21 @@ func (s *Service) putSchedule(w http.ResponseWriter, r *http.Request, user strin
 	if previous.Version != expected {
 		return api.Failure(409, "VERSION_CONFLICT", "La agenda cambió. Tus datos no se guardaron; recargá la versión vigente.")
 	}
+	if validateOnly {
+		draft := agendaRecord{current.ID, current.Timezone, current.Name, current.Modality, request.ScheduleConfig}
+		if err = validateDraftAgendas(ctx, tx, workspace, draft, time.Now().UTC()); err != nil {
+			return err
+		}
+		w.WriteHeader(http.StatusNoContent)
+		return nil
+	}
 	if err = saveAgenda(ctx, tx, current.ID, workspace, &request.ScheduleConfig, previous); err != nil {
 		return err
 	}
 	if err = validateBlockBookings(ctx, tx, current, previous.ScheduleConfig, request.ScheduleConfig, time.Now().UTC()); err != nil {
 		return err
 	}
-	if err = s.validateSchedules(ctx, tx, workspace, time.Now().UTC()); err != nil {
+	if err = s.validateSchedules(ctx, tx, workspace, current.ID, time.Now().UTC()); err != nil {
 		return err
 	}
 	result, err := readAgenda(ctx, tx, current.ID)

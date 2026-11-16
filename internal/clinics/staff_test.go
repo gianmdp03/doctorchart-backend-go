@@ -25,7 +25,7 @@ func staffFixture(t *testing.T) (*fixture, Clinic, time.Time) {
 	f, c, start := bookingFixture(t)
 	f.staff.Store(true)
 	mux := http.NewServeMux()
-	NewWithBookings(f.pool, f.rights, true, true).WithStaff(true, staffTestOrigin).Routes(mux)
+	NewWithBookings(f.runtime, f.rights, true, true).WithStaff(true, staffTestOrigin).Routes(mux)
 	f.handler = api.Gateway("gateway-fixture", api.Dispatch(mux))
 	return f, c, start
 }

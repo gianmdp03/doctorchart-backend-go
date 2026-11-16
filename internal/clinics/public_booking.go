@@ -194,7 +194,7 @@ func (s *Service) writeBookingResult(w http.ResponseWriter, r *http.Request, a *
 	if b.ClinicSnapshot.Timezone != "" {
 		clinic, address, timezone = b.ClinicSnapshot.Name, b.ClinicSnapshot.PublicAddress, b.ClinicSnapshot.Timezone
 	}
-	document := map[string]any{"reference": reference, "status": b.Status, "start": b.Start, "end": b.End, "doctorName": name, "clinicName": clinic, "address": address, "timezone": timezone, "contactName": b.ContactName, "attendeeName": b.AttendeeName}
+	document := map[string]any{"reference": reference, "status": b.Status, "start": b.Start, "end": b.End, "doctorName": name, "clinicName": clinic, "modality": b.ClinicSnapshot.Modality, "address": address, "timezone": timezone, "contactName": b.ContactName, "attendeeName": b.AttendeeName}
 	if b.Specialty.Name != "" {
 		document["specialtyName"] = b.Specialty.Name
 	}

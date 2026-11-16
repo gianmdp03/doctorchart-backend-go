@@ -10,6 +10,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -18,17 +19,21 @@ import (
 	common "github.com/bycode/bycode-image-converter-go/pkg/media"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
+	"github.com/syntah/doctorchart-backend-go/db"
 	"github.com/syntah/doctorchart-backend-go/internal/api"
 	"github.com/syntah/doctorchart-backend-go/internal/storage"
+	"github.com/syntah/doctorchart-backend-go/internal/workspace"
 )
 
 func TestManagedStudyHTTPRecoveryAndRetention(t *testing.T) {
 	services, pool := integrityFixture(t, 10, 10)
 	service := services[0]
 	ctx := t.Context()
-	// The real runtime shares the pool between pgx domain transactions and
-	// database/sql media transactions. One connection proves no nested acquire.
+	// Use the two real restricted logins with one connection each, as in the
+	// runtime. Neither clinical transactions nor media work may nest an acquire.
 	poolConfig := service.pool.Config()
+	poolConfig.ConnConfig.User = db.AppRole
+	poolConfig.ConnConfig.Password = os.Getenv("DOCTORCHART_TEST_APP_PASSWORD")
 	poolConfig.MaxConns = 1
 	constrainedPool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {
@@ -36,6 +41,22 @@ func TestManagedStudyHTTPRecoveryAndRetention(t *testing.T) {
 	}
 	t.Cleanup(constrainedPool.Close)
 	service.pool = constrainedPool
+	service.workspaces = workspace.New(constrainedPool, service.forms)
+	if _, err := db.CheckRuntime(ctx, constrainedPool, db.AppRole); err != nil {
+		t.Fatal(err)
+	}
+	mediaConfig := pool.Config()
+	mediaConfig.MaxConns = 1
+	mediaConfig.ConnConfig.User = db.MediaRole
+	mediaConfig.ConnConfig.Password = os.Getenv("DOCTORCHART_TEST_MEDIA_PASSWORD")
+	mediaPool, err := pgxpool.NewWithConfig(ctx, mediaConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(mediaPool.Close)
+	if _, err := db.CheckRuntime(ctx, mediaPool, db.MediaRole); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := pool.Exec(ctx, `UPDATE specialties SET patient_record_tabs=patient_record_tabs || '["STUDIES"]'::jsonb WHERE id=(SELECT c.specialty_id FROM doctor_specialty_contexts c JOIN doctor_workspaces w ON w.id=c.workspace_id WHERE w.user_id='integrity-owner') AND NOT patient_record_tabs @> '["STUDIES"]'::jsonb`); err != nil {
 		t.Fatal(err)
 	}
@@ -84,9 +105,9 @@ func TestManagedStudyHTTPRecoveryAndRetention(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	db := stdlib.OpenDBFromPool(service.pool)
-	t.Cleanup(func() { db.Close() })
-	files.SetCatalog(db)
+	catalogDB := stdlib.OpenDBFromPool(mediaPool)
+	t.Cleanup(func() { catalogDB.Close() })
+	files.SetCatalog(catalogDB)
 	service.files = files
 	mux := http.NewServeMux()
 	service.StudyRoutes(mux)
@@ -135,11 +156,18 @@ func TestManagedStudyHTTPRecoveryAndRetention(t *testing.T) {
 		return result
 	}
 	first := upload()
+	if err := files.Flush(ctx); err != nil {
+		t.Fatalf("restricted media login could not flush its outbox: %v", err)
+	}
+	var pending int
+	if err := pool.QueryRow(ctx, "SELECT count(*) FROM media_events").Scan(&pending); err != nil || pending != 0 {
+		t.Fatalf("media events were not delivered: %d, %v", pending, err)
+	}
 	var assetID string
 	if err := pool.QueryRow(ctx, "SELECT media_asset_id::text FROM patient_medical_studies WHERE id=$1", first.ID).Scan(&assetID); err != nil {
 		t.Fatal(err)
 	}
-	asset, err := (common.Catalog{DB: db}).Get(ctx, assetID)
+	asset, err := (common.Catalog{DB: catalogDB}).Get(ctx, assetID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -169,7 +197,7 @@ func TestManagedStudyHTTPRecoveryAndRetention(t *testing.T) {
 	if _, err = objects.Head(ctx, asset.ObjectKey); err != nil {
 		t.Fatal("retention removed physical clinical bytes", err)
 	}
-	retired, err := (common.Catalog{DB: db}).Get(ctx, assetID)
+	retired, err := (common.Catalog{DB: catalogDB}).Get(ctx, assetID)
 	if err != nil || retired.Status != common.PendingDelete || retired.DeleteAfter == nil || retired.DeleteAfter.Before(retired.UpdatedAt.Add(72*time.Hour)) {
 		t.Fatal("retirement bypassed recovery window", retired, err)
 	}
@@ -211,7 +239,7 @@ func TestManagedStudyHTTPRecoveryAndRetention(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	protected.SetCatalog(db)
+	protected.SetCatalog(catalogDB)
 	if err = protected.Delete(ctx, assetID); err == nil {
 		t.Fatal("recovery mode allowed deletion")
 	}

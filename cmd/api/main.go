@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/syntah/doctorchart-backend-go/db"
 	"github.com/syntah/doctorchart-backend-go/internal/api"
 	"github.com/syntah/doctorchart-backend-go/internal/billing"
 	"github.com/syntah/doctorchart-backend-go/internal/bootstrap"
@@ -42,28 +43,36 @@ func run() error {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	poolConfig, err := pgxpool.ParseConfig(c.DatabaseURL)
+	pool, err := openPool(ctx, c.DatabaseURL, 10)
 	if err != nil {
-		return errors.New("invalid PostgreSQL configuration")
-	}
-	poolConfig.MaxConns = 10
-	poolConfig.MinConns = 0
-	poolConfig.MaxConnLifetime = 30 * time.Minute
-	poolConfig.MaxConnIdleTime = 10 * time.Minute
-	poolConfig.ConnConfig.RuntimeParams["timezone"] = "UTC"
-	poolConfig.ConnConfig.RuntimeParams["search_path"] = "public"
-	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
-	if err != nil {
-		return errors.New("create PostgreSQL pool failed")
+		return err
 	}
 	defer pool.Close()
-	mediaDB := stdlib.OpenDBFromPool(pool)
-	defer mediaDB.Close()
-	files.SetCatalog(mediaDB)
 	startup, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	if err := pool.Ping(startup); err != nil {
-		return errors.New("PostgreSQL is unavailable")
+	initialized, err := db.CheckRuntime(startup, pool, db.AppRole)
+	if err != nil {
+		return err
+	}
+	if files.Managed() {
+		if c.MediaDatabaseURL == "" {
+			return errors.New("MEDIA_DATABASE_URL is required for managed storage")
+		}
+		mediaPool, err := openPool(ctx, c.MediaDatabaseURL, 4)
+		if err != nil {
+			return err
+		}
+		defer mediaPool.Close()
+		mediaInitialized, err := db.CheckRuntime(startup, mediaPool, db.MediaRole)
+		if err != nil {
+			return err
+		}
+		if !mediaInitialized.Equal(initialized) {
+			return errors.New("media catalog must use the initialized DoctorChart database")
+		}
+		mediaDB := stdlib.OpenDBFromPool(mediaPool)
+		defer mediaDB.Close()
+		files.SetCatalog(mediaDB)
 	}
 	rules := billing.New(c.BillingURL)
 	entitlements := billing.NewEntitlements(pool, c.BillingURL, c.BillingSecret)
@@ -81,9 +90,6 @@ func run() error {
 	})
 	validator, err := wizard.NewValidator()
 	if err != nil {
-		return err
-	}
-	if err := bootstrap.Run(startup, pool, validator); err != nil {
 		return err
 	}
 	notices, err := notifications.New(pool, c.Notifications)
@@ -143,9 +149,52 @@ func run() error {
 	}
 	return nil
 }
+func openPool(ctx context.Context, url string, maxConnections int32) (*pgxpool.Pool, error) {
+	config, err := pgxpool.ParseConfig(url)
+	if err != nil {
+		return nil, errors.New("invalid PostgreSQL configuration")
+	}
+	config.MaxConns = maxConnections
+	config.MinConns = 0
+	config.MaxConnLifetime = 30 * time.Minute
+	config.MaxConnIdleTime = 10 * time.Minute
+	config.ConnConfig.RuntimeParams["timezone"] = "UTC"
+	config.ConnConfig.RuntimeParams["search_path"] = "public"
+	config.ConnConfig.RuntimeParams["row_security"] = "on"
+	return pgxpool.NewWithConfig(ctx, config)
+}
+
+func initializeDatabase() error {
+	url := os.Getenv("DATABASE_URL")
+	if url == "" {
+		return errors.New("init-db requires DATABASE_URL for the schema owner")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	pool, err := openPool(ctx, url, 1)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+	validator, err := wizard.NewValidator()
+	if err != nil {
+		return err
+	}
+	return bootstrap.Run(ctx, pool, validator)
+}
+
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, nil)))
-	if err := run(); err != nil {
+	var err error
+	switch {
+	case len(os.Args) == 1:
+		err = run()
+	case len(os.Args) == 2 && os.Args[1] == "init-db":
+		err = initializeDatabase()
+	default:
+		err = errors.New("supported command: init-db")
+	}
+	if err != nil {
 		slog.Error("startup failed", "error", err)
 		os.Exit(1)
 	}

@@ -18,6 +18,7 @@ type PublicQuestion struct {
 	Required bool   `json:"required"`
 }
 type PublicClinic struct {
+	Modality string `json:"modality"`
 	ID       string `json:"id"`
 	Name     string `json:"name"`
 	Country  string `json:"country"`
@@ -112,7 +113,7 @@ func (s *Service) onlineRights(ctx context.Context, owner string) error {
 		return unavailable()
 	}
 	var count int64
-	if err = s.pool.QueryRow(ctx, "SELECT count(*) FROM clinics c JOIN doctor_workspaces w ON c.workspace_id=w.id WHERE w.user_id=$1 AND c.status<>'ARCHIVED'", owner).Scan(&count); err != nil {
+	if err = s.pool.QueryRow(ctx, "SELECT count(*) FROM clinics c JOIN doctor_workspaces w ON c.workspace_id=w.id WHERE w.user_id=$1 AND c.status<>'ARCHIVED' AND c.modality='IN_PERSON'", owner).Scan(&count); err != nil {
 		return err
 	}
 	if *snap.MaxClinics != -1 && count > *snap.MaxClinics {
@@ -142,6 +143,10 @@ func (s *Service) publicDirectory(w http.ResponseWriter, r *http.Request) error 
 		}
 		switch k {
 		case "country", "province", "city", "specialty", "name", "page", "size":
+		case "modality":
+			if v[0] != inPerson && v[0] != teleconsultation {
+				return api.Invalid("Modalidad inválida.")
+			}
 		case "includeSpecialties":
 			if v[0] != "1" {
 				return api.Invalid("Filtro no admitido.")
@@ -167,7 +172,7 @@ func (s *Service) publicDirectory(w http.ResponseWriter, r *http.Request) error 
 	// Filter locations on the same enabled public clinic; never return private rows.
 	rows, err := s.pool.Query(r.Context(), `SELECT p.public_id::text FROM booking_publications p WHERE p.published AND strpos(lower(p.name),lower($1))>0 AND EXISTS(
  SELECT 1 FROM publication_specialty_contexts pc JOIN doctor_specialty_contexts cctx ON cctx.id=pc.specialty_context_id AND cctx.workspace_id=pc.workspace_id JOIN specialties s ON s.id=cctx.specialty_id JOIN clinic_publications cp ON cp.workspace_id=pc.workspace_id JOIN clinics c ON c.id=cp.clinic_id
- WHERE pc.workspace_id=p.workspace_id AND cctx.onboarding_completed AND cctx.definition IS NOT NULL AND s.active AND (strpos(lower(s.display_name),lower($2))>0 OR lower(s.code)=lower($2)) AND cp.enabled AND c.status='ACTIVE' AND `+publicOfferExists+` AND strpos(lower(c.country),lower($3))>0 AND strpos(lower(c.province),lower($4))>0 AND strpos(lower(c.city),lower($5))>0) ORDER BY lower(p.name),p.public_id LIMIT $6 OFFSET $7`, q.Get("name"), q.Get("specialty"), q.Get("country"), q.Get("province"), q.Get("city"), size+1, page*size)
+ WHERE pc.workspace_id=p.workspace_id AND cctx.onboarding_completed AND cctx.definition IS NOT NULL AND s.active AND (strpos(lower(s.display_name),lower($2))>0 OR lower(s.code)=lower($2)) AND cp.enabled AND c.status='ACTIVE' AND `+publicOfferExists+` AND ($6='' OR c.modality=$6) AND (c.modality='TELECONSULTATION' OR (strpos(lower(c.country),lower($3))>0 AND strpos(lower(c.province),lower($4))>0 AND strpos(lower(c.city),lower($5))>0))) ORDER BY lower(p.name),p.public_id LIMIT $7 OFFSET $8`, q.Get("name"), q.Get("specialty"), q.Get("country"), q.Get("province"), q.Get("city"), q.Get("modality"), size+1, page*size)
 	if err != nil {
 		return err
 	}
@@ -198,7 +203,10 @@ func (s *Service) publicDirectory(w http.ResponseWriter, r *http.Request) error 
 			return e
 		}
 		if d.published && len(d.Clinics) > 0 {
-			result = append(result, d)
+			filterPublicOffers(&d, q.Get("modality"), q.Get("specialty"), q.Get("country"), q.Get("province"), q.Get("city"))
+			if len(d.Clinics) > 0 {
+				result = append(result, d)
+			}
 		}
 	}
 	more := len(ids) > size
@@ -207,7 +215,7 @@ func (s *Service) publicDirectory(w http.ResponseWriter, r *http.Request) error 
 	}
 	response := map[string]any{"items": result, "page": page, "size": size, "hasMore": more}
 	if q.Has("includeSpecialties") {
-		specialties, err := s.publishedSpecialties(r.Context(), q.Get("country"))
+		specialties, err := s.publishedSpecialties(r.Context(), q.Get("country"), q.Get("modality"))
 		if err != nil {
 			return err
 		}
@@ -219,7 +227,7 @@ func (s *Service) publicDirectory(w http.ResponseWriter, r *http.Request) error 
 
 // Return only catalog labels for specialties represented by a published clinic.
 // Online rights and slot availability are still verified by the booking flow.
-func (s *Service) publishedSpecialties(ctx context.Context, country string) ([]publicSpecialty, error) {
+func (s *Service) publishedSpecialties(ctx context.Context, country, modality string) ([]publicSpecialty, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT DISTINCT s.code, s.display_name
 		FROM booking_publications p
@@ -231,9 +239,9 @@ func (s *Service) publishedSpecialties(ctx context.Context, country string) ([]p
 			SELECT 1 FROM clinic_publications cp
 			JOIN clinics c ON c.id = cp.clinic_id
 			WHERE cp.workspace_id = p.workspace_id AND cp.enabled AND c.status = 'ACTIVE'
-			  AND strpos(lower(c.country), lower($1)) > 0 AND `+publicOfferExists+`
+			  AND ($2='' OR c.modality=$2) AND (c.modality='TELECONSULTATION' OR strpos(lower(c.country), lower($1)) > 0) AND `+publicOfferExists+`
 		)
-		ORDER BY s.display_name, s.code`, country)
+		ORDER BY s.display_name, s.code`, country, modality)
 	if err != nil {
 		return nil, err
 	}
@@ -374,22 +382,28 @@ func (s *Service) putPublication(w http.ResponseWriter, r *http.Request, user st
 		if _, err = decimal(c.ClinicID, true); err != nil {
 			return err
 		}
-		if seen[c.ClinicID] || len([]rune(strings.TrimSpace(c.Address))) > 255 || c.Enabled && strings.TrimSpace(c.Address) == "" {
+		if seen[c.ClinicID] || len([]rune(strings.TrimSpace(c.Address))) > 255 {
 			return api.Invalid("Consultorios públicos inválidos.")
 		}
 		seen[c.ClinicID] = true
-		var state string
-		if err = tx.QueryRow(ctx, "SELECT status FROM clinics WHERE id=$1 AND workspace_id=$2 FOR UPDATE", c.ClinicID, workspace).Scan(&state); errors.Is(err, pgx.ErrNoRows) {
+		var state, modality string
+		if err = tx.QueryRow(ctx, "SELECT status,modality FROM clinics WHERE id=$1 AND workspace_id=$2 FOR UPDATE", c.ClinicID, workspace).Scan(&state, &modality); errors.Is(err, pgx.ErrNoRows) {
 			return missing()
 		} else if err != nil {
 			return err
+		}
+		if modality == teleconsultation && strings.TrimSpace(c.Address) != "" {
+			return api.Invalid("La teleconsulta no admite una dirección pública.")
+		}
+		if modality == inPerson && c.Enabled && strings.TrimSpace(c.Address) == "" {
+			return api.Invalid("Ingresá la dirección pública del consultorio.")
 		}
 		if c.Enabled && state == "ACTIVE" {
 			enabled++
 		}
 	}
 	if p.Published && enabled == 0 {
-		return api.Invalid("Elegí al menos un consultorio activo con dirección pública.")
+		return api.Invalid("Elegí al menos una agenda activa para publicar.")
 	}
 	raw, _ := json.Marshal(p.Questions)
 	if p.Questions == nil {
@@ -402,7 +416,7 @@ func (s *Service) putPublication(w http.ResponseWriter, r *http.Request, user st
 		return err
 	}
 	for _, c := range p.Clinics {
-		if _, err = tx.Exec(ctx, "INSERT INTO clinic_publications(clinic_id,workspace_id,public_id,enabled,address) VALUES($1,$2,$3,$4,$5) ON CONFLICT(clinic_id) DO UPDATE SET enabled=excluded.enabled,address=excluded.address", c.ClinicID, workspace, newOpaqueID(), c.Enabled, strings.TrimSpace(c.Address)); err != nil {
+		if _, err = tx.Exec(ctx, "INSERT INTO clinic_publications(clinic_id,workspace_id,public_id,enabled,address,modality) SELECT id,workspace_id,$3,$4,$5,modality FROM clinics WHERE id=$1 AND workspace_id=$2 ON CONFLICT(clinic_id) DO UPDATE SET enabled=excluded.enabled,address=excluded.address", c.ClinicID, workspace, newOpaqueID(), c.Enabled, strings.TrimSpace(c.Address)); err != nil {
 			return err
 		}
 	}

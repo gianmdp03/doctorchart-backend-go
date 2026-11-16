@@ -19,18 +19,25 @@ import (
 	"github.com/syntah/doctorchart-backend-go/internal/notifications"
 )
 
+const (
+	inPerson         = "IN_PERSON"
+	teleconsultation = "TELECONSULTATION"
+)
+
 type Clinic struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Country   string    `json:"country"`
-	Province  string    `json:"province"`
-	City      string    `json:"city"`
-	Address   string    `json:"address"`
-	Timezone  string    `json:"timezone"`
-	Status    string    `json:"status"`
-	Version   string    `json:"version"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	Modality       string    `json:"modality"`
+	FutureBookings int       `json:"futureBookings,omitempty"`
+	ID             string    `json:"id"`
+	Name           string    `json:"name"`
+	Country        string    `json:"country"`
+	Province       string    `json:"province"`
+	City           string    `json:"city"`
+	Address        string    `json:"address"`
+	Timezone       string    `json:"timezone"`
+	Status         string    `json:"status"`
+	Version        string    `json:"version"`
+	CreatedAt      time.Time `json:"createdAt"`
+	UpdatedAt      time.Time `json:"updatedAt"`
 }
 
 type Service struct {
@@ -70,13 +77,13 @@ func (s *Service) WithPublicBookings(enabled bool, secret string) *Service {
 	return s
 }
 
-const columns = "id::text,name,country,province,city,address,timezone,status,version::text,created_at,updated_at"
+const columns = "id::text,name,country,province,city,address,timezone,status,version::text,created_at,updated_at,modality"
 
 type scanner interface{ Scan(...any) error }
 
 func scan(row scanner) (Clinic, error) {
 	var c Clinic
-	err := row.Scan(&c.ID, &c.Name, &c.Country, &c.Province, &c.City, &c.Address, &c.Timezone, &c.Status, &c.Version, &c.CreatedAt, &c.UpdatedAt)
+	err := row.Scan(&c.ID, &c.Name, &c.Country, &c.Province, &c.City, &c.Address, &c.Timezone, &c.Status, &c.Version, &c.CreatedAt, &c.UpdatedAt, &c.Modality)
 	c.CreatedAt, c.UpdatedAt = c.CreatedAt.UTC(), c.UpdatedAt.UTC()
 	return c, err
 }
@@ -160,6 +167,11 @@ func (s *Service) Routes(mux *http.ServeMux) {
 		if err != nil {
 			return err
 		}
+		if s.bookingsEnabled {
+			if err := s.pool.QueryRow(r.Context(), "SELECT count(*) FROM bookings WHERE clinic_id=$1 AND end_at>now() AND status IN ('CONFIRMED','CHECKED_IN')", c.ID).Scan(&c.FutureBookings); err != nil {
+				return err
+			}
+		}
 		api.WriteJSON(w, 200, c)
 		return nil
 	}))
@@ -232,7 +244,7 @@ func (s *Service) capabilities(w http.ResponseWriter, r *http.Request, user stri
 		return err
 	}
 	var count int64
-	if err := s.pool.QueryRow(r.Context(), "SELECT count(*) FROM clinics WHERE workspace_id=$1 AND status<>'ARCHIVED'", workspace).Scan(&count); err != nil {
+	if err := s.pool.QueryRow(r.Context(), "SELECT count(*) FROM clinics WHERE workspace_id=$1 AND status<>'ARCHIVED' AND modality='IN_PERSON'", workspace).Scan(&count); err != nil {
 		return err
 	}
 	actions := map[string]bool{"create": false, "edit": false, "activate": false, "deactivate": false, "archive": false, "restore": false}
@@ -263,7 +275,19 @@ var fieldLimits = map[string]int{"name": 160, "country": 100, "province": 160, "
 func values(body map[string]any, op string) (map[string]string, int64, error) {
 	fields := map[string]string{}
 	var version int64
+	mode, _ := body["modality"].(string)
+	virtual := op == "create" && mode == teleconsultation
 	for key, value := range body {
+		if key == "modality" && op == "create" {
+			if mode != teleconsultation && mode != inPerson {
+				return nil, 0, field(key, "INVALID_MODALITY")
+			}
+			fields[key] = mode
+			continue
+		}
+		if virtual && isPhysicalField(key) {
+			return nil, 0, field(key, "UNEXPECTED_LOCATION")
+		}
 		if key == "expectedVersion" && op != "create" {
 			raw, ok := value.(string)
 			if !ok {
@@ -301,6 +325,9 @@ func values(body map[string]any, op string) (map[string]string, int64, error) {
 	}
 	if op == "create" {
 		for key := range fieldLimits {
+			if virtual && isPhysicalField(key) {
+				continue
+			}
 			if _, ok := fields[key]; !ok {
 				return nil, 0, field(key, "REQUIRED")
 			}
@@ -314,6 +341,15 @@ func values(body map[string]any, op string) (map[string]string, int64, error) {
 		}
 	}
 	return fields, version, nil
+}
+
+func isPhysicalField(key string) bool {
+	switch key {
+	case "country", "province", "city", "address":
+		return true
+	default:
+		return false
+	}
 }
 
 func (s *Service) mutate(w http.ResponseWriter, r *http.Request, user, op string) error {
@@ -384,8 +420,22 @@ func (s *Service) mutate(w http.ResponseWriter, r *http.Request, user, op string
 	if !snapshot.ClinicManagement {
 		return api.Failure(403, "CLINIC_MANAGEMENT_DISABLED", "Tu cobertura no habilita la gestión de consultorios.")
 	}
+	virtual := fields["modality"] == teleconsultation || current.Modality == teleconsultation
+	if virtual {
+		if !s.schedulesEnabled {
+			return missing()
+		}
+		for key := range fields {
+			if isPhysicalField(key) {
+				return field(key, "UNEXPECTED_LOCATION")
+			}
+		}
+		if fields["status"] == "ARCHIVED" {
+			return field("status", "INVALID_STATUS")
+		}
+	}
 	var count int64
-	if err := tx.QueryRow(ctx, "SELECT count(*) FROM clinics WHERE workspace_id=$1 AND status<>'ARCHIVED'", workspace).Scan(&count); err != nil {
+	if err := tx.QueryRow(ctx, "SELECT count(*) FROM clinics WHERE workspace_id=$1 AND status<>'ARCHIVED' AND modality='IN_PERSON'", workspace).Scan(&count); err != nil {
 		return err
 	}
 	target := fields["status"]
@@ -397,13 +447,17 @@ func (s *Service) mutate(w http.ResponseWriter, r *http.Request, user, op string
 	}
 	max := *snapshot.MaxClinics
 	adds := op == "create" || op == "status" && current.Status == "ARCHIVED" && target == "INACTIVE"
-	if max != -1 && (adds && count >= max || (op == "edit" || op == "status" && target == "ACTIVE") && count > max) {
+	if !virtual && max != -1 && (adds && count >= max || (op == "edit" || op == "status" && target == "ACTIVE") && count > max) {
 		return api.Failure(409, "CLINIC_LIMIT_REACHED", "Se alcanzó el límite de consultorios de tu cobertura.")
 	}
 	var result Clinic
 	switch op {
 	case "create":
-		result, err = scan(tx.QueryRow(ctx, "INSERT INTO clinics(workspace_id,name,country,province,city,address,timezone) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING "+columns, workspace, fields["name"], fields["country"], fields["province"], fields["city"], fields["address"], fields["timezone"]))
+		modality := inPerson
+		if virtual {
+			modality = teleconsultation
+		}
+		result, err = scan(tx.QueryRow(ctx, "INSERT INTO clinics(workspace_id,name,country,province,city,address,timezone,modality) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING "+columns, workspace, fields["name"], fields["country"], fields["province"], fields["city"], fields["address"], fields["timezone"], modality))
 	case "status":
 		if current.Status == target {
 			result = current
@@ -419,13 +473,23 @@ func (s *Service) mutate(w http.ResponseWriter, r *http.Request, user, op string
 	}
 	if err != nil {
 		var pg *pgconn.PgError
-		if errors.As(err, &pg) && pg.Code == "23514" && pg.ConstraintName == "clinics_timezone_check" {
-			return field("timezone", "INVALID_TIMEZONE")
+		if errors.As(err, &pg) {
+			switch pg.ConstraintName {
+			case "clinics_timezone_check":
+				return field("timezone", "INVALID_TIMEZONE")
+			case "clinics_one_virtual_idx":
+				return api.Failure(409, "TELECONSULTATION_EXISTS", "Ya tenés una agenda de teleconsultas.")
+			}
 		}
 		return err
 	}
 	if op != "create" {
-		if err := s.validateSchedules(ctx, tx, workspace, time.Now().UTC()); err != nil {
+		if err := s.validateSchedules(ctx, tx, workspace, result.ID, time.Now().UTC()); err != nil {
+			return err
+		}
+	}
+	if s.bookingsEnabled && op == "status" {
+		if err := tx.QueryRow(ctx, "SELECT count(*) FROM bookings WHERE clinic_id=$1 AND end_at>now() AND status IN ('CONFIRMED','CHECKED_IN')", result.ID).Scan(&result.FutureBookings); err != nil {
 			return err
 		}
 	}

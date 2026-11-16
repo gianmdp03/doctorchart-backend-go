@@ -168,6 +168,7 @@ func (s *Service) staffAuthRoutes(mux *http.ServeMux) {
 	}
 	mux.HandleFunc("POST "+staffBase+"/login", wrap(s.staffLogin))
 	mux.HandleFunc("POST "+staffBase+"/activate", wrap(s.staffActivate))
+	mux.HandleFunc("POST "+staffBase+"/invitation", wrap(s.staffInvitation))
 	mux.HandleFunc("POST "+staffBase+"/recover", wrap(s.staffRecover))
 	mux.HandleFunc("GET "+staffBase+"/session", wrap(func(w http.ResponseWriter, r *http.Request) error {
 		session, err := s.staffSession(r, false)

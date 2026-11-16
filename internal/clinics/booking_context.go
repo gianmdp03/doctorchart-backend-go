@@ -13,6 +13,7 @@ type BookingSpecialty struct {
 	Name string `json:"name"`
 }
 type BookingClinic struct {
+	Modality      string `json:"modality,omitempty"`
 	Name          string `json:"name"`
 	Address       string `json:"address"`
 	PublicAddress string `json:"publicAddress"`

@@ -15,12 +15,12 @@ import (
 
 // Clinical aggregate reads share a repeatable snapshot, as in the reference service.
 func (s *Service) readSnapshot(ctx context.Context, fn func(pgx.Tx) error) error {
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
+	tx, err := s.beginClinicalTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
 	if err != nil {
 		return err
 	}
 	defer func() {
-		if err := tx.Rollback(ctx); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
+		if err := rollbackClinicalTx(ctx, tx); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 			slog.Warn("clinical read rollback failed")
 		}
 	}()

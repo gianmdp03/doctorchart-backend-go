@@ -14,13 +14,17 @@ Para ejecutar DoctorChart desde los repositorios principales, consultá la [guí
 
 Las comprobaciones públicas tienen objetivos separados: `GET /api/doctorchart/ping` devuelve 200 mientras el proceso atiende HTTP (liveness). `GET /api/doctorchart/health` es readiness: comprueba PostgreSQL con contexto máximo de un segundo y la disponibilidad del snapshot vigente de límites Billing. Devuelve 200/UP cuando ambos están disponibles y 503/DOWN en caso contrario, sin detalles de conexión ni secretos. Los probes no realizan llamadas HTTP a Billing; el refresco conserva su ciclo y caché acotada. Usar ping para comprobar el proceso y health para decidir si recibe tráfico. Una interrupción de PostgreSQL y su recuperación no requieren reiniciar el servicio.
 
-Requiere Go 1.27.2 y una base PostgreSQL 17 dedicada, creada y accesible. Una base vacía recibe el esquema completo de [db/schema.sql](db/schema.sql), embebido en el binario: 20 tablas funcionales y `app_schema_state` (21 en total), identidades, claves, restricciones e índices. `bootstrap.Run` ejecuta DDL, catálogos y metadata en una sola transacción READ COMMITTED bajo advisory lock `(17209, 3)`, antes de HTTP y jobs. Un fallo revierte toda la inicialización. Los reinicios validan backend, versión, checksum SQL y fingerprint normalizado del catálogo vivo; los seeds idempotentes conservan configuración administrada y las validaciones clínicas existentes.
+Requiere Go 1.27.3 y una base PostgreSQL 17 o 18 dedicada. El comando separado `init-db` crea el esquema completo de [db/schema.sql](db/schema.sql), embebido en el binario: versión 16, 48 tablas y 61 claves foráneas. Inicializa DDL, catálogos y metadata en una sola transacción READ COMMITTED bajo advisory lock `(17209, 3)`. Un fallo revierte toda la inicialización. La API usa logins restringidos y valida identidad, versión, checksum, fingerprint y permisos antes de iniciar HTTP o jobs. Las políticas RLS aíslan los registros clínicos por cuenta y contexto de especialidad, incluso si una consulta omite el filtro SQL.
 
-Una base parcial, incompatible, con drift o sin marcador válido se rechaza explícitamente. El backend no adopta, repara, vacía ni borra una base existente. Las fuentes DDL anteriores `internal/bootstrap/schema.sql` y `migration/schema-reference.sql`, junto con la preparación transitoria FIRST_VISIT, fueron sustituidas por el baseline único; no se requieren migraciones preproducción ni backfills. El rol necesita permisos CREATE para inicializar. Ver [política, pruebas y futuro inicio desde cero](db/README.md) antes de preparar otra base. El reset de desarrollo requiere autorización posterior y no forma parte del arranque. Nunca ejecutar pruebas contra bases existentes.
+Una base parcial, incompatible, con drift o sin marcador válido se rechaza explícitamente. El backend no adopta, repara, vacía ni borra una base existente. No se requieren migraciones preproducción ni backfills. El dueño del esquema inicializa mediante `init-db`; el administrador provisiona antes `doctorchart_app` y `doctorchart_media` con claves distintas y sin privilegios administrativos ni membresías. Ver [política, roles y pruebas](db/README.md). El reset de desarrollo requiere autorización posterior y no forma parte del arranque. Nunca ejecutar pruebas contra bases existentes.
 
 ```powershell
 $env:PORT = '8083'
-$env:DATABASE_URL = 'postgresql://doctorchart:<clave URI codificada>@localhost:5432/doctorchart'
+$env:DATABASE_URL = 'postgresql://doctorchart_owner:<clave URI codificada>@localhost:5432/doctorchart'
+go run ./cmd/api init-db
+
+$env:DATABASE_URL = 'postgresql://doctorchart_app:<clave URI codificada>@localhost:5432/doctorchart'
+$env:MEDIA_DATABASE_URL = 'postgresql://doctorchart_media:<otra clave URI codificada>@localhost:5432/doctorchart'
 $env:GATEWAY_SHARED_SECRET = '<secreto del gateway de al menos 32 caracteres>'
 $env:SERVICES_BILLING_SHARED_SECRET = '<secreto de billing de al menos 32 caracteres>'
 $env:SERVICES_BILLING_URL = 'http://localhost:8081'
@@ -30,7 +34,7 @@ go run ./cmd/api
 
 El directorio de estudios debe ser absoluto, privado y externo al proyecto; no se admiten enlaces simbólicos. En Linux se crean directorios con permisos 0700 y archivos con 0600. Para S3 configurá `STORAGE_TYPE=s3`, `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` y, si corresponde, `S3_REGION` (predeterminado `auto`).
 
-Para desarrollo se carga automáticamente `.env` del directorio actual o, si no existe, de la raíz del módulo Go usando [godotenv](https://github.com/joho/godotenv). Copiar `.env.example` a `.env` y completar los valores locales; ejecutar `go run ./cmd/api` desde la raíz o `go run .` desde `cmd/api`. Precedencia: variables del proceso, `.env`, valores predeterminados. Un archivo local inválido se rechaza sin buscar otro. PostgreSQL requiere exclusivamente `DATABASE_URL`, con esquema `postgres` o `postgresql`, host, base, usuario y contraseña; los caracteres especiales de las credenciales se codifican como componentes URI. `SPRING_DATASOURCE_*`, JDBC y `DB_USERNAME`/`DB_PASSWORD` ya no configuran PostgreSQL. Los aliases de Gateway/Billing documentados abajo permanecen. No se carga `secrets.properties` ni se requieren escapes Java. `.env` queda excluido de Git y de la imagen Docker; el contenedor puede recibir variables mediante `--env-file .env`. Si no existe el archivo se usan las variables del proceso; si existe pero es inválido, se rechaza sin exponer su contenido.
+Para desarrollo, el servidor HTTP carga automáticamente `.env` del directorio actual o, si no existe, de la raíz del módulo Go usando [godotenv](https://github.com/joho/godotenv). Copiar `.env.example` a `.env` y completar los valores locales; ejecutar `go run ./cmd/api` desde la raíz o `go run .` desde `cmd/api`. Precedencia: variables del proceso, `.env`, valores predeterminados. Un archivo local inválido se rechaza sin buscar otro. PostgreSQL usa `DATABASE_URL` para la aplicación y `MEDIA_DATABASE_URL` para el catálogo de medios gestionados, con esquema `postgres` o `postgresql`, host, base, usuario y contraseña. Los caracteres especiales de las credenciales se codifican como componentes URI. `init-db` recibe la conexión del dueño exclusivamente desde el entorno del proceso. `SPRING_DATASOURCE_*`, JDBC y `DB_USERNAME`/`DB_PASSWORD` ya no configuran PostgreSQL. Los aliases de Gateway/Billing documentados abajo permanecen. `.env` queda excluido de Git y de la imagen Docker; el contenedor puede recibir variables mediante `--env-file .env`. Un archivo inválido se rechaza sin exponer su contenido.
 
 Las peticiones privadas requieren encabezados de confianza del servidor Gateway: `X-Gateway-Secret`, `X-User-Id`, `X-User-Role`, `X-User-Plan` y `X-User-Plan-Expires-At` (RFC3339 futuro). Sin beneficio válido se responde 403, salvo la excepción administrativa autorizada. El navegador envía exclusivamente su bearer; el Gateway valida e inyecta identidad/beneficio. Salud mantiene su acceso público. Billing conserva carga, reintentos, fallback y recarga. El almacenamiento y mantenimiento respetan propiedad, transacciones y cola durable de eliminación.
 
@@ -44,30 +48,28 @@ El Dockerfile genera un binario Linux sin CGO, con certificados y zona horaria, 
 
 ## Integración actual reproducible
 
-El harness Windows requiere Go, Docker, Python con `cryptography`, Pillow, pypdf y pypdfium2; Node/Angular, Playwright y Chrome instalados. Usa los repositorios hermanos `doctorchart-frontend`, `api-ai-gateway-go` y `billing-service-go`. Gateway/Billing se leen y el Gateway se compila desde una copia propia; sus checkouts no se modifican. Requiere un contenedor PostgreSQL 17 descartable propio registrado en `.migration/fixture.json` con nombre `doctorchart-go-fixture-*`, puerto loopback y credenciales sintéticas. Preparar ese contenedor sin Spring ni restaurar un esquema antiguo; no usar el procedimiento histórico `migration/fixture.py prepare` para el baseline actual. `integration/run_local.py` crea una nueva base vacía y el arranque Go ejecuta su bootstrap normal. No proporcionar credenciales de una base real.
+El laboratorio `ops/testing/specialty-m6-lab.mjs` usa PostgreSQL 17 y 18 descartables en Docker Linux. Compila los repositorios principales de DoctorChart y Gateway sin modificarlos. Auth y Billing usan adaptadores locales; Angular, Gateway, API, PostgreSQL, conversor y Mailpit son reales. Requiere Docker, Node, dependencias Angular/Playwright y Chrome. No recibe conexiones de desarrollo ni producción. Sus recursos llevan una etiqueta propia que se comprueba antes de eliminarlos.
 
 En una terminal, desde este repositorio:
 
 ```powershell
-go build -o bin/doctorchart.exe ./cmd/api
-python integration/run_local.py
+node ops/testing/specialty-m6-lab.mjs prepare
+node ops/testing/specialty-m6-lab.mjs build
+node ops/testing/specialty-m6-lab.mjs reset-e2e
+node ops/testing/specialty-m6-lab.mjs go-gates 17
+node ops/testing/specialty-m6-lab.mjs go-gates 18 race
 ```
 
-Cada arranque crea una base nueva y limpia únicamente checkpoints del navegador sintético. Esperar `READY`; luego en otra terminal:
+`reset-e2e` vacía exclusivamente la base descartable del laboratorio. Para la prueba de navegador, desde el repositorio del frontend:
 
 ```powershell
-python integration/verify_local.py
-node integration/browser.mjs
-python integration/verify_current.py
-python integration/verify_pdf.py
-python integration/frontend_gates.py
-docker build -t doctorchart-go:staging-local .
-python integration/verify_runtime.py
+node node_modules/@angular/cli/bin/ng.js build --configuration m6-lab
+node scripts/specialty-contexts-m6-real.cjs
 ```
 
-`verify_local.py` se ejecuta una sola vez contra la base recién creada, antes del navegador. El script Chrome usa el Playwright instalado indicado en su import; ajustar la ruta si cambia el runtime local. `verify_current.py` requiere la copia final: si aún no se generó, ejecutar primero `python integration/recheck_gateway.py`, que sustituye solo el contenedor Gateway de la fixture. Los controles Go completos se indican abajo. `integration/finalize.py` consolida evidencia existente, no ejecuta pruebas ni acredita por sí mismo un cambio nuevo. Una reproducción escribe nuevas evidencias: preservar las anteriores si se necesita comparar.
+La prueba cubre tres especialidades, fichas independientes, consultas, recetas, estudios y descargas, turnos, reservas y secretaría. Para repetirla se requiere otro `reset-e2e` del laboratorio. Las evidencias quedan en `%TEMP%/doctorchart-specialty-m6-20261110`. Para retirar únicamente los contenedores y cachés del laboratorio, ejecutá desde el backend `node ops/testing/specialty-m6-lab.mjs down`.
 
-Detener solo los procesos propios con `New-Item -ItemType File .migration/integration/stop`; las bases sintéticas se retienen. El resumen histórico del 09/10/2026 acredita Angular 573 pruebas, siete controles Go, HTTP inicial 137, Gateway final 24, Chrome final 18 más tres casos de preparación, PDF 20 y restore del esquema anterior de 20 tablas. El baseline actual tiene 21 tablas; una ejecución nueva necesita evidencias nuevas. Consultar el informe para el alcance exacto de cada ejecución.
+Los scripts y resultados de `integration/` corresponden al cierre anterior a RLS: asumían inicialización dentro del proceso HTTP y credenciales del dueño. Se conservan como evidencia histórica; para el esquema 16 usá el laboratorio con roles separados.
 
 Para staging hay que fijar la revisión Gateway y reconstruir Angular con URLs públicas de ese entorno, según [la guía Angular](../doctorchart-frontend/docs/angular-go-staging.md). Supabase/OAuth/renovación automática, Billing/pagos, AWS/R2, Gemini e impresoras reales requieren validación externa. No se desplegó ni se modificaron bases reales.
 

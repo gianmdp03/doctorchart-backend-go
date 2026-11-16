@@ -20,7 +20,7 @@ func bookingFixture(t *testing.T) (*fixture, Clinic, time.Time) {
 	f := newFixture(t)
 	f.limit.Store(-1)
 	mux := http.NewServeMux()
-	NewWithBookings(f.pool, f.rights, true, true).Routes(mux)
+	NewWithBookings(f.runtime, f.rights, true, true).Routes(mux)
 	f.handler = api.Gateway("gateway-fixture", api.Dispatch(mux))
 	c := scheduleClinicFixture(t, f)
 	// UTC removes the machine timezone from the HTTP fixture.

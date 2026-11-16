@@ -58,8 +58,12 @@ func TestBaselineEmptyRestartAndSequences(t *testing.T) {
 		t.Fatal(err)
 	}
 	var count int
-	if err := pool.QueryRow("SELECT count(*) FROM pg_tables WHERE schemaname='public'").Scan(&count); err != nil || count != 49 {
+	if err := pool.QueryRow("SELECT count(*) FROM pg_tables WHERE schemaname='public'").Scan(&count); err != nil || count != 48 {
 		t.Fatal(count, err)
+	}
+	var generation int64
+	if err := pool.QueryRow("SELECT generation FROM clinic_entitlement_epoch WHERE id=1").Scan(&generation); err != nil || generation != 0 {
+		t.Fatalf("expected initialized entitlement generation, got %d: %v", generation, err)
 	}
 	// Normal sequence advancement is data, never catalog drift.
 	if _, err := pool.Exec("SELECT nextval(quote_ident(schemaname)||'.'||quote_ident(sequencename)) FROM pg_sequences WHERE schemaname='public'"); err != nil {
@@ -85,7 +89,7 @@ func TestBaselineEmptyRestartAndSequences(t *testing.T) {
 func TestBaselineRejectsDriftWithoutRepair(t *testing.T) {
 	for _, mutation := range []string{
 		"DROP TABLE app_schema_state", "ALTER TABLE app_schema_state DROP COLUMN initialized_at", "ALTER TABLE app_schema_state ALTER COLUMN backend TYPE varchar(40)", "ALTER TABLE app_schema_state ALTER COLUMN backend DROP NOT NULL", "ALTER TABLE app_schema_state ALTER COLUMN initialized_at DROP DEFAULT", "ALTER TABLE app_schema_state DROP CONSTRAINT app_schema_state_pkey", "ALTER TABLE app_schema_state ADD CONSTRAINT fixture_extra CHECK(backend<>'bad')", "CREATE INDEX fixture_extra ON app_schema_state(backend)", "CREATE TABLE fixture_unknown(id integer)", "CREATE DOMAIN fixture_domain AS integer CHECK(VALUE>0)", "CREATE SCHEMA fixture_namespace", "CREATE SCHEMA pgapp; CREATE TABLE pgapp.fixture_hidden(id integer)", "CREATE OPERATOR public.=== (LEFTARG=integer, RIGHTARG=integer, FUNCTION=pg_catalog.int4eq)", "CREATE AGGREGATE public.fixture_aggregate(integer) (SFUNC=pg_catalog.int4pl, STYPE=integer, INITCOND='0')", "CREATE RULE fixture_rule AS ON UPDATE TO app_schema_state DO ALSO NOTIFY fixture_rule",
-		"UPDATE app_schema_state SET baseline_version=999", "UPDATE app_schema_state SET sql_sha256=repeat('0',64)", "UPDATE app_schema_state SET catalog_sha256=repeat('0',64)", "UPDATE app_schema_state SET backend='other'", "DELETE FROM app_schema_state",
+		"UPDATE app_schema_state SET baseline_version=10", "UPDATE app_schema_state SET baseline_version=999", "UPDATE app_schema_state SET sql_sha256=repeat('0',64)", "UPDATE app_schema_state SET catalog_sha256=repeat('0',64)", "UPDATE app_schema_state SET backend='other'", "DELETE FROM app_schema_state",
 		"ALTER TABLE patients DROP COLUMN phone", "DROP INDEX clinical_encounters_one_first_visit", "ALTER TABLE clinical_encounters DROP CONSTRAINT clinical_encounters_consultation_type_check",
 		"ALTER TABLE patient_medical_studies DROP COLUMN study_name", "ALTER TABLE patient_medical_studies ALTER COLUMN study_name DROP NOT NULL",
 	} {
@@ -235,4 +239,59 @@ func mustPool(ctx context.Context, sqlPool *sql.DB) *pgxpool.Pool {
 		panic(err)
 	}
 	return pool
+}
+
+func TestConsolidatedCatalogDerivation(t *testing.T) {
+	pool := fixture(t)
+	tx, err := pool.BeginTx(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	if _, err = tx.Exec("SET LOCAL search_path = public, pg_catalog"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(Schema); err != nil {
+		t.Fatal(err)
+	}
+	var major int
+	var catalog string
+	if err = tx.QueryRow("SELECT current_setting('server_version_num')::integer / 10000").Scan(&major); err != nil {
+		t.Fatal(err)
+	}
+	if err = tx.QueryRow(catalogSQL, []string{}).Scan(&catalog); err != nil {
+		t.Fatal(err)
+	}
+	expected, err := catalogForMajor(major)
+	if err != nil || digest(catalog) != expected {
+		t.Fatalf("catalog derived from SQL has fingerprint %s, expected %s: %v", digest(catalog), expected, err)
+	}
+}
+
+func TestUnknownPostgreSQLMajorFailsClosed(t *testing.T) {
+	for _, major := range []int{16, 19} {
+		if _, err := catalogForMajor(major); err == nil {
+			t.Fatalf("unsupported major %d accepted", major)
+		}
+	}
+}
+
+func TestBaselineTransactionSettings(t *testing.T) {
+	pool := mustPool(t.Context(), fixture(t))
+	defer pool.Close()
+	err := Ensure(t.Context(), pool, func(ctx context.Context, tx pgx.Tx) error {
+		for setting, expected := range map[string]string{"transaction_isolation": "read committed", "lock_timeout": "10s", "statement_timeout": "20s"} {
+			var actual string
+			if err := tx.QueryRow(ctx, "SHOW "+setting).Scan(&actual); err != nil {
+				return err
+			}
+			if actual != expected {
+				return fmt.Errorf("%s=%s, expected %s", setting, actual, expected)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 }

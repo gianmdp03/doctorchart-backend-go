@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -12,10 +13,13 @@ import (
 	"github.com/syntah/doctorchart-backend-go/internal/billing"
 )
 
+var staffPhone = regexp.MustCompile(`^\+[1-9][0-9]{7,14}$`)
+
 type staffAccess struct {
 	ID          string   `json:"id"`
 	Email       string   `json:"email"`
 	Name        string   `json:"name"`
+	Phone       string   `json:"phone"`
 	Version     string   `json:"version"`
 	Active      bool     `json:"active"`
 	Activated   bool     `json:"activated"`
@@ -25,6 +29,7 @@ type staffAccess struct {
 type staffAccessRequest struct {
 	Email           string   `json:"email"`
 	Name            string   `json:"name"`
+	Phone           string   `json:"phone"`
 	ExpectedVersion string   `json:"expectedVersion"`
 	Permissions     []string `json:"permissions"`
 	ClinicIDs       []string `json:"clinicIds"`
@@ -67,7 +72,7 @@ func (s *Service) staffOwnerRoutes(mux *http.ServeMux, wrap func(func(http.Respo
 	}))
 }
 func readStaffAccess(ctx context.Context, q scheduleReader, workspace int64) ([]staffAccess, error) {
-	rows, err := q.Query(ctx, `SELECT a.id::text,a.email,a.name,a.version::text,a.active,a.account_id IS NOT NULL,a.permissions,COALESCE(array_agg(c.clinic_id::text ORDER BY c.clinic_id) FILTER(WHERE c.clinic_id IS NOT NULL),ARRAY[]::text[]) FROM staff_access a LEFT JOIN staff_access_clinics c ON c.access_id=a.id WHERE a.workspace_id=$1 GROUP BY a.id ORDER BY a.email`, workspace)
+	rows, err := q.Query(ctx, `SELECT a.id::text,a.email,a.name,a.phone,a.version::text,a.active,a.account_id IS NOT NULL,a.permissions,COALESCE(array_agg(c.clinic_id::text ORDER BY c.clinic_id) FILTER(WHERE c.clinic_id IS NOT NULL),ARRAY[]::text[]) FROM staff_access a LEFT JOIN staff_access_clinics c ON c.access_id=a.id WHERE a.workspace_id=$1 GROUP BY a.id ORDER BY a.email`, workspace)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +80,7 @@ func readStaffAccess(ctx context.Context, q scheduleReader, workspace int64) ([]
 	items := []staffAccess{}
 	for rows.Next() {
 		var a staffAccess
-		if err = rows.Scan(&a.ID, &a.Email, &a.Name, &a.Version, &a.Active, &a.Activated, &a.Permissions, &a.ClinicIDs); err != nil {
+		if err = rows.Scan(&a.ID, &a.Email, &a.Name, &a.Phone, &a.Version, &a.Active, &a.Activated, &a.Permissions, &a.ClinicIDs); err != nil {
 			return nil, err
 		}
 		items = append(items, a)
@@ -131,6 +136,10 @@ func (s *Service) staffOwnerWrite(w http.ResponseWriter, r *http.Request, user, 
 			if err != nil {
 				return err
 			}
+			req.Phone = strings.TrimSpace(req.Phone)
+			if req.Phone != "" && !staffPhone.MatchString(req.Phone) {
+				return api.Invalid("Usá un teléfono con código de país, por ejemplo +5491123456789.")
+			}
 			req.Name = strings.TrimSpace(req.Name)
 			if len([]rune(req.Name)) < 1 || len([]rune(req.Name)) > 160 {
 				return api.Invalid("Revisá el nombre.")
@@ -169,9 +178,9 @@ func (s *Service) staffOwnerWrite(w http.ResponseWriter, r *http.Request, user, 
 			if _, err = tx.Exec(r.Context(), "UPDATE staff_invitations SET consumed_at=COALESCE(consumed_at,clock_timestamp()) WHERE access_id=$1", id); err != nil {
 				return err
 			}
-			_, err = tx.Exec(r.Context(), "UPDATE staff_access SET name=$1,permissions=$2,active=true,version=version+1 WHERE id=$3", req.Name, req.Permissions, id)
+			_, err = tx.Exec(r.Context(), "UPDATE staff_access SET name=$1,permissions=$2,active=true,version=version+1,phone=$4 WHERE id=$3", req.Name, req.Permissions, id, req.Phone)
 		} else if errors.Is(err, pgx.ErrNoRows) {
-			_, err = tx.Exec(r.Context(), "INSERT INTO staff_access(id,workspace_id,email,name,permissions) VALUES($1,$2,$3,$4,$5)", id, workspace, req.Email, req.Name, req.Permissions)
+			_, err = tx.Exec(r.Context(), "INSERT INTO staff_access(id,workspace_id,email,name,permissions,phone) VALUES($1,$2,$3,$4,$5,$6)", id, workspace, req.Email, req.Name, req.Permissions, req.Phone)
 		} else {
 			return err
 		}
@@ -222,7 +231,7 @@ func (s *Service) staffOwnerWrite(w http.ResponseWriter, r *http.Request, user, 
 		}
 	}
 	var code string
-	expiry := time.Now().UTC().Add(24 * time.Hour)
+	expiry := time.Now().UTC().Add(6 * time.Hour)
 	if op == "invite" {
 		code = staffToken()
 		_, err = tx.Exec(r.Context(), "INSERT INTO staff_invitations(token_hash,access_id,expires_at) VALUES($1,$2,$3)", staffHash(code), id, expiry)
@@ -232,11 +241,6 @@ func (s *Service) staffOwnerWrite(w http.ResponseWriter, r *http.Request, user, 
 	}
 	if err != nil {
 		return err
-	}
-	if op == "invite" && s.notices != nil {
-		if err = s.notices.Invitation(r.Context(), tx, id, req.Email, code, expiry); err != nil {
-			return err
-		}
 	}
 	if err = staffAudit(r.Context(), tx, "", id, "OWNER_"+strings.ToUpper(op)); err != nil {
 		return err

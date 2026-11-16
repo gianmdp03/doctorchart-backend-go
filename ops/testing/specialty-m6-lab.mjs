@@ -15,6 +15,14 @@ const json=(p,value)=>writeFileSync(p,JSON.stringify(value,null,2),{mode:0o600})
 const docker=(...args)=>run('docker',args);
 const compose=(...args)=>docker('compose','-p',project,'-f',join(root,'compose.json'),...args);
 const mount=p=>p.replaceAll('\\','/');
+const appPassword='fixture_m6_doctorchart_app';
+const mediaPassword='fixture_m6_doctorchart_media';
+const ownerPassword='fixture_m6_doctorchart_owner';
+function initialize(s){
+ if(s.database!=='fixture_m6_specialties')throw Error('Unexpected disposable database identity');
+ const owner=`postgres://doctorchart_owner:${ownerPassword}@pg18:5432/doctorchart_m6_e2e?sslmode=disable`;
+ compose('run','--rm','--no-deps','-e',`DATABASE_URL=${owner}`,'--entrypoint','/app/backend','backend','init-db');
+}
 function owned(){
  const state=JSON.parse(readFileSync(join(root,'settings.json')));if(state.task!==tag)throw Error('Lab identity mismatch');
  const network=project+'_default';
@@ -37,10 +45,10 @@ if(command==='prepare'){
  writeFileSync(join(root,'cert.sh'),'set -eu\ncd /src\ngo run ./ops/local/cert.go /lab/certs\n');
  if(!existsSync(join(root,'certs/cert.pem')))docker('run','--rm','--label','codex.task='+tag,'--mount',`type=bind,source=${backend},target=/src,readonly`,'--mount',`type=bind,source=${root},target=/lab`,'--mount',`type=volume,source=${tag}-gocache,target=/root/.cache/go-build`,'golang:1.27.3','sh','/lab/cert.sh');
  const labels={'codex.task':tag},certs=mount(join(root,'certs'))+':/certs:ro',bin=mount(join(root,'bin'))+':/app:ro';
- const postgres=major=>({image:'postgres:'+major,container_name:project+'-pg'+major,labels,environment:{POSTGRES_USER:'migration_fixture',POSTGRES_PASSWORD:s.database,POSTGRES_DB:major===18?'doctorchart_m6_e2e':'postgres'},ports:[`127.0.0.1:${major===17?55468:55470}:5432`],tmpfs:[major===17?'/var/lib/postgresql/data':'/var/lib/postgresql'],healthcheck:{test:['CMD','pg_isready','-U','migration_fixture'],interval:'2s',timeout:'3s',retries:30}});
+ const postgres=major=>({image:'postgres:'+major,container_name:project+'-pg'+major,labels,environment:{POSTGRES_USER:'migration_fixture',POSTGRES_PASSWORD:s.database,POSTGRES_DB:major===18?'doctorchart_m6_e2e':'postgres'},ports:[`127.0.0.1:${major===17?55468:55470}:5432`],tmpfs:[major===17?'/var/lib/postgresql/data':'/var/lib/postgresql'],healthcheck:{test:['CMD','pg_isready','-U','migration_fixture','-d','postgres'],interval:'2s',timeout:'3s',retries:30}});
  const services={pg17:postgres(17),pg18:postgres(18),
  support:{image:'node:24.20.0',container_name:project+'-support',labels,command:['node','/support.mjs'],ports:['127.0.0.1:19447:9443'],volumes:[mount(join(backend,'ops/local/support.mjs'))+':/support.mjs:ro',mount(root)+':/local',certs]},
- backend:{image:'golang:1.27.3',container_name:project+'-backend',labels,command:['/app/backend'],volumes:[bin,mount(join(root,'storage'))+':/data',certs],environment:{PORT:'8083',DATABASE_URL:`postgres://migration_fixture:${s.database}@pg18:5432/doctorchart_m6_e2e?sslmode=disable`,GATEWAY_SHARED_SECRET:s.gateway,SERVICES_BILLING_SHARED_SECRET:s.billing,SERVICES_BILLING_URL:'http://support:9000',STORAGE_TYPE:'local',STUDIES_STORAGE_DIR:'/data/studies',MEDIA_PROVIDER:'local',MEDIA_ENVIRONMENT:'development',MEDIA_LOCAL_DIR:'/data/media',MEDIA_RECOVERY_LOCAL_DIR:'/data/recovery',IMAGE_CONVERTER_URL:'http://converter:8086',IMAGE_CONVERTER_API_KEY:s.image,STUDIES_ALLOW_IMAGE_TRANSFORM:'true',SCHEDULES_ENABLED:'true',BOOKINGS_ENABLED:'true',PUBLIC_BOOKINGS_ENABLED:'true',STAFF_ENABLED:'true',STAFF_ORIGIN:s.origin,NOTIFICATIONS_ENABLED:'true',NOTIFICATIONS_KEY:s.notifications,NOTIFICATIONS_PUBLIC_ORIGIN:s.origin,NOTIFICATIONS_SMTP_HOST:'mailpit',NOTIFICATIONS_SMTP_PORT:'1025',NOTIFICATIONS_SMTP_FROM:'turnos@doctorchart.local',NOTIFICATIONS_SMTP_TLS:'starttls',SSL_CERT_FILE:'/certs/cert.pem'},depends_on:{pg18:{condition:'service_healthy'},support:{condition:'service_started'},mailpit:{condition:'service_started'}}},
+ backend:{image:'golang:1.27.3',container_name:project+'-backend',labels,command:['/app/backend'],volumes:[bin,mount(join(root,'storage'))+':/data',certs],environment:{PORT:'8083',DATABASE_URL:`postgres://doctorchart_app:${appPassword}@pg18:5432/doctorchart_m6_e2e?sslmode=disable`,MEDIA_DATABASE_URL:`postgres://doctorchart_media:${mediaPassword}@pg18:5432/doctorchart_m6_e2e?sslmode=disable`,GATEWAY_SHARED_SECRET:s.gateway,SERVICES_BILLING_SHARED_SECRET:s.billing,SERVICES_BILLING_URL:'http://support:9000',STORAGE_TYPE:'local',STUDIES_STORAGE_DIR:'/data/studies',MEDIA_PROVIDER:'local',MEDIA_ENVIRONMENT:'development',MEDIA_LOCAL_DIR:'/data/media',MEDIA_RECOVERY_LOCAL_DIR:'/data/recovery',IMAGE_CONVERTER_URL:'http://converter:8086',IMAGE_CONVERTER_API_KEY:s.image,STUDIES_ALLOW_IMAGE_TRANSFORM:'true',SCHEDULES_ENABLED:'true',BOOKINGS_ENABLED:'true',PUBLIC_BOOKINGS_ENABLED:'true',STAFF_ENABLED:'true',STAFF_ORIGIN:s.origin,NOTIFICATIONS_ENABLED:'true',NOTIFICATIONS_KEY:s.notifications,NOTIFICATIONS_PUBLIC_ORIGIN:s.origin,NOTIFICATIONS_SMTP_HOST:'mailpit',NOTIFICATIONS_SMTP_PORT:'1025',NOTIFICATIONS_SMTP_FROM:'turnos@doctorchart.local',NOTIFICATIONS_SMTP_TLS:'starttls',SSL_CERT_FILE:'/certs/cert.pem'},depends_on:{pg18:{condition:'service_healthy'},support:{condition:'service_started'},mailpit:{condition:'service_started'}}},
  gateway:{image:'golang:1.27.3',container_name:project+'-gateway',labels,command:['/app/gateway'],ports:['127.0.0.1:18087:8000'],volumes:[bin,certs],environment:{PORT:'8000',GATEWAY_SHARED_SECRET:s.gateway,POINTLY_SERVICE_URL:'http://support:9000',BILLING_SERVICE_URL:'http://support:9000',DOCTORCHART_SERVICE_URL:'http://backend:8083',SUPABASE_JWT_ISSUER:'https://local-support:9443/auth/v1',SUPABASE_JWKS_URL:'https://local-support:9443/auth/v1/.well-known/jwks.json',SUPABASE_JWT_AUDIENCE:'authenticated',CORS_ALLOWED_ORIGINS:s.origin,SSL_CERT_FILE:'/certs/cert.pem'},depends_on:['backend','support']},
  converter:{image:'bycode/image-email:local',container_name:project+'-converter',labels,environment:{LISTEN_ADDR:':8086',APPLICATIONS:'doctorchart',PROFILES:'doctorchart-study,avatar',APP_DOCTORCHART_API_KEY:s.image,APP_DOCTORCHART_PROFILES:'doctorchart-study,avatar',PROFILE_DOCTORCHART_STUDY_MODE:'transform',PROFILE_DOCTORCHART_STUDY_FORMAT:'webp',PROFILE_DOCTORCHART_STUDY_QUALITY:'75',PROFILE_DOCTORCHART_STUDY_MAX_WIDTH:'2048',PROFILE_DOCTORCHART_STUDY_MAX_HEIGHT:'2048',MAIL_ENABLED:'false'}},
  mailpit:{image:'axllent/mailpit:v1.27.10',container_name:project+'-mailpit',labels,ports:['127.0.0.1:18029:8025'],volumes:[certs],environment:{MP_SMTP_TLS_CERT:'/certs/cert.pem',MP_SMTP_TLS_KEY:'/certs/key.pem',MP_SMTP_REQUIRE_STARTTLS:'true'}}};
@@ -54,15 +62,26 @@ if(command==='prepare'){
  const generated=join(frontend,'src/environments/environment.m6.generated.ts');if(existsSync(generated)&&!readFileSync(generated,'utf8').startsWith('// Owned M6 lab only'))throw Error('Refusing to overwrite foreign generated config');
  writeFileSync(generated,"// Owned M6 lab only; never deploy.\nimport {baseEnvironment} from './environment.base';\nexport const environment={...baseEnvironment,production:false,appUrl:"+JSON.stringify(s.origin)+",apiUrl:"+JSON.stringify(s.origin+'/api/doctorchart')+",aiGatewayUrl:"+JSON.stringify(s.origin+'/api/ai/doctorchart/chat')+",bycodePlansUrl:"+JSON.stringify(s.origin+'/dashboard')+",supabase:"+JSON.stringify(values.supabase)+"};\n");
  writeFileSync(join(root,'build.sh'),`set -eu\ncd /src\ngo build -mod=readonly -o /lab/bin/backend ./cmd/api\ncd /gateway\ngo build -mod=readonly -o /lab/bin/gateway .\n`);
- compose('up','-d','pg17','pg18','support','converter','mailpit');
+ compose('up','-d','--wait','pg17','pg18','support','converter','mailpit');
+ owned();
+ for(const major of [17,18]){
+  const sql=`DO $$ BEGIN
+   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='doctorchart_app') THEN CREATE ROLE doctorchart_app LOGIN PASSWORD '${appPassword}'; END IF;
+   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='doctorchart_media') THEN CREATE ROLE doctorchart_media LOGIN PASSWORD '${mediaPassword}'; END IF;
+   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='doctorchart_owner') THEN CREATE ROLE doctorchart_owner LOGIN PASSWORD '${ownerPassword}'; END IF;
+  END $$;`;
+  docker('exec',project+'-pg'+major,'psql','-X','-v','ON_ERROR_STOP=1','-U','migration_fixture','-d','postgres','-c',sql);
+ }
+ docker('exec',project+'-pg18','psql','-X','-v','ON_ERROR_STOP=1','-U','migration_fixture','-d','postgres','-c','ALTER DATABASE doctorchart_m6_e2e OWNER TO doctorchart_owner');
  console.log('Owned M6 lab prepared; no existing database or frontend local config changed.');
 }else if(command==='build'){
  owned();docker('run','--rm','--label','codex.task='+tag,'--mount',`type=bind,source=${backend},target=/src,readonly`,'--mount',`type=bind,source=${gateway},target=/gateway,readonly`,'--mount',`type=bind,source=${join(repos,'bycode-image-email-service-go/pkg/media')},target=/bycode-image-email-service-go/pkg/media,readonly`,'--mount',`type=bind,source=${root},target=/lab`,'--mount',`type=volume,source=${tag}-gomod,target=/go/pkg/mod`,'--mount',`type=volume,source=${tag}-gocache,target=/root/.cache/go-build`,'-e','GOMAXPROCS=2','golang:1.27.3','sh','/lab/build.sh');
-}else if(command==='up'){owned();compose('up','-d','backend','gateway');
+}else if(command==='up'){initialize(owned());compose('up','-d','backend','gateway');
 }else if(command==='reset-e2e'){
- owned();compose('stop','gateway','backend');
+ const s=owned();compose('stop','gateway','backend');
  docker('exec',project+'-pg18','dropdb','-U','migration_fixture','--force','doctorchart_m6_e2e');
- docker('exec',project+'-pg18','createdb','-U','migration_fixture','doctorchart_m6_e2e');
+ docker('exec',project+'-pg18','createdb','-U','migration_fixture','-O','doctorchart_owner','doctorchart_m6_e2e');
+ initialize(s);
  compose('up','-d','backend','gateway');
 }else if(command==='go-gates'){
  const s=owned(),major=Number(process.argv[3]),race=process.argv[4]==='race';
@@ -86,6 +105,8 @@ trap 'kill "$proxy_pid"' EXIT
 test -z "$(gofmt -l cmd db internal ops)"
 go build ./...
 go vet ./...
+export DOCTORCHART_TEST_APP_PASSWORD='${appPassword}'
+export DOCTORCHART_TEST_MEDIA_PASSWORD='${mediaPassword}'
 export BASELINE_TEST_ADMIN_DSN='${dsn('postgres')}'
 ${Object.entries(databases).map(([key,name])=>`export ${key}='${dsn(name)}'`).join('\n')}
 go test ${race?'-race ':''}-p 1 ./... -count=1

@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/syntah/doctorchart-backend-go/db"
 	"github.com/syntah/doctorchart-backend-go/internal/api"
 	"github.com/syntah/doctorchart-backend-go/internal/billing"
 	"github.com/syntah/doctorchart-backend-go/internal/growth"
@@ -166,12 +167,12 @@ func (s *Service) transaction(ctx context.Context, readOnly bool, fn func(pgx.Tx
 	if readOnly {
 		options.AccessMode = pgx.ReadOnly
 	}
-	tx, err := s.pool.BeginTx(ctx, options)
+	tx, err := s.beginClinicalTx(ctx, options)
 	if err != nil {
 		return err
 	}
 	defer func() {
-		if err := tx.Rollback(ctx); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
+		if err := rollbackClinicalTx(ctx, tx); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 			slog.Warn("clinical rollback failed")
 		}
 	}()
@@ -417,6 +418,9 @@ func (s *Service) CreatePatient(ctx context.Context, identity api.Identity, requ
 		if err != nil {
 			return err
 		}
+		if err := db.BindClinicalScope(ctx, tx, identity.UserID, setup.ContextID); err != nil {
+			return err
+		}
 		admin := false
 		for _, role := range identity.Roles {
 			if strings.EqualFold(role, "ROLE_SUPER_ADMIN") {
@@ -434,7 +438,7 @@ func (s *Service) CreatePatient(ctx context.Context, identity api.Identity, requ
 				}
 			}
 			var count int64
-			if err := tx.QueryRow(ctx, "SELECT count(*) FROM patients WHERE user_id=$1", identity.UserID).Scan(&count); err != nil {
+			if err := tx.QueryRow(ctx, "SELECT public.patient_quota_count()").Scan(&count); err != nil {
 				return err
 			}
 			max := s.rules.Int(plan, "max_patients", 50)

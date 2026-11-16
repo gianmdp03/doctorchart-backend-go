@@ -15,6 +15,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/syntah/doctorchart-backend-go/db"
 	"github.com/syntah/doctorchart-backend-go/internal/api"
 )
 
@@ -338,6 +339,14 @@ func replayBooking(ctx context.Context, q scheduleReader, workspace int64, key, 
 func bookingTransition(old, target string) bool {
 	return old == target || (old == "CONFIRMED" && (target == "CHECKED_IN" || target == "NO_SHOW" || target == "CANCELLED")) || (old == "CHECKED_IN" && (target == "COMPLETED" || target == "CANCELLED"))
 }
+
+func bindBookingPatientScope(ctx context.Context, tx pgx.Tx, owner, contextID string) error {
+	id, err := strconv.ParseInt(contextID, 10, 64)
+	if err != nil || id <= 0 {
+		return bookingContextConflict()
+	}
+	return db.BindClinicalScope(ctx, tx, owner, id)
+}
 func (s *Service) mutateBooking(w http.ResponseWriter, r *http.Request, user, op string) error {
 	var previous Booking
 	if op != "create" {
@@ -365,6 +374,9 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 		return err
 	}
 	staff := staffFrom(r.Context())
+	if request.PatientID != nil && (staff != nil || public != nil) {
+		return api.Failure(403, "PATIENT_LINK_FORBIDDEN", "Sólo el médico puede vincular la ficha clínica.")
+	}
 	var status int
 	var response json.RawMessage
 	if staff == nil {
@@ -437,18 +449,11 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 		return api.Failure(403, "CLINIC_MANAGEMENT_DISABLED", "Tu cobertura no habilita la gestión de reservas.")
 	}
 	var count int64
-	if err = tx.QueryRow(ctx, "SELECT count(*) FROM clinics WHERE workspace_id=$1 AND status<>'ARCHIVED'", workspace).Scan(&count); err != nil {
+	if err = tx.QueryRow(ctx, "SELECT count(*) FROM clinics WHERE workspace_id=$1 AND status<>'ARCHIVED' AND modality='IN_PERSON'", workspace).Scan(&count); err != nil {
 		return err
 	}
 	if snapshot.MaxClinics == nil {
 		return unavailable()
-	}
-	// Cancelling or closing an existing booking must remain possible during a downgrade.
-	if (op == "create" || op == "reschedule") && *snapshot.MaxClinics != -1 && count > *snapshot.MaxClinics {
-		if public != nil {
-			return publicDenied()
-		}
-		return api.Failure(409, "CLINIC_LIMIT_REACHED", "Regularizá el cupo de consultorios antes de crear o reprogramar reservas.")
 	}
 	if op != "create" {
 		previous, err = ownedBooking(ctx, tx, user, previous.ID)
@@ -463,6 +468,9 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 		return api.Failure(403, "PATIENT_LINK_FORBIDDEN", "Sólo el médico puede vincular la ficha clínica.")
 	}
 	if request.PatientID != nil && op == "link" {
+		if err = bindBookingPatientScope(ctx, tx, user, previous.ContextID); err != nil {
+			return err
+		}
 		var valid bool
 		if err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM patients WHERE id=$1 AND user_id=$2 AND specialty_context_id=$3 AND workspace_id=$4)", *request.PatientID, user, previous.ContextID, workspace).Scan(&valid); err != nil {
 			return err
@@ -501,6 +509,12 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 		if err != nil {
 			return err
 		}
+		if clinic.Modality != teleconsultation && *snapshot.MaxClinics != -1 && count > *snapshot.MaxClinics {
+			if public != nil {
+				return publicDenied()
+			}
+			return api.Failure(409, "CLINIC_LIMIT_REACHED", "Regularizá el cupo de consultorios antes de crear o reprogramar reservas.")
+		}
 		if clinic.Status != "ACTIVE" {
 			return api.Failure(409, "CLINIC_STATE_CONFLICT", "El consultorio no está activo.")
 		}
@@ -533,6 +547,9 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 			return bookingContextConflict()
 		}
 		if request.PatientID != nil {
+			if err = bindBookingPatientScope(ctx, tx, user, slot.contextID); err != nil {
+				return err
+			}
 			var valid bool
 			if err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM patients WHERE id=$1 AND workspace_id=$2 AND specialty_context_id=$3)", *request.PatientID, workspace, slot.contextID).Scan(&valid); err != nil {
 				return err

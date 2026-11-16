@@ -40,6 +40,7 @@ type Error struct {
 	Code    string       `json:"code"`
 	Message string       `json:"message"`
 	Errors  []FieldError `json:"errors"`
+	Details any          `json:"details,omitempty"`
 }
 
 func (e *Error) Error() string { return e.Code + ": " + e.Message }
@@ -223,7 +224,7 @@ func StaffRoute(method, p string) bool {
 		}
 		if method == "POST" {
 			switch parts[0] {
-			case "login", "activate", "recover", "logout", "password", "recovery-email", "recover-email":
+			case "login", "activate", "invitation", "recover", "logout", "password", "recovery-email", "recover-email":
 				return true
 			}
 		}

@@ -249,11 +249,18 @@ func (s *Service) StudyRoutes(mux *http.ServeMux) {
 					description = &value
 				}
 			}
+			var stable string
 			if err == nil {
 				// Authorize before conversion, then release the database connection
 				// while the request waits in the shared converter's queue.
 				err = s.transaction(ctx, true, func(tx pgx.Tx) error {
-					return s.studyOwner(ctx, tx, api.User(ctx).UserID, id)
+					if err := s.studyOwner(ctx, tx, api.User(ctx).UserID, id); err != nil {
+						return err
+					}
+					if s.files.Managed() {
+						return tx.QueryRow(ctx, "SELECT media_identity::text FROM patients WHERE id=$1", id).Scan(&stable)
+					}
+					return nil
 				})
 			}
 			if err == nil {
@@ -265,15 +272,9 @@ func (s *Service) StudyRoutes(mux *http.ServeMux) {
 				}
 				uploadContext := ctx
 				if s.files.Managed() {
-					var stable string
-					err = s.pool.QueryRow(ctx, "SELECT media_identity::text FROM patients WHERE id=$1 AND user_id=$2", id, api.User(ctx).UserID).Scan(&stable)
-					if err == nil {
-						uploadContext = storage.WithOwner(ctx, api.User(ctx).UserID, stable)
-					}
+					uploadContext = storage.WithOwner(ctx, api.User(ctx).UserID, stable)
 				}
-				if err == nil {
-					stored, err = upload.Save(uploadContext, originalName, input)
-				}
+				stored, err = upload.Save(uploadContext, originalName, input)
 			}
 			if err == nil {
 				err = s.transaction(ctx, false, func(tx pgx.Tx) error {
@@ -298,14 +299,11 @@ func (s *Service) StudyRoutes(mux *http.ServeMux) {
 						if err != nil {
 							return err
 						}
-						if _, err = tx.Exec(ctx, common.CatalogUpsert, asset.ID, string(data)); err != nil {
-							return err
-						}
 						eventID, event, err := common.QueuedEvent("association-confirmed", asset)
 						if err != nil {
 							return err
 						}
-						if _, err = tx.Exec(ctx, common.OutboxInsert, eventID, string(event)); err != nil {
+						if _, err = tx.Exec(ctx, "SELECT public.record_study_asset($1,$2,$3,$4,$5)", id, asset.ID, string(data), eventID, string(event)); err != nil {
 							return err
 						}
 					}
@@ -510,7 +508,7 @@ func (s *Service) deletePendingFiles(ctx context.Context) {
 				// Retire owns a catalog transaction on this same pool. Do not
 				// hold a queue connection while it acquires its connection.
 				var referenced bool
-				if err := s.pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM patient_medical_studies WHERE stored_file_name=$1)", key).Scan(&referenced); err != nil {
+				if err := s.pool.QueryRow(ctx, "SELECT public.study_file_referenced($1)", key).Scan(&referenced); err != nil {
 					slog.Warn("study deletion queue unavailable")
 					return
 				}
@@ -520,7 +518,7 @@ func (s *Service) deletePendingFiles(ctx context.Context) {
 				if err := s.files.Delete(ctx, key); err != nil {
 					continue // durable queue and catalog intent remain for retry
 				}
-				if _, err := s.pool.Exec(ctx, "DELETE FROM study_file_deletions WHERE storage_key=$1 AND NOT EXISTS(SELECT 1 FROM patient_medical_studies WHERE stored_file_name=$1)", key); err != nil {
+				if _, err := s.pool.Exec(ctx, "DELETE FROM study_file_deletions WHERE storage_key=$1 AND NOT public.study_file_referenced(storage_key)", key); err != nil {
 					slog.Warn("study file deletion retained for retry")
 				}
 				continue
@@ -535,7 +533,7 @@ func (s *Service) deletePendingFiles(ctx context.Context) {
 					return err
 				}
 				var referenced bool
-				if err := tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM patient_medical_studies WHERE stored_file_name=$1)", key).Scan(&referenced); err != nil {
+				if err := tx.QueryRow(ctx, "SELECT public.study_file_referenced($1)", key).Scan(&referenced); err != nil {
 					return err
 				}
 				if referenced {

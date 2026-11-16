@@ -6,18 +6,19 @@
 
 Cuenta local por email normalizado, contraseña bcrypt (12, 12–72 bytes), sesiones opacas aleatorias de 256 bits, solo hash SHA-256 persistido. Cookie `__Secure-dc_staff`, HttpOnly, Secure, SameSite=Strict, Path=/api/doctorchart/staff; duración absoluta 8h. Sin sesión médica inyectada ni headers de identidad aceptados. Mutaciones requieren Origin exactamente autorizado y token CSRF ligado a la sesión; login/activación/recuperación también comprueban Origin. Gateway solo permite operaciones staff explícitas, mantiene el secreto servidor y elimina identidad/bearer del navegador. Límite persistente por red y cuenta, respuestas genéricas de autenticación. Auditoría sin contraseñas/tokens.
 
-Invitación: médico entrega código secreto de un uso (24h) por un canal privado, nunca URL. Activación requiere código+email+contraseña; cuenta existente debe demostrar su contraseña actual, nunca se sobrescribe. La activación entrega una sola vez código personal de recuperación de 256 bits. Recuperar exige email+código+contraseña nueva; consume/rota código y revoca todas las sesiones. Un médico solo revoca su relación, nunca restablece una cuenta compartida. Cambio de contraseña exige contraseña actual y revoca las otras sesiones. Sin envío email en M7 (M8).
+Invitación privada de un solo uso con vencimiento de 6 horas. El enlace lleva el secreto en el fragmento de `/staff/activate#invite=…`; Angular lo quita del historial y lo envía en el cuerpo de la solicitud. Consultar el enlace no lo consume. La cuenta existente requiere su contraseña actual. El código personal de recuperación se puede guardar de forma opcional desde la agenda. Recuperar exige email+código+contraseña nueva; consume y rota el código y revoca todas las sesiones. Un médico solo revoca su relación, nunca restablece una cuenta compartida. Cambiar la contraseña exige la contraseña actual y revoca las otras sesiones.
 
 ## Médico autenticado
 
 `GET /api/doctorchart/secretaries`: relaciones propias, permisos, sedes y versión decimal string.
-`POST /secretaries/invitations`: `{email,name,clinicIds:string[],permissions:string[]}` →201 `{id,invitationCode,expiresAt}`. Secretos solo al crearlos, no listados.
+`POST /secretaries/invitations`: `{email,name,phone?,clinicIds:string[],permissions:string[]}` →201 `{id,invitationCode,expiresAt}`. El teléfono opcional usa formato internacional con `+` y código de país. La respuesta incluye el secreto solo al crearlo. El médico comparte el enlace por el canal que prefiera.
 `PUT /secretaries/{id}`: `{expectedVersion,clinicIds,permissions}` → relación actualizada; `DELETE /secretaries/{id}` revoca relación, invitaciones y autoridad inmediatamente. Revocar no depende de Billing.
 Permisos explícitos: `view`, `create`, `cancel`, `reschedule`, `status`. `view` obligatorio para los demás. Nunca permiso clínico ni de horarios. Asignación solo sedes propias no archivadas. Revocación y reservas se serializan mediante el mismo lock de workspace M4.
 
 ## Secretaria local
 
 Base `/api/doctorchart/staff`:
+- POST `/invitation` `{invitationCode}` → `{email,name,expiresAt,existingAccount}` para enlaces vigentes. Requiere el origen autorizado y aplica límites por red y código.
 - POST `/activate` `{email,password,invitationCode}` → cuenta/sesión + recoveryCode una vez.
 - POST `/login` `{email,password}` → sesión + csrfToken.
 - POST `/recover` `{email,recoveryCode,password}` → código nuevo, revoca sesiones.

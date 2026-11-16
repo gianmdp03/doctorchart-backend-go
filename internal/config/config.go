@@ -20,6 +20,7 @@ type Config struct {
 	Notifications         notifications.Config
 	Port                  string
 	DatabaseURL           string
+	MediaDatabaseURL      string
 	GatewaySecret         string
 	BillingSecret         string
 	BillingURL            string
@@ -178,6 +179,7 @@ func Load() (Config, error) {
 		}
 	}
 	c.DatabaseURL = db.String()
+	c.MediaDatabaseURL = get("MEDIA_DATABASE_URL", "", "")
 	billingURL, err := url.Parse(c.BillingURL)
 	if err != nil || billingURL.Hostname() == "" || billingURL.Scheme != "http" && billingURL.Scheme != "https" || billingURL.User != nil || billingURL.ForceQuery || strings.Contains(c.BillingURL, "#") || billingURL.RawQuery != "" || billingURL.Fragment != "" {
 		return c, fmt.Errorf("Configuración inválida: services.billing.url debe ser una URL HTTP(S) sin credenciales, parámetros ni fragmentos.")

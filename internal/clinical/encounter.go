@@ -245,6 +245,7 @@ func (s *Service) CreateEncounter(ctx context.Context, identity api.Identity, re
 		if !ok {
 			return api.Failure(409, "INVALID_WIZARD_DEFINITION", "La configuración no es válida.")
 		}
+		form = wizard.WithHeightMeasurementMode(form)
 		context, err := s.encounterContext(ctx, tx, p, date, nil)
 		if err != nil {
 			return err

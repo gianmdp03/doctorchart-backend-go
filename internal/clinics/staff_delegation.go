@@ -96,14 +96,26 @@ func staffBookingDocument(raw json.RawMessage) (map[string]any, error) {
 	if err := json.Unmarshal(raw, &b); err != nil {
 		return nil, err
 	}
-	delete(b, "patientId")
-	delete(b, "provenance")
+	document := staffFields(b, "id", "clinicId", "start", "end", "status", "version",
+		"attendeeName", "contactName", "contactPhone", "createdAt", "updatedAt", "specialtyContextId")
 	if clinic, ok := b["clinicSnapshot"].(map[string]any); ok {
-		delete(clinic, "address")
-		delete(clinic, "publicAddress")
+		document["clinicSnapshot"] = staffFields(clinic, "name", "timezone", "modality")
 	}
-	return b, nil
+	if specialty, ok := b["specialty"].(map[string]any); ok {
+		document["specialty"] = staffFields(specialty, "id", "code", "name")
+	}
+	return document, nil
 }
+func staffFields(source map[string]any, keys ...string) map[string]any {
+	result := make(map[string]any, len(keys))
+	for _, key := range keys {
+		if value, ok := source[key].(string); ok {
+			result[key] = value
+		}
+	}
+	return result
+}
+
 func (s *Service) staffReadTx(r *http.Request, a *staffAdmission) (pgx.Tx, error) {
 	snapshot, err := s.staffRights.Resolve(r.Context(), a.owner)
 	if err != nil {
@@ -298,18 +310,18 @@ func (s *Service) staffAssignments(w http.ResponseWriter, r *http.Request) error
 			}
 			return e
 		}
-		clinics, e := tx.Query(r.Context(), "SELECT c.id::text,c.name,c.timezone,a.permissions,COALESCE(p.name,'Profesional asignado') FROM staff_access_clinics x JOIN clinics c ON c.id=x.clinic_id JOIN staff_access a ON a.id=x.access_id LEFT JOIN booking_publications p ON p.workspace_id=a.workspace_id WHERE x.access_id=$1 AND c.status<>'ARCHIVED' ORDER BY c.id", rel.id)
+		clinics, e := tx.Query(r.Context(), "SELECT c.id::text,c.name,c.timezone,c.modality,a.permissions,COALESCE(p.name,'Profesional asignado') FROM staff_access_clinics x JOIN clinics c ON c.id=x.clinic_id JOIN staff_access a ON a.id=x.access_id LEFT JOIN booking_publications p ON p.workspace_id=a.workspace_id WHERE x.access_id=$1 AND c.status<>'ARCHIVED' ORDER BY c.id", rel.id)
 		if e != nil {
 			tx.Rollback(context.Background())
 			return e
 		}
 		for clinics.Next() {
-			var id, name, zone, doctorName string
+			var id, name, zone, modality, doctorName string
 			var permissions []string
-			if e = clinics.Scan(&id, &name, &zone, &permissions, &doctorName); e != nil {
+			if e = clinics.Scan(&id, &name, &zone, &modality, &permissions, &doctorName); e != nil {
 				break
 			}
-			items = append(items, map[string]any{"ownerId": rel.owner, "accessId": rel.id, "clinicId": id, "clinicName": name, "doctorName": doctorName, "timezone": zone, "permissions": permissions, "validUntil": a.validUntil})
+			items = append(items, map[string]any{"ownerId": rel.owner, "accessId": rel.id, "clinicId": id, "clinicName": name, "doctorName": doctorName, "timezone": zone, "modality": modality, "permissions": permissions, "validUntil": a.validUntil})
 		}
 		if e == nil {
 			e = clinics.Err()

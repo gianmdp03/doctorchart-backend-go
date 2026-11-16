@@ -4,9 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/syntah/doctorchart-backend-go/db"
 	"github.com/syntah/doctorchart-backend-go/internal/api"
+	"github.com/syntah/doctorchart-backend-go/internal/workspace"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 )
@@ -63,16 +67,31 @@ func TestSameDoctorMultipleContextClinicalHTTPIsolation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	config := pool.Config()
+	config.ConnConfig.User = db.AppRole
+	config.ConnConfig.Password = os.Getenv("DOCTORCHART_TEST_APP_PASSWORD")
+	runtimePool, err := pgxpool.NewWithConfig(ctx, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer runtimePool.Close()
+	if _, err := db.CheckRuntime(ctx, runtimePool, db.AppRole); err != nil {
+		t.Fatal(err)
+	}
+	restricted, err := New(runtimePool, workspace.New(runtimePool, s.forms), s.forms, s.rules, s.files)
+	if err != nil {
+		t.Fatal(err)
+	}
 	mux := http.NewServeMux()
-	s.Routes(mux)
-	s.DirectoryRoutes(mux)
-	s.EncounterRoutes(mux)
-	s.PrescriptionRoutes(mux)
-	s.GrowthRoutes(mux)
-	s.VaccinationRoutes(mux)
-	s.CalculatorRoutes(mux)
-	s.StudyRoutes(mux)
-	s.PrintRoutes(mux)
+	restricted.Routes(mux)
+	restricted.DirectoryRoutes(mux)
+	restricted.EncounterRoutes(mux)
+	restricted.PrescriptionRoutes(mux)
+	restricted.GrowthRoutes(mux)
+	restricted.VaccinationRoutes(mux)
+	restricted.CalculatorRoutes(mux)
+	restricted.StudyRoutes(mux)
+	restricted.PrintRoutes(mux)
 	handler := api.Gateway("context-fixture", api.Dispatch(mux))
 	call := func(method, path, owner, scope string, body map[string]any) *httptest.ResponseRecorder {
 		t.Helper()

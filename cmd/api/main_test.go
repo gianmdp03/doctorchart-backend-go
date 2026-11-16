@@ -111,6 +111,15 @@ func TestStartupCreatesSchemaAndServesHealth(t *testing.T) {
 	proxy, disconnect := startupDatabaseProxy(t, address.Host)
 	backendDatabase := *address
 	backendDatabase.Host = proxy
+	appPassword := os.Getenv("DOCTORCHART_TEST_APP_PASSWORD")
+	mediaPassword := os.Getenv("DOCTORCHART_TEST_MEDIA_PASSWORD")
+	if appPassword == "" || mediaPassword == "" {
+		t.Fatal("startup fixture requires restricted app and media credentials")
+	}
+	runtimeDatabase := backendDatabase
+	runtimeDatabase.User = url.UserPassword("doctorchart_app", appPassword)
+	mediaDatabase := backendDatabase
+	mediaDatabase.User = url.UserPassword("doctorchart_media", mediaPassword)
 	var billingRequests int
 	var billingMu sync.Mutex
 	billing := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -142,7 +151,7 @@ func TestStartupCreatesSchemaAndServesHealth(t *testing.T) {
 	if err := listener.Close(); err != nil {
 		t.Fatal(err)
 	}
-	dotenv := fmt.Sprintf("DATABASE_URL='%s'\nGATEWAY_SHARED_SECRET=%s\nSERVICES_BILLING_SHARED_SECRET=%s\nSERVICES_BILLING_URL=%s\nPORT=%d\nSTORAGE_TYPE=local\nSTUDIES_STORAGE_DIR='%s'\n", backendDatabase.String(), strings.Repeat("g", 64), strings.Repeat("b", 64), billing.URL, port, filepath.Join(root, "studies"))
+	dotenv := fmt.Sprintf("DATABASE_URL='%s'\nMEDIA_DATABASE_URL='%s'\nGATEWAY_SHARED_SECRET=%s\nSERVICES_BILLING_SHARED_SECRET=%s\nSERVICES_BILLING_URL=%s\nPORT=%d\nSTORAGE_TYPE=local\nSTUDIES_STORAGE_DIR='%s'\n", runtimeDatabase.String(), mediaDatabase.String(), strings.Repeat("g", 64), strings.Repeat("b", 64), billing.URL, port, filepath.Join(root, "studies"))
 	if err := os.WriteFile(filepath.Join(root, ".env"), []byte(dotenv), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -153,6 +162,11 @@ func TestStartupCreatesSchemaAndServesHealth(t *testing.T) {
 	build := exec.CommandContext(ctx, "go", "build", "-mod=readonly", "-o", binary, ".")
 	if output, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build fixture binary: %v\n%s", err, output)
+	}
+	initialize := exec.CommandContext(ctx, binary, "init-db")
+	initialize.Env = append(os.Environ(), "DATABASE_URL="+backendDatabase.String())
+	if output, err := initialize.CombinedOutput(); err != nil {
+		t.Fatalf("initialize fixture baseline: %v\n%s", err, output)
 	}
 	logPath := filepath.Join(root, "server.log")
 	logFile, err := os.Create(logPath)
@@ -216,7 +230,7 @@ func TestStartupCreatesSchemaAndServesHealth(t *testing.T) {
 	if err := pool.QueryRow(ctx, "SELECT count(*) FROM specialties").Scan(&specialties); err != nil {
 		t.Fatal(err)
 	}
-	if tables != 49 || specialties == 0 {
+	if tables != 48 || specialties == 0 {
 		t.Fatalf("health served with %d tables and %d specialties", tables, specialties)
 	}
 	probe := func(path string, expected int) {

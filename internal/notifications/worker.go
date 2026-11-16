@@ -29,12 +29,12 @@ type job struct {
 	attempts         int
 	booking          *int64
 	version          *int64
-	access, recovery *string
+	recovery         *string
 }
 
 func (s *Service) claim(ctx context.Context) (job, error) {
 	j := job{lease: uuid()}
-	err := s.pool.QueryRow(ctx, `WITH next AS (SELECT id FROM notification_outbox WHERE (state='PENDING' AND due_at<=clock_timestamp()) OR (state='PROCESSING' AND lease_until<clock_timestamp()) ORDER BY due_at,id FOR UPDATE SKIP LOCKED LIMIT 1) UPDATE notification_outbox o SET state='PROCESSING',attempts=attempts+1,lease_id=$1,lease_until=clock_timestamp()+interval '2 minutes',last_code=NULL FROM next WHERE o.id=next.id RETURNING o.id,o.dedup_key,o.kind,o.payload,o.attempts,o.booking_id,o.booking_version,o.access_id::text,o.recovery_id::text`, j.lease).Scan(&j.id, &j.key, &j.kind, &j.payload, &j.attempts, &j.booking, &j.version, &j.access, &j.recovery)
+	err := s.pool.QueryRow(ctx, `WITH next AS (SELECT id FROM notification_outbox WHERE (state='PENDING' AND due_at<=clock_timestamp()) OR (state='PROCESSING' AND lease_until<clock_timestamp()) ORDER BY due_at,id FOR UPDATE SKIP LOCKED LIMIT 1) UPDATE notification_outbox o SET state='PROCESSING',attempts=attempts+1,lease_id=$1,lease_until=clock_timestamp()+interval '2 minutes',last_code=NULL FROM next WHERE o.id=next.id RETURNING o.id,o.dedup_key,o.kind,o.payload,o.attempts,o.booking_id,o.booking_version,o.recovery_id::text`, j.lease).Scan(&j.id, &j.key, &j.kind, &j.payload, &j.attempts, &j.booking, &j.version, &j.recovery)
 	return j, err
 }
 func (s *Service) current(ctx context.Context, j job, m Message) (bool, error) {
@@ -52,8 +52,6 @@ func (s *Service) current(ctx context.Context, j job, m Message) (bool, error) {
 		// Linking a clinical file changes no administrative message content. Keep
 		// pending confirmations/reminders valid without enqueueing duplicates.
 		err = s.pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM bookings b WHERE id=$1 AND version>=$2 AND status=$3 AND ($4<>'BOOKING_REMINDER' OR start_at>clock_timestamp()) AND (version=$2 OR ((SELECT count(*) FROM booking_events e WHERE e.booking_id=b.id AND e.version>$2)=b.version-$2 AND NOT EXISTS(SELECT 1 FROM booking_events e WHERE e.booking_id=b.id AND e.version>$2 AND e.kind<>'PATIENT_LINKED'))))", *j.booking, *j.version, required, j.kind).Scan(&valid)
-	} else if j.access != nil {
-		err = s.pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM staff_invitations i JOIN staff_access a ON a.id=i.access_id WHERE a.id=$1 AND a.active AND i.token_hash=$2 AND i.consumed_at IS NULL AND i.expires_at>clock_timestamp())", *j.access, Hash(m.Code)).Scan(&valid)
 	} else if j.recovery != nil {
 		err = s.pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM staff_email_recovery WHERE id=$1 AND consumed_at IS NULL AND expires_at>clock_timestamp() AND token_hash=$2)", *j.recovery, Hash(m.Code)).Scan(&valid)
 	} else {
@@ -84,6 +82,10 @@ func (s *Service) ProcessOne(ctx context.Context) (bool, error) {
 	}
 	if err != nil {
 		return false, err
+	}
+	// Retire invitations queued by older builds without contacting SMTP.
+	if j.kind == "STAFF_INVITATION" {
+		return true, s.finish(ctx, j, "OBSOLETE", "INVITATION_EMAIL_DISABLED")
 	}
 	if j.attempts > 10 {
 		return true, s.finish(ctx, j, "DEAD", "ATTEMPTS_EXHAUSTED")

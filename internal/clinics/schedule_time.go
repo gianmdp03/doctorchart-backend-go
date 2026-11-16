@@ -62,6 +62,15 @@ func wallMinute(raw string, end bool) (int, error) {
 	}
 	return t.Hour()*60 + t.Minute(), nil
 }
+
+type localRangeConflict struct {
+	requested, existing ScheduleRange
+	weekday             int
+	from, through       string
+}
+
+func (*localRangeConflict) Error() string { return "las franjas se superponen" }
+
 func validateRanges(ranges []ScheduleRange) error {
 	if ranges == nil {
 		return fmt.Errorf("las franjas deben ser una lista explícita")
@@ -72,6 +81,7 @@ func validateRanges(ranges []ScheduleRange) error {
 	ordered := append([]ScheduleRange(nil), ranges...)
 	sort.Slice(ordered, func(i, j int) bool { return ordered[i].Start < ordered[j].Start })
 	last := -1
+	var previous ScheduleRange
 	for _, r := range ordered {
 		start, err := wallMinute(r.Start, false)
 		if err != nil {
@@ -85,9 +95,9 @@ func validateRanges(ranges []ScheduleRange) error {
 			return fmt.Errorf("la franja debe terminar después del inicio")
 		}
 		if start < last {
-			return fmt.Errorf("las franjas se superponen")
+			return &localRangeConflict{requested: r, existing: previous}
 		}
-		last = end
+		last, previous = end, r
 	}
 	return nil
 }
@@ -105,6 +115,9 @@ func (c ScheduleConfig) Validate() error {
 		}
 		seen[day.Weekday] = true
 		if err := c.validateBlocks(day.Ranges); err != nil {
+			if conflict, ok := err.(*localRangeConflict); ok {
+				conflict.weekday = day.Weekday
+			}
 			return err
 		}
 	}
@@ -128,6 +141,9 @@ func (c ScheduleConfig) Validate() error {
 		}
 		previous = e.Through
 		if err := c.validateBlocks(e.Ranges); err != nil {
+			if conflict, ok := err.(*localRangeConflict); ok {
+				conflict.from, conflict.through = e.From, e.Through
+			}
 			return err
 		}
 	}

@@ -59,7 +59,7 @@ func TestMultipleSpecialtySchedulesBookingsPublicOffersAndLinks(t *testing.T) {
 	}
 	f.online.Store(true)
 	mux := http.NewServeMux()
-	NewWithBookings(f.pool, f.rights, true, true).WithPublicBookings(true, "gateway-fixture").Routes(mux)
+	NewWithBookings(f.runtime, f.rights, true, true).WithPublicBookings(true, "gateway-fixture").Routes(mux)
 	f.handler = api.Gateway("gateway-fixture", api.Dispatch(mux))
 	publication := Publication{ExpectedVersion: "0", Name: "Multiple specialties", Published: true, ContextIDs: []string{first, second}, Clinics: []PublishedClinic{{c.ID, true, "Public address"}}, Questions: []PublicQuestion{}}
 	reply := f.request("PUT", "/booking-publication", owner, jsonString(publication))

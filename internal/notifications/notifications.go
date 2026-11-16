@@ -227,9 +227,6 @@ func (s *Service) Code(ctx context.Context, id string) (string, time.Time, error
 	raw, err := s.open(data, "booking:"+id)
 	return string(raw), expires, err
 }
-func (s *Service) Invitation(ctx context.Context, tx pgx.Tx, access, email, code string, expires time.Time) error {
-	return s.enqueue(ctx, tx, "invitation:"+Hash(code), "STAFF_INVITATION", nil, nil, access, nil, time.Now().UTC(), Message{To: email, Code: code, Expires: expires})
-}
 func (s *Service) Recovery(ctx context.Context, tx pgx.Tx, account, email string) error {
 	id, code := uuid(), Token()
 	expires := time.Now().UTC().Add(15 * time.Minute)

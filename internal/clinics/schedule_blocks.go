@@ -95,14 +95,14 @@ func readAgenda(ctx context.Context, q scheduleReader, id string) (clinicSchedul
 	return result, result.Validate()
 }
 func readAgendas(ctx context.Context, q scheduleReader, workspace int64) ([]agendaRecord, error) {
-	rows, err := q.Query(ctx, "SELECT c.id::text,c.timezone,c.name FROM clinics c JOIN clinic_schedules s ON s.clinic_id=c.id WHERE c.workspace_id=$1 AND c.status<>'ARCHIVED' ORDER BY c.id", workspace)
+	rows, err := q.Query(ctx, "SELECT c.id::text,c.timezone,c.name,c.modality FROM clinics c JOIN clinic_schedules s ON s.clinic_id=c.id WHERE c.workspace_id=$1 AND c.status<>'ARCHIVED' ORDER BY c.id", workspace)
 	if err != nil {
 		return nil, err
 	}
 	result := []agendaRecord{}
 	for rows.Next() {
 		var a agendaRecord
-		if err = rows.Scan(&a.id, &a.zone, &a.name); err != nil {
+		if err = rows.Scan(&a.id, &a.zone, &a.name, &a.modality); err != nil {
 			rows.Close()
 			return nil, err
 		}

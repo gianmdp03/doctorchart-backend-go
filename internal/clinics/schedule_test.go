@@ -40,6 +40,10 @@ func TestScheduleRoutesOwnershipConflictsAndVersion(t *testing.T) {
 	}
 	start := time.Now()
 	assertCode(t, f.request("PUT", path, owner, scheduleBody("0", 1, "09:00", "12:00")), 200, "")
+	validatePath := "/clinics/" + second.ID + "/schedule/validate"
+	assertCode(t, f.request("POST", validatePath, other, scheduleBody("0", 1, "11:00", "13:00")), 404, "CLINIC_NOT_FOUND")
+	assertCode(t, f.request("POST", validatePath, owner, scheduleBody("0", 1, "11:00", "13:00")), 409, "SCHEDULE_CONFLICT")
+	assertCode(t, f.request("POST", validatePath, owner, scheduleBody("0", 1, "12:00", "13:00")), 204, "")
 	assertCode(t, f.request("PUT", path, owner, scheduleBody("0", 1, "10:00", "12:00")), 409, "VERSION_CONFLICT")
 	assertCode(t, f.request("PUT", "/clinics/"+second.ID+"/schedule", owner, scheduleBody("0", 1, "11:00", "13:00")), 409, "SCHEDULE_CONFLICT")
 	var count int

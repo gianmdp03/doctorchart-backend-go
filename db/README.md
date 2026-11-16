@@ -1,197 +1,28 @@
-# M5 de especialidades: esquema 15
+# Esquema inicial de DoctorChart
 
-`0015_multiple_specialty_contexts.sql` retira la unicidad transitoria por workspace,
-conservando la unicidad workspace/especialidad. Separa preferencias clínicas y
-selección pública por contexto; conserva valores históricos y exige configuración
-efectiva para reservas nuevas/reprogramadas. 49 tablas/61 FK. Baseline y 0002–0014
-intactos; runner, locks, checksums y catálogos uniformes conservados.
-Ver [contratos, pruebas y handoff M5](../docs/specialty-contexts-m5.md).
-El arranque aplicaría 15: no iniciar contra una base real sin autorización.
+`db/schema.sql` define la estructura completa de la versión 16. Contiene 48 tablas y 61 claves foráneas. El código embebe ese archivo y el bootstrap carga los seeds administrados. Las entregas históricas de M1–M6 se conservan en `docs/`.
 
----
+## Arranque
 
-# M4 de especialidades: esquema 14
+- Para una base vacía, el administrador de PostgreSQL provisiona dos logins independientes, `doctorchart_app` y `doctorchart_media`, con credenciales distintas y sin membresías ni privilegios administrativos. El rol que inicializa es dueño de la base de DoctorChart y de sus objetos.
+- Ejecutá `doctorchart init-db` una sola vez con `DATABASE_URL` del dueño del esquema en el entorno de ese proceso. El comando crea el catálogo y concede los permisos de los dos logins. Los secretos del dueño corresponden al proceso de inicialización.
+- El servidor HTTP usa `DATABASE_URL` de `doctorchart_app` y `MEDIA_DATABASE_URL` de `doctorchart_media` para almacenamiento gestionado. Comprueba el rol, el marcador y el fingerprint antes de iniciar HTTP o trabajos de fondo.
+- La inicialización usa READ COMMITTED, un contexto de 30 s, `lock_timeout` de 10 s, `statement_timeout` de 20 s y el advisory lock transaccional `(17209, 3)`. Estructura, seeds y marcador se confirman juntos antes de habilitar HTTP o jobs.
+- Un reinicio valida el marcador y el catálogo, y conserva los registros y las decisiones administradas. El fingerprint se deriva de la definición aplicada a una base vacía de cada versión mayor de PostgreSQL.
+- Un esquema previo o incompatible requiere una reinicialización autorizada. Guardá un respaldo físico verificable y la configuración asociada antes de vaciar una base de desarrollo. El backend rechaza una base incompatible al iniciar.
 
-`0014_booking_contexts.sql` conserva el contexto y snapshots de especialidad,
-consultorio y bloque autorizado de las reservas. Las anteriores se clasifican
-por contexto único con origen histórico de bloque desconocido, sin inventarlo.
-Vinculación posterior explícita de paciente con FK contextual, versión y evento.
-47 tablas/58 FK. Baseline y 0002–0013 intactos.
-Ver [modelo, política histórica, contratos y handoff](../docs/specialty-contexts-m4.md).
-El arranque aplicaría 14: no iniciar contra una base real sin autorización.
+## Aislamiento clínico
 
----
+Go valida la cuenta y el contexto de especialidad y fija ambos en la transacción. Las políticas RLS del rol de la app limitan lecturas y escrituras en fichas, consultas, recetas, estudios, vacunación, cálculos clínicos y las líneas de recetas. El rol de medios accede al catálogo operativo de adjuntos, su cola y el marcador de esquema. Para verificar referencias antes de compactar la recuperación, puede consultar únicamente la columna `media_asset_id` de estudios. La API verifica la ficha antes de abrir un archivo.
 
-# M3 de especialidades: esquema 13
+Las excepciones devuelven un resultado acotado. El cupo de pacientes devuelve el total de la cuenta. El trabajo de archivos consulta si una clave de su cola conserva una referencia. Los turnos usan la especialidad persistida del turno al vincular una ficha.
 
-`0013_schedule_blocks.sql` conserva la raíz por consultorio y traslada franjas
-y excepciones a bloques relacionales con identidad, contexto y duración propios.
-Conserva cierres, etiquetas, versiones y reservas; rechaza inconsistencias y
-revierte sin reparar datos. 47 tablas/56 FK. Baseline y 0002–0012 intactos.
-Ver [modelo, contrato, pruebas y handoff](../docs/specialty-contexts-m3.md).
-El arranque aplicaría 13: no iniciar contra una base real sin autorización.
+La identidad de la transacción depende del backend y de la protección de las credenciales de PostgreSQL. RLS cubre filtros SQL omitidos en consultas de la aplicación.
 
----
+## Pruebas
 
-# M2 de especialidades: esquema 12
+Las suites `./db`, `./internal/bootstrap` y `./cmd/api` cubren catálogo, RLS, reinicio, concurrencia, rollback y seeds. Usá PostgreSQL descartable con los dos roles provisionados. El comando `go-gates` de `ops/testing/specialty-m6-lab.mjs` configura las conexiones y las contraseñas sintéticas de ambos roles para la suite Go completa.
 
-`0012_patient_specialty_contexts.sql` incorpora pertenencia obligatoria e
-inmutable de pacientes, FK compuestas de propietario/contexto e integridad de
-recursos clínicos. Conserva datos y referencias; rechaza inconsistencias sin
-repararlas. 45 tablas/51 FK. Baseline y 0002–0011 intactos. Ver
-[modelo, contrato y handoff](../docs/specialty-contexts-m2.md).
-El arranque aplicaría 12: no iniciar contra una base real sin autorización.
+Validación del 11/11/2026 en Docker Linux con Go 1.27.3: compilación, vet y suite completa en PostgreSQL 18; suite con detector de carreras en PostgreSQL 17 y repetición final de las suites de base y clínica tras ajustar el permiso de bloqueo de la cola. La prueba de navegador completó 17 recorridos y 90 solicitudes con tres especialidades, descargas autorizadas, rechazos cruzados y entrega de todos los eventos de medios. Auth y Billing fueron adaptadores locales. La regresión de adjuntos usa los dos logins restringidos, una conexión por pool y verifica borrado, retención y recuperación. Una instancia con un esquema anterior requiere una reinicialización autorizada para activar la versión 16.
 
----
-
-# M1 de especialidades: esquema 11
-
-`0011_specialty_contexts.sql` separa el workspace administrativo del único
-contexto clínico de M1, conserva datos/identidades y elimina las columnas
-clínicas transferidas del workspace. Baseline y 0002–0010 inmutables. Resultado:
-45 tablas y 46 FK. Ver [modelo, contratos y validación](../docs/specialty-contexts-m1.md).
-El runner existente aplica 11 al arrancar: no iniciar este binario contra una
-base real sin autorización explícita. La M1 de especialidades es distinta de
-las etapas históricas de consultorios y agenda que siguen documentadas abajo.
-
----
-
-# M8: esquema10 en desarrolloaislado
-
-Migración0010_notifications.sql;44tablas/45FK. Baseline/0002..0009inmutables. Outboxdurable, accesoaconstancias y recuperaciónemailstaff; sin pacientes/clínica modificados. Fresh/upgrade9→10 y fallosSQL/drift/seed/rollback/reintento probados enPG17/18descartables. No ejecutar en basesreales. Binarioprevio rechaza10; recuperación con binariocompatible o respaldo autorizado, nunca bajar marcador.
-
-M8usa fixtures BASELINE_TEST_ADMIN_DSN y DOCTORCHART_CLINICS_TEST_DATABASE_URL ya validados porownership/nombre/loopback. NOTIFICATIONS_ENABLED=false; activar requiere claveestable32bytesbase64 y SMTPconTLS/OriginHTTPS exacto. Parámetros y límites en docs/ai/M8_DELIVERY.md.
-
-Inspecciónoperativa read-only: SELECT id,kind,state,attempts,last_code,due_at,lease_until FROM notification_outbox ORDER BY id; nunca imprimir payloadcifrado, correosdestinatarios, tokens o credenciales. DEAD no reenvíaautomáticamente: revisarcausa y autorización antes de reponer PENDING; conservarjob/historial, sin borrar ni cambiarpayload.
-
----
-
-Antecedentes anteriores a M8:
-
-# Esquema de desarrollo M7: versión9
-
-Migración0009_secretaries.sql,41 tablas/40 FK. Baseline y0002..0008 inmutables. Cuenta local, relaciones/sedes, sesiones, invitaciones, contadores y auditoría; sin modificar pacientes. Fresh/upgrade8→9/rollback transaccional/reintento/reinicio y conservación probados en PG17/18 descartables. Suite staff usa DOCTORCHART_CLINICS_TEST_DATABASE_URL, migración BASELINE_TEST_ADMIN_DSN; conservar validaciones de ownership y nombres de fixtures existentes.
-
-STAFF_ENABLED=false por defecto; opt-in de ensayo requiere BOOKINGS_ENABLED/SCHEDULES_ENABLED y STAFF_ORIGIN HTTPS exacto. Ninguna autorización para ejecutar en bases reales. Un binario previo no reconoce9: recuperación mediante binario compatible o restauración de respaldo autorizada, nunca modificar marcador ni borrar tablas. Informe docs/ai/M7_DELIVERY.md.
-
----
-
-Antecedentes anteriores al cierre M7:
-
-# PostgreSQL — baseline 1 y esquema 4 (M2)
-
-`db/schema.sql` permanece inmutable (23 tablas). `migrations/0002_clinics.sql` agrega `clinics`, `app_schema_migrations`, un índice y el validador IANA; el esquema 2 tiene 25 tablas y 21 FK. M2 agrega clinic_entitlement_epoch mediante 0003_entitlement_epoch.sql. La corrección 0004_clinic_timezone_policy.sql alinea la función IANA y revalida el CHECK: esquema 4 conserva 26 tablas y 21 FK. Baseline y migraciones 0002/0003 intactos. No modifica pacientes ni relaciones clínicas. `AGENTS.md` conserva `production: true`.
-
-## Arranque y contrato
-
-`Ensure` conserva pgxpool, READ COMMITTED, contexto 30s, lock_timeout 10s, statement_timeout 20s, search_path public/pg_catalog y advisory lock transaccional (17209, 3).
-- Vacío real: baseline → catálogo 1 → migración 2 → catálogo 2 → migración 3 → catálogo 3 → migración 4 → catálogo 4 → seeds → marcador.
-- Versión 1: verifica identidad, checksum del baseline y catálogo anterior esperado antes de DDL; migra 1 → 2 → 3 → 4 conservando initialized_at y datos administrados.
-- Versiones 2/3: valida catálogo/historial publicados antes de aplicar las transiciones restantes hasta 4.
-- Versión 4: verifica identidad, checksums, historial y catálogo; seeds idempotentes sin reescribir marcador/historial.
-- Sin marcador con objetos, versiones desconocidas, historial ausente/extra/alterado, checksum incompatible o drift: rechazo sin adopción ni reparación.
-
-**Este binario aplica el upgrade en el próximo arranque sobre versión 1/2/3 válida.** No iniciarlo contra una base real sin autorización específica de migración. Solo se ejecutó en bases descartables propias.
-DDL, seeds y metadatos confirman en una sola transacción antes de HTTP/jobs. Error/cancelación revierte todo; rollback usa contexto de limpieza independiente acotado a 5s.
-
-## Catálogo e historial
-
-`app_schema_state.sql_sha256` identifica el baseline inmutable; la columna histórica `baseline_version` registra ahora la versión instalada (1..4). `app_schema_migrations` registra versiones 2, 3 y 4, checksum SQL, catálogo anterior/final y applied_at.
-Hashes SQL equivalentes para CRLF/LF. Los hashes de catálogo esperados están fijados en `migrations.go`, obtenidos de bases vacías independientes desde los SQL publicados; nunca recalcularlos desde una base existente para ocultar drift.
-
-`catalog.go` permanece intacto: estructura, constraints/índices, secuencias, funciones, tipos y extensiones; excluye filas, OIDs, valores de secuencias, propietarios y permisos. Las constraints heredadas pueden repetir nombre; las pruebas comparan definiciones completas como multiconjunto.
-Se verificaron PostgreSQL 17.11 y 18.6 con contratos distintos: 18 incluye constraints NOT NULL adicionales y coincide con el motor documentado del VPS. Otras versiones mayores se rechazan antes de DDL. **El cambio de motor 17 → 18 no forma parte de M1:** no reescribir automáticamente marcadores/fingerprints de una restauración entre versiones.
-
-## Lugares
-
-`clinics.workspace_id` referencia el workspace del médico sin cascada de borrado. Nombre y ubicación no vacíos; zona IANA real (UTC o región nombrada); estados ACTIVE/INACTIVE/ARCHIVED; versión no negativa; timestamps ordenados.
-Índice `(workspace_id, status, id)` para consultas futuras por propietario y FK.
-Sin lugares inventados durante migración ni asociación clínica a lugares. M2 agrega gestión de lugares/capacidades, sin horarios, reservas ni staff. [Derechos efectivos/fence](../docs/ai/contracts/M2_EFFECTIVE_ENTITLEMENTS.md).
-
-## Pruebas descartables
-
-Entornos autorizados y ejecutados:
-- `doctorchart-m1-20261029`: PostgreSQL 17.11, 127.0.0.1:55442.
-- `doctorchart-m1-pg18-20261029`: PostgreSQL 18.6, 127.0.0.1:55440.
-- Label `codex.task=doctorchart-m1`, rol `migration_fixture`, datos temporales sin volumen persistente. Verificar identidad antes de crear/destruir fixtures; nunca usar DSN de desarrollo.
-
-`db/init_test.go` crea/elimina únicamente `stage3_baseline_doctorchart_*`. Las suites M1 requieren cinco bases vacías separadas: `doctorchart_schema_test`, `doctorchart_integrity_test`, `doctorchart_growth_test`, `doctorchart_followups_query_test` y `doctorchart_startup_test`.
-Para M2 agregar doctorchart_clinics_test y doctorchart_entitlements_test (total siete bases fijas y ocho DSN contando admin). Con el servidor propio autorizado y esas bases creadas, definir variables solo para el proceso de pruebas (contraseña del fixture, no de una base real):
-
-```powershell
-$fixtureRoot = 'postgres://migration_fixture:<fixture-password>@127.0.0.1:55442'
-$env:BASELINE_TEST_ADMIN_DSN = "$fixtureRoot/postgres?sslmode=disable"
-$env:DOCTORCHART_SCHEMA_TEST_DATABASE_URL = "$fixtureRoot/doctorchart_schema_test?sslmode=disable"
-$env:DOCTORCHART_INTEGRITY_TEST_DATABASE_URL = "$fixtureRoot/doctorchart_integrity_test?sslmode=disable"
-$env:DOCTORCHART_GROWTH_TEST_DSN = "$fixtureRoot/doctorchart_growth_test?sslmode=disable"
-$env:DOCTORCHART_FOLLOWUP_TEST_DATABASE_URL = "$fixtureRoot/doctorchart_followups_query_test?sslmode=disable"
-$env:DOCTORCHART_STARTUP_TEST_DATABASE_URL = "$fixtureRoot/doctorchart_startup_test?sslmode=disable"
-$env:DOCTORCHART_CLINICS_TEST_DATABASE_URL = "$fixtureRoot/doctorchart_clinics_test?sslmode=disable"
-$env:DOCTORCHART_ENTITLEMENTS_TEST_DATABASE_URL = "$fixtureRoot/doctorchart_entitlements_test?sslmode=disable"
-go test ./cmd/api -run '^TestStartupCreatesSchemaAndServesHealth$' -count=1 -v
-go build ./...
-go vet ./...
-go test ./... -count=1
-go test -race ./... -count=1
-govulncheck ./...
-```
-
-Race requiere CGO y compilador C. Windows tenía CGO=0; race se ejecutó realmente en `golang:1.27.3` Linux con GCC 14.2, fuentes montadas en solo lectura y red del PostgreSQL 17 propio. Un proxy loopback temporal del contenedor llevó 55442 a 5432; no se modificaron guards del fixture.
-No ejecutar dos suites simultáneas contra las mismas bases con nombres fijos. Growth exige empezar vacío y se limpia al terminar.
-
-La prueba de arranque debe mostrar `--- PASS: TestStartupCreatesSchemaAndServesHealth`; un `SKIP` por ausencia de `DOCTORCHART_STARTUP_TEST_DATABASE_URL` no valida esta integración. `TestBaselineUpgradeWithRealSeedsPreservesAdminConfiguration` usa `bootstrap.Run` y los seeds reales sobre baseline 1, verifica transición hasta 4, conservación de configuraciones administradas y reinicio idempotente.
-
-## M6: esquema 8, reservas públicas
-
-0008 agrega cuatro tablas de publicación, sedes públicas, detalles administrativos versionados y rate-limits anónimos; 34 tablas/32 FK. Baseline y 0002..0007 inmutables. `go test ./db -run '^TestPublicBookingMigration' -count=1` verifica upgrade M5→8, conservación de clínica/reservas, SQL fallido/drift/seed tardío, rollback/reintento, reinicio y fresh=upgrade; ejecutado en PostgreSQL 17/18 descartables. Ver entrega M6 para fingerprints independientes y evidencia.
-
-El rollback es transaccional ante fallo, no un DOWN después de aceptar reservas públicas. M5 rechaza el marcador 8; cualquier recuperación real exige autorización independiente, respaldo/restauración probada o binario compatible que conserve escrituras nuevas. No rebajar versión ni borrar datos personales/contadores/reservas para eludir la validación. Ninguna migración real fue ejecutada.
-
-## M5: esquema 7, persona atendida administrativa
-
-0007 agrega attendee_name nullable con CHECK e inmutabilidad, sin backfill ni cambios clínicos. El lector usa COALESCE(attendee_name,contact_name) para reservas previas. Eventos y recibos anteriores no se reescriben. Instalación vacía y upgrade M4→7 convergen; `go test ./db -run '^TestAttendeeMigration' -count=1` comprueba conservación, fallo tardío, rollback/reintento y reinicio. Ejecución aprobada sobre PostgreSQL 17/18 descartables, además de suite completa. Baseline/0002..0006 permanecen intactos; catálogos fijados desde SQL independiente, registrados en entrega M5.
-
-Sin DOWN destructivo: una vez confirmado esquema 7, M4 rechaza ese marcador. Antes de una aplicación real futura exigir respaldo/restauración verificada y permiso separado; recuperación mediante binario compatible o restauración autorizada que preserve las escrituras nuevas. No rebajar marcador, reescribir checksums ni eliminar reservas/pacientes para volver atrás.
-
-## M4: esquema 6 y pruebas de reservas
-
-Migración `0006_bookings.sql` posterior a M3/esquema 5; no modifica baseline ni migraciones publicadas. Instalación vacía y upgrade conservador llegan a 30 tablas/28 FK y el mismo catálogo. Exclusión GiST por workspace e intervalo `[start,end)` para estados distintos de CANCELLED, sin extensión nueva. FK clínica opcional RESTRICT: no se eliminan silenciosamente vínculos a pacientes.
-
-Con las DSN descartables anteriores (nunca una base real):
-```sh
-go test -p 1 ./... -count=1
-go test -race ./internal/clinics -run '^TestBookings' -count=1
-go test ./db -run '^TestBookingMigration' -count=1
-go vet ./...
-go build ./...
-```
-La suite de migración comprueba M3→6, SQL fallido/drift/seed tardío, rollback integral, reintento, datos clínicos y agendas conservados, catálogo fresh/upgrade, reinicio con reserva/evento/recibo y rechazo de checksum alterado. El rollback es transaccional ante fallo, no un DOWN destructivo después de confirmar reservas.
-
-Antes de una aplicación real futura se requiere respaldo/restauración probada y aprobación independiente. Un binario M3 rechaza esquema 6: no usarlo como rollback tras confirmar 0006. Conservar las reservas nuevas exige un binario compatible o recuperación autorizada; no rebajar marcador ni borrar tablas. Este documento no autoriza migraciones o despliegues reales.
-
-## Política horaria de consultorios y upgrade 3 → 4
-
-UTC explícito y nombres regionales IANA exactos; Go carga tzdata y SQL consulta pg_timezone_names. Se excluyen offsets, abreviaturas sin región, Local, posix/, right/ y todo Etc/ (incluye Etc/GMT±N y aliases Etc/UTC/Etc/GMT; usar UTC explícito al crear una sede). La política es del campo timezone del consultorio, no cambia el contexto clínico global timeZone.
-
-Migración 4 toma lock de clinics contra escrituras durante el preflight. Si **cualquier fila**, incluso archivada, contiene Etc/, aborta con conteo y mensaje de conciliación explícita del propietario. No actualiza, normaliza ni borra datos. La transacción preserva catálogo, filas, secuencias, historial y marcador de versión 3 al fallar; no alcanza readiness. No se debe sortear el rechazo editando fingerprints o migraciones históricas. Resolver datos incompatibles requiere decisión/autorización independiente; nunca reparación automática.
-
-El CHECK se recrea y valida dentro de la misma transacción porque reemplazar su función no revalida filas antiguas por sí solo. Las pruebas cubren datos clínicos/consultorios, estado de secuencia, rechazo de filas excluidas, fallo SQL, drift, seed tardío, rollback/reintento y catálogo idéntico entre instalación vacía y upgrade. Fingerprints independientes de esquema 4: PG17 85cbcbb463c81876f40babf1d156444bb64793e41388c511bd5c661159b362d6; PG18 1eb0e7bb7b9e3f10aa39c0eaa0101727f304d834ecd5ce9fdbbf77764e73ae7f.
-
-El rollback probado es transaccional ante un upgrade fallido. No hay DOWN automático tras confirmar versión 4: binarios previos rechazan ese marcador; recuperación operativa requiere binario compatible o respaldo/restauración autorizada y verificada. No se ejecutó ninguna recuperación real.
-
-Cobertura: vacío/upgrade convergentes; todos los objetos originales intactos; snapshots de tablas originales con pacientes, consultas, recetas, estudios, medios y vacunas representativos; IDs, referencias, secuencias y marcador preservados; reinicios; 16 inicializadores; cancelación; errores SQL/seed; rollback y reintento; drift/historial/checksums y restricciones de lugares. Regresiones clínicas/wizard se ejecutan sin lugares.
-Converter externo y sincronización Billing requieren servicios opt-in adicionales y no se ejecutaron en M1.
-
-## Aplicación futura y recuperación — no ejecutadas ni autorizadas
-
-Leer `../docs/vps-operations.md` y revalidar identidad/versión/servicio. Este procedimiento no autoriza ejecución:
-1. Obtener revisión de Argon y aprobación del propietario. Validar el contrato sobre copia aislada representativa y permisos DDL del propietario.
-2. Respaldar consistentemente la base DoctorChart, medios referenciados y configuración; probar restauración aislada y conservar imagen/SHA previos.
-3. Planificar ventana sin escrituras y detener únicamente consumidores DoctorChart, preservando PostgreSQL compartido y servicios vecinos.
-4. Solo con autorización específica y preflight de zonas aprobado, iniciar imagen nueva: bootstrap aplicará las transiciones pendientes hasta 4. Verificar salud, versión 4, tres filas de historial, catálogo, datos clínicos/consultorios y reinicio antes de reabrir escrituras.
-5. Si falla dentro de la transacción, versión anterior (1/2/3), catálogo y datos permanecen intactos; corregir causa y reintentar. Nunca reparar hashes manualmente. Filas Etc/ requieren conciliación explícita, no conversión automática.
-6. Tras confirmar versión 4, M1 y el binario M2 anterior rechazan el marcador 4. No sirve como rollback directo: se necesita imagen compatible o restauración autorizada del respaldo verificado, antes de reabrir escrituras. Si ya hubo escrituras nuevas, resolver su conservación antes de restaurar.
-
-No hay DOWN destructivo ni eliminación de lugares. No se actualizaron servicios reales, configuración de conexión ni autenticación Supabase.
-
-M2 conserva pruebas desde esquemas publicados 1/2/3 hasta 4, rollback y conservación. El fence de invalidación comparte generación entre réplicas; el marcador nunca se rebaja para volver a M1. La recuperación real exige procedimiento y permiso separados. El esquema Billing no se modificó.
+La [guía local de Windows](../ops/local/README.md) indica cómo arrancar y detener la instancia persistente.

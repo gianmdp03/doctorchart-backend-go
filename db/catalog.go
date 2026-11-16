@@ -1,5 +1,12 @@
 package db
 
+import (
+	"context"
+	"fmt"
+
+	"github.com/jackc/pgx/v5"
+)
+
 // PostgreSQL supplies normalized definitions. Object identities are qualified
 // names, never OIDs. Mutable rows, sequence values, privileges and deployment
 // owners are deliberately excluded; those do not describe schema structure.
@@ -54,3 +61,26 @@ const emptySQL = `SELECT NOT EXISTS(
  UNION ALL SELECT 1 FROM pg_operator o JOIN pg_namespace n ON n.oid=o.oprnamespace WHERE n.nspname='public'
  UNION ALL SELECT 1 FROM pg_extension WHERE extname<>'plpgsql'
 )`
+
+// Fingerprints derived by applying schema.sql to empty PostgreSQL 17 and 18 databases.
+func catalogForMajor(major int) (string, error) {
+	switch major {
+	case 17:
+		return "bf375ef91ad4536433488538acc0ec9ea3bdd99cfd101fd02e8d33a9c8a9a7b2", nil
+	case 18:
+		return "560e680b5152477b572da881dfe1013545b75bf4996d16f9883e8717f788d09f", nil
+	default:
+		return "", fmt.Errorf("unsupported PostgreSQL major version %d; no schema changes performed", major)
+	}
+}
+
+func validateCatalog(ctx context.Context, tx pgx.Tx, expected string) error {
+	var live string
+	if err := tx.QueryRow(ctx, catalogSQL, []string{}).Scan(&live); err != nil {
+		return fmt.Errorf("inspect %s schema catalog: %w", Backend, err)
+	}
+	if digest(live) != expected {
+		return fmt.Errorf("%s schema drift: live PostgreSQL catalog differs from expected version; no repair performed", Backend)
+	}
+	return nil
+}

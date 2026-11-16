@@ -101,10 +101,7 @@ func (s *Service) render(kind, key string, m Message) ([]byte, error) {
 		return nil, errors.New("invalid recipient")
 	}
 	subject, text := "", ""
-	if kind == "STAFF_INVITATION" {
-		subject = "Invitación a la agenda de Doctor Chart"
-		text = "Un médico te invitó a gestionar su agenda.\nAbrí " + s.origin + "/staff/activate e ingresá este código privado:\n\n" + m.Code + "\n\nVence el " + m.Expires.UTC().Format("02/01/2006 15:04") + " UTC. Si ya tenés cuenta local, usá tu contraseña actual. No compartas este código ni tu contraseña."
-	} else if kind == "STAFF_RECOVERY" {
+	if kind == "STAFF_RECOVERY" {
 		subject = "Recuperación de acceso a Doctor Chart"
 		text = "Recibimos una solicitud para recuperar tu acceso local de secretaría.\nAbrí " + s.origin + "/staff/recover y elegí recuperación por email. Ingresá este código:\n\n" + m.Code + "\n\nVence en 15 minutos. Si no lo solicitaste, ignorá este correo: tu contraseña y sesiones no fueron modificadas. Nunca compartas contraseñas ni tu código personal de recuperación."
 	} else {

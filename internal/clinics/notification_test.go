@@ -227,18 +227,17 @@ func TestNotificationOutboxFailureRollsBackWithM4(t *testing.T) {
 		t.Fatal("partial confirmation committed despite database event failure")
 	}
 }
-func TestNotificationStaffInvitationAndEmailRecoveryPreserveLocalAuth(t *testing.T) {
+func TestNotificationStaffInvitationIsManualAndEmailRecoveryStillWorks(t *testing.T) {
 	f, c, _, _, n, sender := notificationFixture(t)
 	_, code := staffInvite(t, f, owner, c, []string{"view"})
-	processMail(t, n)
-	if sender.count() != 1 {
-		t.Fatal("invitation delivery missing")
+	if processed, err := n.ProcessOne(t.Context()); err != nil || processed {
+		t.Fatal("manual invitation queued an email", processed, err)
 	}
 	client := staffActivateTest(t, f, code)
 	assertCode(t, staffReq(f, staffTestClient{}, "POST", "/recovery-email", map[string]string{"email": "assistant@example.invalid"}), 202, "")
 	processMail(t, n)
 	// Only decrypt the captured test mailbox's MIME body, never query a plaintext token.
-	message := string(sender.messages[1])
+	message := string(sender.messages[0])
 	parts := strings.SplitN(message, "\r\n\r\n", 2)
 	raw, err := base64.StdEncoding.DecodeString(strings.ReplaceAll(parts[1], "\r\n", ""))
 	if err != nil {
@@ -279,7 +278,7 @@ func TestNotificationPublicRecoveryRateAndNoReferenceOverride(t *testing.T) {
 	}
 }
 
-func TestNotificationAttendedReservationsAndRevokedInvitationsNeverSend(t *testing.T) {
+func TestNotificationAttendedReservationsAndLegacyInvitationsNeverSend(t *testing.T) {
 	f, c, start, p, n, sender := notificationFixture(t)
 	_, b := notificationBooking(t, f, p, start)
 	for _, status := range []string{"CHECKED_IN", "COMPLETED"} {
@@ -295,20 +294,14 @@ func TestNotificationAttendedReservationsAndRevokedInvitationsNeverSend(t *testi
 	if sender.count() != 0 {
 		t.Fatal("attended booking sent obsolete confirmation/reminder")
 	}
-	access, code := staffInvite(t, f, owner, c, []string{"view"})
-	// Renewal keeps the relation, consumes old code and produces a distinct job.
-	access2, code2 := staffInvite(t, f, owner, c, []string{"view"})
-	if access2 != access || code == code2 {
-		t.Fatal("invitation not safely renewed")
+	access, _ := staffInvite(t, f, owner, c, []string{"view"})
+	if _, err := f.pool.Exec(t.Context(), "INSERT INTO notification_outbox(dedup_key,kind,access_id,payload,due_at) VALUES('legacy-invitation','STAFF_INVITATION',$1,$2,now())", access, []byte("legacy payload")); err != nil {
+		t.Fatal(err)
 	}
 	processMail(t, n)
-	if sender.count() != 0 {
-		t.Fatal("renewed invitation delivered old code")
-	}
-	assertCode(t, f.request("DELETE", "/secretaries/"+access, owner, ""), 204, "")
-	processMail(t, n)
-	if sender.count() != 0 {
-		t.Fatal("revoked invitation still delivered")
+	var state string
+	if err := f.pool.QueryRow(t.Context(), "SELECT state FROM notification_outbox WHERE dedup_key='legacy-invitation'").Scan(&state); err != nil || state != "OBSOLETE" || sender.count() != 0 {
+		t.Fatal("legacy invitation was not retired", state, err)
 	}
 }
 
@@ -317,8 +310,6 @@ func TestNotificationConcurrentEmailRecoveryTokensAreSingleUse(t *testing.T) {
 	_, code := staffInvite(t, f, owner, c, []string{"view"})
 	_ = staffActivateTest(t, f, code)
 	assertCode(t, staffReq(f, staffTestClient{}, "POST", "/recovery-email", map[string]string{"email": "assistant@example.invalid"}), 202, "")
-	// The consumed invitation job is discarded before the email recovery job.
-	processMail(t, n)
 	processMail(t, n)
 	parts := strings.SplitN(string(sender.messages[0]), "\r\n\r\n", 2)
 	plain, err := base64.StdEncoding.DecodeString(strings.ReplaceAll(parts[1], "\r\n", ""))
