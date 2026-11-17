@@ -65,22 +65,27 @@ func (s *Service) ClinicalSummary(ctx context.Context, user string, id int64) (C
 		if err != nil {
 			return err
 		}
+		form, err := wizard.Decode(p.Snapshot)
+		if err != nil {
+			return err
+		}
 		dates, err := decodeHistoryDates(p.Personal)
 		if err != nil {
 			return err
 		}
-		result.History = recordHistory(values, "PATIENT", p.ID, dates)
-		rows, err := tx.Query(ctx, `SELECT id,encounter_date,form_values,primary_diagnosis_description FROM clinical_encounters WHERE patient_id=$1 ORDER BY encounter_date DESC,id DESC`, id)
+		result.History = recordHistory(wizard.VisibleValues(form, values), "PATIENT", p.ID, dates)
+		rows, err := tx.Query(ctx, `SELECT id,encounter_date,form_values,form_definition_snapshot,primary_diagnosis_description,chief_complaint,follow_up_instructions,follow_up_date::text FROM clinical_encounters WHERE patient_id=$1 AND annulled_at IS NULL ORDER BY encounter_date DESC,id DESC`, id)
 		if err != nil {
 			return err
 		}
 		seenDiagnoses := map[string]bool{}
+		snapshots := map[string]map[string]any{}
 		for rows.Next() {
 			var encounterID int64
 			var instant time.Time
-			var raw []byte
-			var diagnosis *string
-			if err := rows.Scan(&encounterID, &instant, &raw, &diagnosis); err != nil {
+			var raw, snapshot []byte
+			var diagnosis, complaint, followUp, followUpDate *string
+			if err := rows.Scan(&encounterID, &instant, &raw, &snapshot, &diagnosis, &complaint, &followUp, &followUpDate); err != nil {
 				rows.Close()
 				return err
 			}
@@ -88,6 +93,21 @@ func (s *Service) ClinicalSummary(ctx context.Context, user string, id int64) (C
 			if err != nil {
 				rows.Close()
 				return err
+			}
+			form, err := summarySnapshot(snapshot, snapshots)
+			if err != nil {
+				rows.Close()
+				return err
+			}
+			projected := wizard.ClinicalProjections(form, answers)
+			record := Encounter{EncounterSummary: EncounterSummary{Complaint: complaint, Diagnosis: diagnosis, FollowUp: followUp}}
+			if err := projectEncounterText(&record, projected); err != nil {
+				rows.Close()
+				return err
+			}
+			diagnosis = record.Diagnosis
+			if result.LastEncounter == nil {
+				result.LastEncounter = &SummaryEncounter{ID: encounterID, Date: instant.In(s.viewZone(ctx)).Format("2006-01-02"), Complaint: record.Complaint, Diagnosis: record.Diagnosis, FollowUp: record.FollowUp, FollowUpDate: followUpDate}
 			}
 			stamp := instant.UTC().Format(time.RFC3339Nano)
 			if diagnosis != nil && len(result.Diagnoses) < 5 {
@@ -97,24 +117,14 @@ func (s *Service) ClinicalSummary(ctx context.Context, user string, id int64) (C
 					result.Diagnoses = append(result.Diagnoses, SummaryEncounter{ID: encounterID, Date: instant.In(s.viewZone(ctx)).Format("2006-01-02"), Diagnosis: diagnosis})
 				}
 			}
-			mergeRecordHistory(result.History, recordHistory(answers, "ENCOUNTER", encounterID, map[string]string{"ALLERGY": stamp, "PROBLEM": stamp, "MEDICATION": stamp}))
+			mergeRecordHistory(result.History, recordHistory(wizard.VisibleValues(form, answers), "ENCOUNTER", encounterID, map[string]string{"ALLERGY": stamp, "PROBLEM": stamp, "MEDICATION": stamp}))
 		}
 		rows.Close()
 		if err := rows.Err(); err != nil {
 			return err
 		}
-		var encounter SummaryEncounter
-		var date time.Time
-		err = tx.QueryRow(ctx, `SELECT id,encounter_date,chief_complaint,primary_diagnosis_description,follow_up_instructions,follow_up_date::text FROM clinical_encounters WHERE patient_id=$1 ORDER BY encounter_date DESC,id DESC LIMIT 1`, id).Scan(&encounter.ID, &date, &encounter.Complaint, &encounter.Diagnosis, &encounter.FollowUp, &encounter.FollowUpDate)
-		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-			return err
-		}
-		if err == nil {
-			encounter.Date = date.In(s.viewZone(ctx)).Format("2006-01-02")
-			result.LastEncounter = &encounter
-		}
 		if err := s.workspaces.Feature(ctx, tx, user, "PRESCRIPTIONS"); err == nil {
-			rows, err := tx.Query(ctx, `SELECT r.id,r.created_at,m.medication_name,m.dosage,m.frequency FROM patient_prescription_records r JOIN prescription_medications m ON m.record_id=r.id WHERE r.patient_id=$1 AND r.author_user_id=$2 ORDER BY r.created_at DESC,r.id DESC,m.item_position LIMIT 8`, id, user)
+			rows, err := tx.Query(ctx, `SELECT r.id,r.created_at,m.medication_name,m.dosage,m.frequency FROM patient_prescription_records r JOIN prescription_medications m ON m.record_id=r.id WHERE r.patient_id=$1 AND r.author_user_id=$2 AND r.annulled_at IS NULL ORDER BY r.created_at DESC,r.id DESC,m.item_position LIMIT 8`, id, user)
 			if err != nil {
 				return err
 			}
@@ -189,6 +199,13 @@ func (s *Service) SaveClinicalProfile(ctx context.Context, user string, id int64
 			return err
 		}
 		now := time.Now()
+		reason, err := revisionReason(request["reason"], false)
+		if err != nil {
+			return err
+		}
+		if err := bindRevision(ctx, tx, user, reason); err != nil {
+			return err
+		}
 		if err := updateClinicalProfile(&profile, historical, request, p.BirthDate, now.In(s.viewZone(ctx)).Format("2006-01-02"), now.UTC().Format(time.RFC3339Nano), user); err != nil {
 			return err
 		}
@@ -246,4 +263,18 @@ func (s *Service) summaryRoutes(mux *http.ServeMux) {
 			api.WriteJSON(w, 200, result)
 		})
 	}
+}
+
+// Keep only a small request-local decode cache. Every row is still visited;
+// uncommon snapshots are decoded normally when the cache is full.
+func summarySnapshot(raw []byte, cache map[string]map[string]any) (map[string]any, error) {
+	key := string(raw)
+	if form, exists := cache[key]; exists {
+		return form, nil
+	}
+	form, err := wizard.Decode(raw)
+	if err == nil && len(cache) < 8 {
+		cache[key] = form
+	}
+	return form, err
 }

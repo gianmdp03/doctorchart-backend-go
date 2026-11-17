@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/syntah/doctorchart-backend-go/db"
 	"github.com/syntah/doctorchart-backend-go/internal/api"
+	"github.com/syntah/doctorchart-backend-go/internal/testfixture"
 	"github.com/syntah/doctorchart-backend-go/internal/workspace"
 	"net/http"
 	"net/http/httptest"
@@ -132,7 +133,7 @@ func TestSameDoctorMultipleContextClinicalHTTPIsolation(t *testing.T) {
 			t.Fatal("document disclosure")
 		}
 	}
-	assertCode(call("DELETE", fmt.Sprintf("/patients/%d", pA.ID), "integrity-owner", fmt.Sprint(b.ContextID), nil), 404, "PATIENT_NOT_FOUND")
+	assertCode(call("DELETE", fmt.Sprintf("/patients/%d", pA.ID), "integrity-owner", fmt.Sprint(b.ContextID), map[string]any{"reason": "Fixture"}), 404, "PATIENT_NOT_FOUND")
 	assertCode(call("PUT", fmt.Sprintf("/patients/%d", pA.ID), "integrity-owner", fmt.Sprint(a.ContextID), map[string]any{"expectedVersion": 0, "specialtyContextId": b.ContextID, "values": integrityPatientRequest()["values"]}), 400, "INVALID_REQUEST")
 	list := call("GET", "/patients?search=12345678", "integrity-owner", fmt.Sprint(a.ContextID), nil)
 	assertCode(list, 200, "")
@@ -153,5 +154,137 @@ func TestSameDoctorMultipleContextClinicalHTTPIsolation(t *testing.T) {
 	}
 	if _, err = s.CreatePatient(ctxB, api.Identity{UserID: "integrity-other", Plan: "BASIC"}, integrityPatientRequest()); err == nil {
 		t.Fatal("internal foreign context creation allowed")
+	}
+
+	patientPath := fmt.Sprintf("/patients/%d", pA.ID)
+	encounterPath := fmt.Sprintf("/encounters/%d", eA.ID)
+	rxPath := fmt.Sprintf("%s/prescriptions/%d", patientPath, rx.ID)
+	historyPath := patientPath + "/revisions"
+	scope := fmt.Sprint(a.ContextID)
+	owner := "integrity-owner"
+	// A persisted pre-SP-04B version starts with an empty history. No authors
+	// or revisions are generated for earlier version numbers.
+	if _, err := pool.Exec(ctx, "UPDATE patients SET version=4 WHERE id=$1", pA.ID); err != nil {
+		t.Fatal(err)
+	}
+	readHistory := func() []revisionItem {
+		t.Helper()
+		response := call("GET", historyPath, owner, scope, nil)
+		assertCode(response, 200, "")
+		var page revisionPage[revisionItem]
+		if err := json.Unmarshal(response.Body.Bytes(), &page); err != nil {
+			t.Fatal(err)
+		}
+		return page.Items
+	}
+	if len(readHistory()) != 0 {
+		t.Fatal("invented history for a pre-audit version")
+	}
+	for index, name := range []string{"Primera corrección", "Segunda corrección"} {
+		values := integrityPatientRequest()["values"].(map[string]any)
+		values["sys_firstName"] = name
+		assertCode(call("PUT", patientPath, owner, scope, map[string]any{
+			"expectedVersion": 4 + index, "values": values, "reason": "Identificación verificada",
+		}), 200, "")
+	}
+	revisions := readHistory()
+	if len(revisions) != 2 || revisions[0].PreviousVersion != 5 || revisions[0].NewVersion != 6 ||
+		revisions[1].PreviousVersion != 4 || revisions[0].Actor != owner ||
+		!strings.Contains(string(revisions[0].Previous), "Primera corrección") ||
+		!strings.Contains(string(revisions[1].Previous), "Synthetic Integrity") {
+		t.Fatal("successive revisions did not preserve the ordered previous values")
+	}
+
+	assertCode(call("PUT", encounterPath, owner, scope, map[string]any{"expectedVersion": 0,
+		"consultationType": "FIRST_VISIT", "values": map[string]any{"chiefComplaint": "Motivo corregido", "weightKg": 20, "heightCm": 100}}), 200, "")
+	assertCode(call("GET", historyPath, owner, fmt.Sprint(b.ContextID), nil), 404, "PATIENT_NOT_FOUND")
+	other, err := s.workspaces.Setup(ctx, "integrity-other")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertCode(call("GET", historyPath, "integrity-other", fmt.Sprint(other.ContextID), nil), 404, "PATIENT_NOT_FOUND")
+	staff := httptest.NewRequest("GET", "/api/doctorchart"+historyPath+"?specialtyContextId="+scope, nil)
+	staff.Header.Set("X-Gateway-Secret", "context-fixture")
+	staff.AddCookie(&http.Cookie{Name: "doctorchart_staff", Value: "synthetic"})
+	staffResponse := httptest.NewRecorder()
+	handler.ServeHTTP(staffResponse, staff)
+	assertCode(staffResponse, 401, "")
+
+	assertCode(call("GET", rxPath+"/pdf", owner, scope, nil), 200, "")
+	assertCode(call("GET", encounterPath, owner, scope, nil), 200, "")
+	assertCode(call("DELETE", rxPath, owner, scope, map[string]any{"reason": "Orden reemplazada"}), 204, "")
+	assertCode(call("GET", rxPath+"/pdf", owner, scope, nil), 404, "PRESCRIPTION_NOT_FOUND")
+	assertCode(call("DELETE", encounterPath, owner, scope, map[string]any{"reason": "Consulta duplicada", "expectedVersion": 1}), 204, "")
+	assertCode(call("GET", encounterPath, owner, scope, nil), 404, "ENCOUNTER_NOT_FOUND")
+	assertCode(call("GET", fmt.Sprintf("%s/encounters/%d/print", patientPath, eA.ID), owner, scope, nil), 404, "ENCOUNTER_NOT_FOUND")
+	summary := call("GET", patientPath+"/clinical-summary", owner, scope, nil)
+	assertCode(summary, 200, "")
+	if strings.Contains(summary.Body.String(), "Motivo corregido") || strings.Contains(summary.Body.String(), "Synthetic study") {
+		t.Fatal("annulled content appeared in current summary")
+	}
+
+	var unchanged bool
+	verifySnapshot := func() {
+		t.Helper()
+		if err := pool.QueryRow(ctx, `SELECT previous_content->'form_definition_snapshot'=$2::jsonb
+			FROM clinical_revisions WHERE entity='ENCOUNTER' AND entity_id=$1 AND operation='CORRECT'`,
+			eA.ID, eA.Snapshot).Scan(&unchanged); err != nil || !unchanged {
+			t.Fatal("encounter revision lost its original form", err)
+		}
+	}
+	verifySnapshot()
+	var wizardVersion, specialtyVersion int64
+	if err := pool.QueryRow(ctx, "SELECT version FROM wizard_defaults WHERE specialty_id=$1", a.Specialty.ID).Scan(&wizardVersion); err != nil {
+		t.Fatal(err)
+	}
+	if err := testfixture.ApproveDraft(ctx, pool, a.Specialty.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.workspaces.SaveWizard(ctx, a.Specialty.ID, map[string]any{"expectedVersion": json.Number(fmt.Sprint(wizardVersion))}, true); err != nil {
+		t.Fatal(err)
+	}
+	verifySnapshot()
+	if err := pool.QueryRow(ctx, "SELECT version FROM specialties WHERE id=$1", a.Specialty.ID).Scan(&specialtyVersion); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.workspaces.UpdateSpecialty(ctx, a.Specialty.ID, map[string]any{"expectedVersion": json.Number(fmt.Sprint(specialtyVersion)), "active": false}); err != nil {
+		t.Fatal(err)
+	}
+	if len(readHistory()) != 5 {
+		t.Fatal("history changed after republishing or deactivating a specialty")
+	}
+
+	assertCode(call("DELETE", patientPath, owner, scope, map[string]any{"reason": "Ficha duplicada", "expectedVersion": 5}), 409, "VERSION_CONFLICT")
+	assertCode(call("GET", patientPath, owner, scope, nil), 200, "")
+	if len(readHistory()) != 5 {
+		t.Fatal("partial history survived failed annulment")
+	}
+	assertCode(call("DELETE", patientPath, owner, scope, map[string]any{"reason": "Ficha duplicada", "expectedVersion": 6}), 204, "")
+	assertCode(call("GET", patientPath, owner, scope, nil), 404, "PATIENT_NOT_FOUND")
+	assertCode(call("GET", patientPath+"/clinical-summary", owner, scope, nil), 404, "PATIENT_NOT_FOUND")
+	archive := call("GET", "/patients/archived", owner, scope, nil)
+	assertCode(archive, 200, "")
+	if !strings.Contains(archive.Body.String(), "Segunda corrección") || len(readHistory()) != 7 {
+		t.Fatal("annulled patient or dependent encounter missing in history")
+	}
+	var pdfRecorded, encounterRecorded bool
+	if err := pool.QueryRow(ctx, `SELECT
+		EXISTS(SELECT 1 FROM clinical_access_events WHERE operation='PRESCRIPTION_PDF'
+			AND entity_id=$1 AND patient_id=$2 AND record_version=0 AND outcome='ARTIFACT_READY'),
+		EXISTS(SELECT 1 FROM clinical_access_events WHERE operation='ENCOUNTER_READ'
+			AND entity_id=$3 AND patient_id=$2 AND record_version=1 AND outcome='AUTHORIZED')`,
+		rx.ID, pA.ID, eA.ID).Scan(&pdfRecorded, &encounterRecorded); err != nil || !pdfRecorded || !encounterRecorded {
+		t.Fatal("missing document or encounter audit after annulment", err)
+	}
+	auditResponse := call("GET", "/workspace/clinical-access", owner, fmt.Sprint(b.ContextID), nil)
+	assertCode(auditResponse, 200, "")
+	var accessPage struct{ Items []accessEvent }
+	if err := json.Unmarshal(auditResponse.Body.Bytes(), &accessPage); err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range accessPage.Items {
+		if row.Patient != nil && *row.Patient == pA.ID && row.Outcome == "AUTHORIZED" {
+			t.Fatal("another context returned an authorized access to the first context's patient")
+		}
 	}
 }

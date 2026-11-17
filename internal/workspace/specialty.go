@@ -30,9 +30,6 @@ func (s *Store) CreateSpecialty(ctx context.Context, request map[string]any) (Sp
 	if !codePattern.MatchString(code) {
 		return result, api.Invalid("El código de especialidad debe estar en minúsculas y usar caracteres válidos.")
 	}
-	if !supportedSpecialty(code) {
-		return result, api.Failure(409, "SPECIALTY_CATALOG_LOCKED", "No se pueden incorporar nuevas especialidades en esta etapa.")
-	}
 	name, err := api.Text(request, "name", 120)
 	if err != nil {
 		return result, err
@@ -129,8 +126,14 @@ func (s *Store) UpdateSpecialty(ctx context.Context, id int64, request map[strin
 			if err := tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM wizard_defaults WHERE specialty_id=$1 AND published_definition IS NOT NULL)", id).Scan(&published); err != nil {
 				return err
 			}
-			if *active && !published {
-				return api.Failure(409, "SPECIALTY_NOT_AVAILABLE", "Publicá el wizard antes de activar la especialidad.")
+			if *active {
+				available, err := templateAvailable(ctx, tx, id, false)
+				if err != nil {
+					return err
+				}
+				if !available {
+					return api.Failure(409, "TEMPLATE_APPROVAL_REQUIRED", "La publicación vigente requiere una aprobación válida para activarse.")
+				}
 			}
 			if !*active && current.Active && published {
 				var count int64
@@ -178,10 +181,8 @@ func (s *Store) SaveWizard(ctx context.Context, id int64, request map[string]any
 		}
 	}
 	err = s.transaction(ctx, false, func(tx pgx.Tx) error {
-		if publish {
-			if err := catalogLock(ctx, tx); err != nil {
-				return err
-			}
+		if err := catalogLock(ctx, tx); err != nil {
+			return err
 		}
 		current, err := defaultWizard(ctx, tx, id)
 		if err != nil {
@@ -191,6 +192,17 @@ func (s *Store) SaveWizard(ctx context.Context, id int64, request map[string]any
 			return err
 		}
 		if publish {
+			review, err := reviewDraftFor(ctx, tx, id)
+			if err != nil {
+				return err
+			}
+			approval, err := currentDraftApproval(ctx, tx, id, review)
+			if err != nil {
+				return err
+			}
+			if approval == nil {
+				return api.Failure(409, "TEMPLATE_APPROVAL_REQUIRED", "Aprobá esta revisión exacta antes de publicarla.")
+			}
 			draft, err := wizard.Decode(current.Draft)
 			if err != nil {
 				return err
@@ -198,12 +210,23 @@ func (s *Store) SaveWizard(ctx context.Context, id int64, request map[string]any
 			if err := s.validator.Validate(draft); err != nil {
 				return err
 			}
-			_, err = tx.Exec(ctx, "UPDATE specialties SET active=true,version=version+1,updated_at=greatest(clock_timestamp(),updated_at+interval '1 microsecond') WHERE id=$1", id)
+			_, err = tx.Exec(ctx, `UPDATE specialties s SET active=true,version=s.version+1,
+				navigation=a.content->'experience'->'navigation',
+				patient_record_tabs=a.content->'experience'->'patientRecordTabs',
+				patient_record_actions=a.content->'experience'->'patientRecordActions',
+				updated_at=greatest(clock_timestamp(),s.updated_at+interval '1 microsecond')
+				FROM wizard_approvals a WHERE s.id=$1 AND a.id=$2`, id, *approval)
 			if err != nil {
 				return err
 			}
-			current.Published = current.Draft
-			current.PublishedVersion++
+			_, err = tx.Exec(ctx, `UPDATE wizard_defaults SET published_definition=draft_definition,
+				published_version=published_version+1,published_approval_id=$2,draft_experience=NULL,
+				version=version+1,updated_at=greatest(clock_timestamp(),updated_at+interval '1 microsecond') WHERE specialty_id=$1`, id, *approval)
+			if err != nil {
+				return err
+			}
+			result, err = defaultWizard(ctx, tx, id)
+			return err
 		} else {
 			previous, err := wizard.Decode(current.Draft)
 			if err != nil {
@@ -217,7 +240,7 @@ func (s *Store) SaveWizard(ctx context.Context, id int64, request map[string]any
 				return err
 			}
 		}
-		err = tx.QueryRow(ctx, `UPDATE wizard_defaults SET draft_definition=$2,published_definition=$3,published_version=$4,version=version+1,updated_at=greatest(clock_timestamp(),updated_at+interval '1 microsecond') WHERE specialty_id=$1 AND version=$5 RETURNING specialty_id,version,published_version,draft_definition,published_definition`, id, current.Draft, current.Published, current.PublishedVersion, current.Version).Scan(&result.SpecialtyID, &result.Version, &result.PublishedVersion, &result.Draft, &result.Published)
+		err = tx.QueryRow(ctx, `UPDATE wizard_defaults SET draft_definition=$2,version=version+1,updated_at=greatest(clock_timestamp(),updated_at+interval '1 microsecond') WHERE specialty_id=$1 AND version=$3 RETURNING specialty_id,version,published_version,draft_definition,published_definition`, id, current.Draft, current.Version).Scan(&result.SpecialtyID, &result.Version, &result.PublishedVersion, &result.Draft, &result.Published)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return api.Failure(409, "VERSION_CONFLICT", "La configuración cambió. Actualizá los datos antes de guardar.")
 		}

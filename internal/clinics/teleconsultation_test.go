@@ -156,8 +156,8 @@ func TestTeleconsultationOnlyPublicDirectoryAndPrivateStaffProjection(t *testing
 	}
 	assertCode(t, pubRequest(f, "POST", path, key, body), 201, "")
 
-	data, err := staffBookingDocument([]byte(`{"id":"1","patientId":"2","meetingUrl":"private","clinicSnapshot":{"name":"Virtual","modality":"TELECONSULTATION","meetingUrl":"private"},"specialty":{"name":"General","private":"private"}}`))
-	if err != nil || strings.Contains(jsonString(data), "private") || !strings.Contains(jsonString(data), "TELECONSULTATION") {
+	data, err := staffBookingDocument([]byte(`{"id":"1","patientId":"2","meetingUrl":"private","answers":{"insurance":"synthetic-sensitive-answer"},"clinicalNote":"synthetic-sensitive-note","clinicSnapshot":{"name":"Virtual","modality":"TELECONSULTATION","meetingUrl":"private"},"specialty":{"name":"General","private":"private"}}`))
+	if err != nil || strings.Contains(jsonString(data), "private") || strings.Contains(jsonString(data), "synthetic-sensitive") || !strings.Contains(jsonString(data), "TELECONSULTATION") {
 		t.Fatal(data, err)
 	}
 }

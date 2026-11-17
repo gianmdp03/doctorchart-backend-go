@@ -130,15 +130,13 @@ func (s *Service) printPDF(doc printDocument, metadata url.Values) ([]byte, erro
 		}
 		return y
 	}
-	clinic := fallback(metadata.Get("clinicName"), "DoctorChart")
-	doctor := fallback(metadata.Get("doctorName"), "Profesional Médico")
-	specialty := fallback(metadata.Get("specialty"), api.JavaTrim(pointer(doc.Author.Specialty)))
-	phone := ""
-	if has(metadata.Get("clinicPhone")) {
-		phone = "Tel: " + api.JavaTrim(metadata.Get("clinicPhone"))
+	label, signature := "Vista previa técnica", "Vista previa sin firma digital"
+	if doc.emitted {
+		label, signature = "Emisión técnica", "Emitido sin firma digital"
 	}
-	leftEnd := column(40, 283.25, 42, []string{clinic, api.JavaTrim(metadata.Get("clinicAddress")), phone}, []float64{13, 8.5, 8.5}, true, "L")
-	rightEnd := column(323.25, 231.75, 41.4, []string{doctor, specialty}, []float64{12, 8.5}, true, "R")
+	doctor, specialty := "Profesional "+doc.Author.UserID, pointer(doc.Author.Specialty)
+	leftEnd := column(40, 283.25, 42, []string{"DoctorChart", label}, []float64{13, 8.5}, true, "L")
+	rightEnd := column(323.25, 231.75, 41.4, []string{doctor, specialty}, []float64{10, 8.5}, true, "R")
 	end := leftEnd
 	if rightEnd > end {
 		end = rightEnd
@@ -315,7 +313,7 @@ func (s *Service) printPDF(doc printDocument, metadata url.Values) ([]byte, erro
 		line(283.25, 12, specialty, "", 8, muted, "C")
 	}
 	pdf.SetX(271.75)
-	line(283.25, 12, "Firma y Sello del Profesional", "", 8, muted, "C")
+	line(283.25, 12, signature, "", 8, muted, "C")
 	var buffer bytes.Buffer
 	if contentErr != nil {
 		return nil, contentErr

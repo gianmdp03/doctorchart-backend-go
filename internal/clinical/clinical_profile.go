@@ -96,7 +96,7 @@ func updateClinicalProfile(profile *ClinicalProfile, historical []ClinicalEntry,
 	}
 	switch operation {
 	case "ADD":
-		if err := api.Only(request, "expectedVersion", "operation", "kind", "text", "details", "date", "certainty"); err != nil {
+		if err := api.Only(request, "expectedVersion", "operation", "kind", "text", "details", "date", "certainty", "reason"); err != nil {
 			return err
 		}
 		if len(profile.Entries) >= 1000 {
@@ -147,7 +147,7 @@ func updateClinicalProfile(profile *ClinicalProfile, historical []ClinicalEntry,
 			profile.NoKnownAllergiesAt = ""
 		}
 	case "RESOLVE", "CONFIRM":
-		if err := api.Only(request, "expectedVersion", "operation", "entryId"); err != nil {
+		if err := api.Only(request, "expectedVersion", "operation", "entryId", "reason"); err != nil {
 			return err
 		}
 		id, err := api.Text(request, "entryId", 50)
@@ -172,7 +172,7 @@ func updateClinicalProfile(profile *ClinicalProfile, historical []ClinicalEntry,
 		}
 		return api.Failure(409, "VERSION_CONFLICT", "El registro cambió. Actualizá antes de guardar.")
 	case "NO_KNOWN_ALLERGIES":
-		if err := api.Only(request, "expectedVersion", "operation"); err != nil {
+		if err := api.Only(request, "expectedVersion", "operation", "reason"); err != nil {
 			return err
 		}
 		for _, entry := range append(append([]ClinicalEntry{}, profile.Entries...), historical...) {

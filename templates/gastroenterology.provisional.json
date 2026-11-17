@@ -1,0 +1,483 @@
+{
+  "status": "PROVISIONAL_TEST_ONLY",
+  "createSpecialty": {
+    "code": "gastroenterology",
+    "name": "Gastroenterología",
+    "description": "Plantilla provisional de consulta ambulatoria de Gastroenterología para revisión profesional.",
+    "definition": {
+      "schemaVersion": 1,
+      "patientForm": {
+        "categories": [
+          {
+            "key": "sys_patient_profile",
+            "title": "Datos Personales",
+            "enabled": true,
+            "system": true,
+            "fields": [
+              {
+                "key": "sys_firstName",
+                "type": "TEXT",
+                "label": "Nombre",
+                "system": true,
+                "required": true
+              },
+              {
+                "key": "sys_lastName",
+                "type": "TEXT",
+                "label": "Apellido",
+                "system": true,
+                "required": true
+              },
+              {
+                "key": "sys_dni",
+                "type": "TEXT",
+                "label": "DNI",
+                "system": true,
+                "required": true
+              },
+              {
+                "key": "sys_dob",
+                "type": "DATE",
+                "label": "Fecha de nacimiento",
+                "system": true,
+                "required": true
+              },
+              {
+                "key": "sys_sex",
+                "type": "SELECT",
+                "label": "Sexo",
+                "system": true,
+                "options": [
+                  {
+                    "label": "Masculino",
+                    "value": "MALE"
+                  },
+                  {
+                    "label": "Femenino",
+                    "value": "FEMALE"
+                  },
+                  {
+                    "label": "Otro",
+                    "value": "OTHER"
+                  },
+                  {
+                    "label": "Sin información",
+                    "value": "UNKNOWN"
+                  }
+                ],
+                "required": true
+              },
+              {
+                "key": "sys_phone",
+                "type": "TEXT",
+                "label": "Teléfono",
+                "system": true,
+                "required": false
+              },
+              {
+                "key": "sys_email",
+                "type": "TEXT",
+                "label": "Email",
+                "system": true,
+                "required": false
+              },
+              {
+                "key": "sys_insurance",
+                "type": "TEXT",
+                "label": "Obra social / Cobertura",
+                "system": true,
+                "required": false
+              },
+              {
+                "key": "address",
+                "type": "TEXT",
+                "label": "Dirección",
+                "required": false
+              }
+            ]
+          },
+          {
+            "key": "digestiveHistory",
+            "title": "Antecedentes digestivos",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "digestivePersonalHistory",
+                "label": "Antecedentes digestivos personales",
+                "type": "TEXTAREA",
+                "required": false
+              },
+              {
+                "key": "digestiveProcedures",
+                "label": "Cirugías y procedimientos previos",
+                "type": "TEXTAREA",
+                "required": false
+              },
+              {
+                "key": "digestiveFamilyHistory",
+                "label": "Antecedentes familiares relevantes",
+                "type": "TEXTAREA",
+                "required": false
+              },
+              {
+                "key": "digestiveHabits",
+                "label": "Hábitos relacionados con la consulta",
+                "type": "TEXTAREA",
+                "required": false
+              }
+            ]
+          },
+          {
+            "key": "sys_clinical_history",
+            "title": "Antecedentes clínicos",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "sys_allergyStatus",
+                "label": "Alergias conocidas",
+                "type": "SELECT",
+                "required": false,
+                "options": [
+                  {
+                    "value": "UNKNOWN",
+                    "label": "Sin información / no revisado"
+                  },
+                  {
+                    "value": "NONE",
+                    "label": "No refiere alergias conocidas"
+                  },
+                  {
+                    "value": "PRESENT",
+                    "label": "Tiene alergias conocidas"
+                  }
+                ]
+              },
+              {
+                "key": "sys_allergies",
+                "label": "Alergias y reacciones",
+                "type": "TEXTAREA",
+                "required": false,
+                "placeholder": "Una alergia por línea. Incluí la reacción, si se conoce."
+              },
+              {
+                "key": "sys_conditionStatus",
+                "label": "Enfermedades o problemas actuales",
+                "type": "SELECT",
+                "required": false,
+                "options": [
+                  {
+                    "value": "UNKNOWN",
+                    "label": "Sin información / no revisado"
+                  },
+                  {
+                    "value": "NONE",
+                    "label": "No refiere enfermedades actuales"
+                  },
+                  {
+                    "value": "PRESENT",
+                    "label": "Tiene enfermedades o problemas actuales"
+                  }
+                ]
+              },
+              {
+                "key": "sys_conditions",
+                "label": "Enfermedades y problemas de salud",
+                "type": "TEXTAREA",
+                "required": false,
+                "placeholder": "Un problema actual por línea. Ej.: asma en seguimiento."
+              },
+              {
+                "key": "sys_medicationStatus",
+                "label": "Medicación habitual",
+                "type": "SELECT",
+                "required": false,
+                "options": [
+                  {
+                    "value": "UNKNOWN",
+                    "label": "Sin información / no revisado"
+                  },
+                  {
+                    "value": "NONE",
+                    "label": "No utiliza medicación habitual"
+                  },
+                  {
+                    "value": "PRESENT",
+                    "label": "Utiliza medicación habitual"
+                  }
+                ]
+              },
+              {
+                "key": "sys_medications",
+                "label": "Tratamiento habitual",
+                "type": "TEXTAREA",
+                "required": false,
+                "placeholder": "Un medicamento por línea, con dosis y frecuencia cuando se conozcan."
+              },
+              {
+                "key": "sys_historySource",
+                "label": "Origen de la información revisada",
+                "type": "SELECT",
+                "required": false,
+                "options": [
+                  {
+                    "value": "REPORTED",
+                    "label": "Informado por el paciente o su familia"
+                  },
+                  {
+                    "value": "CONFIRMED",
+                    "label": "Corroborado por el profesional"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "encounterForm": {
+        "categories": [
+          {
+            "key": "reason",
+            "title": "Motivo y evolución",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "chiefComplaint",
+                "label": "Motivo de consulta",
+                "type": "TEXTAREA",
+                "required": false
+              },
+              {
+                "key": "presentIllness",
+                "label": "Evolución clínica",
+                "type": "TEXTAREA",
+                "required": false
+              }
+            ]
+          },
+          {
+            "key": "digestiveSymptoms",
+            "title": "Características de los síntomas",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "digestiveSymptomLocation",
+                "label": "Localización y características de las molestias",
+                "type": "TEXTAREA",
+                "required": false
+              },
+              {
+                "key": "bowelChanges",
+                "label": "Cambios del tránsito intestinal",
+                "type": "TEXTAREA",
+                "required": false
+              },
+              {
+                "key": "foodRelation",
+                "label": "Relación con la alimentación, si corresponde",
+                "type": "TEXTAREA",
+                "required": false
+              }
+            ]
+          },
+          {
+            "key": "sys_clinical_history",
+            "title": "Antecedentes clínicos",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "sys_allergyStatus",
+                "label": "Alergias conocidas",
+                "type": "SELECT",
+                "required": false,
+                "options": [
+                  {
+                    "value": "UNKNOWN",
+                    "label": "Sin información / no revisado"
+                  },
+                  {
+                    "value": "NONE",
+                    "label": "No refiere alergias conocidas"
+                  },
+                  {
+                    "value": "PRESENT",
+                    "label": "Tiene alergias conocidas"
+                  }
+                ]
+              },
+              {
+                "key": "sys_allergies",
+                "label": "Alergias y reacciones",
+                "type": "TEXTAREA",
+                "required": false,
+                "placeholder": "Una alergia por línea. Incluí la reacción, si se conoce."
+              },
+              {
+                "key": "sys_conditionStatus",
+                "label": "Enfermedades o problemas actuales",
+                "type": "SELECT",
+                "required": false,
+                "options": [
+                  {
+                    "value": "UNKNOWN",
+                    "label": "Sin información / no revisado"
+                  },
+                  {
+                    "value": "NONE",
+                    "label": "No refiere enfermedades actuales"
+                  },
+                  {
+                    "value": "PRESENT",
+                    "label": "Tiene enfermedades o problemas actuales"
+                  }
+                ]
+              },
+              {
+                "key": "sys_conditions",
+                "label": "Enfermedades y problemas de salud",
+                "type": "TEXTAREA",
+                "required": false,
+                "placeholder": "Un problema actual por línea. Ej.: asma en seguimiento."
+              },
+              {
+                "key": "sys_medicationStatus",
+                "label": "Medicación habitual",
+                "type": "SELECT",
+                "required": false,
+                "options": [
+                  {
+                    "value": "UNKNOWN",
+                    "label": "Sin información / no revisado"
+                  },
+                  {
+                    "value": "NONE",
+                    "label": "No utiliza medicación habitual"
+                  },
+                  {
+                    "value": "PRESENT",
+                    "label": "Utiliza medicación habitual"
+                  }
+                ]
+              },
+              {
+                "key": "sys_medications",
+                "label": "Tratamiento habitual",
+                "type": "TEXTAREA",
+                "required": false,
+                "placeholder": "Un medicamento por línea, con dosis y frecuencia cuando se conozcan."
+              },
+              {
+                "key": "sys_historySource",
+                "label": "Origen de la información revisada",
+                "type": "SELECT",
+                "required": false,
+                "options": [
+                  {
+                    "value": "REPORTED",
+                    "label": "Informado por el paciente o su familia"
+                  },
+                  {
+                    "value": "CONFIRMED",
+                    "label": "Corroborado por el profesional"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "key": "physicalExam",
+            "title": "Examen físico",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "physicalExam",
+                "label": "Examen abdominal y otros hallazgos",
+                "type": "TEXTAREA",
+                "required": false
+              }
+            ]
+          },
+          {
+            "key": "complementaryStudies",
+            "title": "Estudios revisados",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "reviewedStudies",
+                "label": "Estudios revisados; informes y resultados disponibles en Estudios",
+                "type": "TEXTAREA",
+                "required": false
+              }
+            ]
+          },
+          {
+            "key": "assessment",
+            "title": "Evaluación clínica",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "clinicalAssessment",
+                "label": "Evaluación clínica",
+                "type": "TEXTAREA",
+                "required": false
+              },
+              {
+                "key": "diagnosis",
+                "label": "Diagnóstico",
+                "type": "TEXTAREA",
+                "required": false
+              }
+            ]
+          },
+          {
+            "key": "plan",
+            "title": "Tratamiento y seguimiento",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "treatment",
+                "label": "Tratamiento e indicaciones",
+                "type": "TEXTAREA",
+                "required": false
+              },
+              {
+                "key": "followUpInstructions",
+                "label": "Indicaciones de seguimiento",
+                "type": "TEXTAREA",
+                "required": false
+              },
+              {
+                "key": "followUpDate",
+                "label": "Próximo control",
+                "type": "DATE",
+                "required": false
+              }
+            ]
+          }
+        ]
+      },
+      "modulesConfig": {
+        "MEDICATION_CATALOG": true,
+        "AI_ASSISTANT": false,
+        "GROWTH_CHARTS": false
+      }
+    }
+  },
+  "experience": {
+    "navigation": [
+      "DASHBOARD",
+      "PATIENTS",
+      "WIZARD"
+    ],
+    "patientRecordTabs": [
+      "SUMMARY",
+      "ENCOUNTERS",
+      "PRESCRIPTIONS",
+      "STUDIES"
+    ],
+    "patientRecordActions": [
+      "EDIT_PATIENT",
+      "NEW_ENCOUNTER",
+      "PRINT_DOCUMENT"
+    ]
+  }
+}

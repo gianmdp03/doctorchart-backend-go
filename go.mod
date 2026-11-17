@@ -1,6 +1,6 @@
 module github.com/syntah/doctorchart-backend-go
 
-go 1.27.3
+go 1.27.4
 
 require (
 	github.com/ALTree/bigfloat v0.3.0

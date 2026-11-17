@@ -20,7 +20,8 @@ var Schema string
 const Backend = "doctorchart"
 const LockNamespace = 17209
 const LockKey = 3
-const currentVersion = 16
+const TemplateCatalogLockKey = 41001
+const currentVersion = 20
 
 func digest(value string) string {
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(strings.ReplaceAll(value, "\r\n", "\n"))))
@@ -112,6 +113,10 @@ func Ensure(ctx context.Context, pool *pgxpool.Pool, seed func(context.Context, 
 }
 
 func validateMarker(ctx context.Context, tx pgx.Tx, checksum, expected string) error {
+	return validateMarkerVersion(ctx, tx, currentVersion, checksum, expected)
+}
+
+func validateMarkerVersion(ctx context.Context, tx pgx.Tx, expectedVersion int, checksum, expected string) error {
 	var count int
 	if err := tx.QueryRow(ctx, "SELECT count(*) FROM public.app_schema_state").Scan(&count); err != nil {
 		return fmt.Errorf("invalid baseline metadata: %w", err)
@@ -124,7 +129,7 @@ func validateMarker(ctx context.Context, tx pgx.Tx, checksum, expected string) e
 	if err := tx.QueryRow(ctx, "SELECT backend,baseline_version,sql_sha256,catalog_sha256 FROM public.app_schema_state WHERE id=1").Scan(&backend, &version, &sqlHash, &catalogHash); err != nil {
 		return fmt.Errorf("invalid baseline metadata: %w", err)
 	}
-	if backend != Backend || version != currentVersion || sqlHash != checksum {
+	if backend != Backend || version != expectedVersion || sqlHash != checksum {
 		return fmt.Errorf("%s incompatible baseline identity/version/checksum; requires an empty database or the consolidated baseline", Backend)
 	}
 	if catalogHash != expected {

@@ -54,13 +54,16 @@ type Encounter struct {
 }
 
 const encounterColumns = `e.id,e.version,e.patient_id,p.full_name,e.encounter_date,e.specialty_id,s.id,s.code,s.display_name,s.description,e.consultation_type,e.chief_complaint,e.primary_diagnosis_code,e.primary_diagnosis_description,e.vital_signs,e.prescriptions,e.history_of_present_illness,e.treatment_plan,e.follow_up_instructions,e.follow_up_date::text,e.weight_kg,e.height_cm,e.head_circumference_cm,e.form_values,e.formula_results,e.form_definition_snapshot,e.formula_context,e.workspace_version,e.physical_examination,e.secondary_diagnoses,e.clinical_impression,e.diagnostic_orders,p.user_id,p.specialty_context_id`
-const encounterFrom = ` FROM clinical_encounters e JOIN patients p ON p.id=e.patient_id JOIN specialties s ON s.id=e.specialty_id `
+const encounterFrom = ` FROM clinical_encounters e JOIN patients p ON p.id=e.patient_id AND p.annulled_at IS NULL JOIN specialties s ON s.id=e.specialty_id AND e.annulled_at IS NULL `
 
 func scanEncounter(row pgx.Row, extra ...any) (Encounter, error) {
 	var e Encounter
 	dest := []any{&e.ID, &e.Version, &e.PatientID, &e.PatientName, &e.instant, &e.SpecialtyID, &e.Specialty.ID, &e.Specialty.Code, &e.Specialty.Name, &e.Specialty.Description, &e.Type, &e.Complaint, &e.DiagnosisCode, &e.Diagnosis, &e.VitalSigns, &e.Prescriptions, &e.History, &e.Treatment, &e.FollowUp, &e.FollowUpDate, &e.Measurements.Weight, &e.Measurements.Height, &e.Measurements.Head, &e.Values, &e.Results, &e.Snapshot, &e.Context, &e.WorkspaceVersion, &e.Physical, &e.Secondary, &e.Impression, &e.Orders, &e.owner, &e.ContextID}
 	err := row.Scan(append(dest, extra...)...)
 	e.Date = e.instant.UTC().Format(time.RFC3339Nano)
+	if err == nil {
+		err = projectEncounter(&e)
+	}
 	return e, err
 }
 func ownedEncounter(ctx context.Context, tx pgx.Tx, userID string, id int64) (Encounter, error) {
@@ -106,7 +109,7 @@ func (s *Service) encounterContext(ctx context.Context, tx pgx.Tx, p Patient, da
 	} else {
 		result["patient.gender"] = *p.Gender
 	}
-	rows, err := tx.Query(ctx, `SELECT weight_kg,height_cm FROM clinical_encounters WHERE patient_id=$1 AND encounter_date<$2 AND ($3::bigint IS NULL OR id<>$3) AND (encounter_date AT TIME ZONE $5)::date >= $4::date AND (weight_kg IS NOT NULL OR height_cm IS NOT NULL OR head_circumference_cm IS NOT NULL) ORDER BY encounter_date DESC,id DESC`, p.ID, date, excluded, p.BirthDate, s.viewZone(ctx).String())
+	rows, err := tx.Query(ctx, `SELECT weight_kg,height_cm FROM clinical_encounters WHERE patient_id=$1 AND annulled_at IS NULL AND encounter_date<$2 AND ($3::bigint IS NULL OR id<>$3) AND (encounter_date AT TIME ZONE $5)::date >= $4::date AND (weight_kg IS NOT NULL OR height_cm IS NOT NULL OR head_circumference_cm IS NOT NULL) ORDER BY encounter_date DESC,id DESC`, p.ID, date, excluded, p.BirthDate, s.viewZone(ctx).String())
 	if err != nil {
 		return nil, err
 	}
@@ -138,6 +141,9 @@ func (s *Service) encounterContext(ctx context.Context, tx pgx.Tx, p Patient, da
 func applyEncounter(e *Encounter, evaluation wizard.Evaluation) error {
 	p := evaluation.Projections
 	for key, dest := range map[string]**string{"chiefComplaint": &e.Complaint, "historyOfPresentIllness": &e.History, "physicalExamination": &e.Physical, "primaryDiagnosisDescription": &e.Diagnosis, "treatmentPlan": &e.Treatment, "followUpInstructions": &e.FollowUp, "followUpDate": &e.FollowUpDate} {
+		if _, represented := p["encounter."+key]; key == "followUpDate" && !represented {
+			continue
+		}
 		text, err := nullableText(p["encounter."+key])
 		if err != nil {
 			return err
@@ -192,14 +198,18 @@ func (s *Service) CreateEncounter(ctx context.Context, identity api.Identity, re
 		return result, err
 	}
 	err = s.transaction(ctx, false, func(tx pgx.Tx) error {
+		if _, err := ownedPatient(ctx, tx, identity.UserID, patientID); err != nil {
+			return err
+		}
+		// Bookings that link a patient also lock the workspace before the patient.
+		setup, err := s.workspaces.Effective(ctx, tx, identity.UserID, *expected)
+		if err != nil {
+			return err
+		}
 		if err := lockPatient(ctx, tx, identity.UserID, patientID); err != nil {
 			return err
 		}
 		p, err := ownedPatient(ctx, tx, identity.UserID, patientID)
-		if err != nil {
-			return err
-		}
-		setup, err := s.workspaces.Effective(ctx, tx, identity.UserID, *expected)
 		if err != nil {
 			return err
 		}
@@ -210,7 +220,7 @@ func (s *Service) CreateEncounter(ctx context.Context, identity api.Identity, re
 		date := time.Now().UTC().Truncate(time.Microsecond)
 		var count int64
 		var first bool
-		if err := tx.QueryRow(ctx, `SELECT count(*),coalesce(bool_or(consultation_type='FIRST_VISIT'),false) FROM clinical_encounters WHERE patient_id=$1`, patientID).Scan(&count, &first); err != nil {
+		if err := tx.QueryRow(ctx, `SELECT count(*),coalesce(bool_or(consultation_type='FIRST_VISIT'),false) FROM clinical_encounters WHERE patient_id=$1 AND annulled_at IS NULL`, patientID).Scan(&count, &first); err != nil {
 			return err
 		}
 		if kind == "FIRST_VISIT" && first {
@@ -276,7 +286,11 @@ func (s *Service) CreateEncounter(ctx context.Context, identity api.Identity, re
 }
 func (s *Service) UpdateEncounter(ctx context.Context, userID string, id int64, request map[string]any) (Encounter, error) {
 	var result Encounter
-	if err := api.Only(request, "expectedVersion", "encounterDate", "consultationType", "values"); err != nil {
+	if err := api.Only(request, "expectedVersion", "encounterDate", "consultationType", "values", "reason"); err != nil {
+		return result, err
+	}
+	reason, err := revisionReason(request["reason"], false)
+	if err != nil {
 		return result, err
 	}
 	expected, err := api.Version(request, false)
@@ -322,7 +336,7 @@ func (s *Service) UpdateEncounter(ctx context.Context, userID string, id int64, 
 		}
 		if kind == "FIRST_VISIT" {
 			var duplicate bool
-			if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM clinical_encounters WHERE patient_id=$1 AND consultation_type='FIRST_VISIT' AND id<>$2)`, e.PatientID, id).Scan(&duplicate); err != nil {
+			if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM clinical_encounters WHERE patient_id=$1 AND annulled_at IS NULL AND consultation_type='FIRST_VISIT' AND id<>$2)`, e.PatientID, id).Scan(&duplicate); err != nil {
 				return err
 			}
 			if duplicate {
@@ -337,17 +351,12 @@ func (s *Service) UpdateEncounter(ctx context.Context, userID string, id int64, 
 		if err != nil {
 			return err
 		}
-		form = wizard.WithClinicalHistory(form)
-		e.Snapshot, err = json.Marshal(form)
-		if err != nil {
-			return err
-		}
 		previousValues, err := wizard.Decode(e.Values)
 		if err != nil {
 			return err
 		}
 		wizard.RetainUnreviewedHistory(previousValues, values)
-		evaluation, err := s.forms.Evaluate(form, values, context)
+		evaluation, err := s.forms.EvaluateUpdate(form, values, context, previousValues)
 		if err != nil {
 			return err
 		}
@@ -360,7 +369,10 @@ func (s *Service) UpdateEncounter(ctx context.Context, userID string, id int64, 
 		if err != nil {
 			return err
 		}
-		err = tx.QueryRow(ctx, `UPDATE clinical_encounters SET encounter_date=$2,consultation_type=$3,chief_complaint=$4,history_of_present_illness=$5,physical_examination=$6,primary_diagnosis_description=$7,treatment_plan=$8,follow_up_instructions=$9,follow_up_date=$10::date,weight_kg=$11,height_cm=$12,head_circumference_cm=$13,form_values=$14,formula_results=$15,formula_context=$16,form_definition_snapshot=$18,version=version+1,updated_at=greatest(clock_timestamp(),updated_at+interval '1 microsecond') WHERE id=$1 AND version=$17 RETURNING version`, id, date, kind, e.Complaint, e.History, e.Physical, e.Diagnosis, e.Treatment, e.FollowUp, e.FollowUpDate, e.Measurements.Weight, e.Measurements.Height, e.Measurements.Head, e.Values, e.Results, e.Context, *expected, e.Snapshot).Scan(&e.Version)
+		if err := bindRevision(ctx, tx, userID, reason); err != nil {
+			return err
+		}
+		err = tx.QueryRow(ctx, `UPDATE clinical_encounters SET encounter_date=$2,consultation_type=$3,chief_complaint=$4,history_of_present_illness=$5,physical_examination=$6,primary_diagnosis_description=$7,treatment_plan=$8,follow_up_instructions=$9,follow_up_date=$10::date,weight_kg=$11,height_cm=$12,head_circumference_cm=$13,form_values=$14,formula_results=$15,formula_context=$16,version=version+1,updated_at=greatest(clock_timestamp(),updated_at+interval '1 microsecond') WHERE id=$1 AND version=$17 RETURNING version`, id, date, kind, e.Complaint, e.History, e.Physical, e.Diagnosis, e.Treatment, e.FollowUp, e.FollowUpDate, e.Measurements.Weight, e.Measurements.Height, e.Measurements.Head, e.Values, e.Results, e.Context, *expected).Scan(&e.Version)
 		result = e
 		return err
 	})
@@ -437,26 +449,40 @@ func (s *Service) EncounterRoutes(mux *http.ServeMux) {
 				return err
 			})
 		}
+		if err == nil {
+			accessReference(r.Context(), &e.ID, &e.PatientID, &e.Version)
+		}
 		clinicalReply(w, e, err, 200)
 	})
 	s.handle(mux, "DELETE /api/doctorchart/encounters/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id, err := pathID(r, "id")
-		if err == nil {
-			err = s.transaction(r.Context(), false, func(tx pgx.Tx) error {
-				e, err := ownedEncounter(r.Context(), tx, api.User(r.Context()).UserID, id)
-				if err != nil {
-					return err
-				}
-				if err := lockPatient(r.Context(), tx, api.User(r.Context()).UserID, e.PatientID); err != nil {
-					return err
-				}
-				if _, err := ownedEncounter(r.Context(), tx, api.User(r.Context()).UserID, id); err != nil {
-					return err
-				}
-				_, err = tx.Exec(r.Context(), "DELETE FROM clinical_encounters WHERE id=$1", id)
-				return err
-			})
+		if err != nil {
+			api.WriteError(w, err)
+			return
 		}
+		request, err := readAnnulment(w, r)
+		if err != nil {
+			api.WriteError(w, err)
+			return
+		}
+		ctx := r.Context()
+		user := api.User(ctx).UserID
+		err = s.transaction(ctx, false, func(tx pgx.Tx) error {
+			encounter, err := ownedEncounter(ctx, tx, user, id)
+			if err != nil {
+				return err
+			}
+			if err := lockPatient(ctx, tx, user, encounter.PatientID); err != nil {
+				return err
+			}
+			if _, err := ownedEncounter(ctx, tx, user, id); err != nil {
+				return err
+			}
+			if err := bindRevision(ctx, tx, user, request.reason); err != nil {
+				return err
+			}
+			return annulOne(ctx, tx, "clinical_encounters", id, request.expected)
+		})
 		clinicalReply(w, nil, err, 204)
 	})
 	byPatient := func(w http.ResponseWriter, r *http.Request) {

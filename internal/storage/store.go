@@ -297,14 +297,25 @@ func (s *Store) readOriginal(ctx context.Context, name string, input io.Reader) 
 	return content, contentType, err
 }
 func (s *Store) Open(ctx context.Context, key string) (io.ReadCloser, int64, error) {
+	file, size, _, err := s.OpenWithDigest(ctx, key)
+	return file, size, err
+}
+
+// OpenWithDigest exposes the persisted checksum of managed objects.
+func (s *Store) OpenWithDigest(ctx context.Context, key string) (io.ReadCloser, int64, string, error) {
 	if s.library != nil {
 		asset, err := s.library.Catalog.Get(ctx, key)
 		if err != nil {
-			return nil, 0, mediaReadError(err)
+			return nil, 0, "", mediaReadError(err)
 		}
 		f, err := s.library.Manager.Open(ctx, asset)
-		return f, asset.Size, mediaReadError(err)
+		return f, asset.Size, asset.SHA256, mediaReadError(err)
 	}
+	file, size, err := s.openLegacy(ctx, key)
+	return file, size, "", err
+}
+
+func (s *Store) openLegacy(ctx context.Context, key string) (io.ReadCloser, int64, error) {
 	if err := validateKey(key); err != nil {
 		return nil, 0, err
 	}

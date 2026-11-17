@@ -37,14 +37,6 @@ func firstStep(definition map[string]any) string {
 
 var stepPattern = regexp.MustCompile(`^(specialty|encounter|patient:[A-Za-z][A-Za-z0-9_-]{0,79})$`)
 
-func supportedSpecialty(code string) bool {
-	switch strings.ToLower(code) {
-	case "pediatrics", "general_medicine", "dermatology":
-		return true
-	}
-	return false
-}
-
 // The current context is always resolved through the authenticated owner.
 // An optional ID fences stale clients without allowing arbitrary context access.
 func authorizeContext(w *workspace, request map[string]any) error {
@@ -146,14 +138,18 @@ func (s *Store) Select(ctx context.Context, userID string, request map[string]an
 		if err != nil {
 			return err
 		}
-		if !supportedSpecialty(specialty.Code) || !specialty.Active || len(d.Published) == 0 {
+		available, err := templateAvailable(ctx, tx, id, true)
+		if err != nil {
+			return err
+		}
+		if !available {
 			return api.Failure(409, "SPECIALTY_NOT_AVAILABLE", "La especialidad no está disponible.")
 		}
 		definition, err := wizard.Decode(d.Published)
 		if err != nil {
 			return err
 		}
-		if err := s.validator.Validate(definition); err != nil {
+		if err := s.validator.ValidateStored(definition); err != nil {
 			return err
 		}
 		if w == nil {
@@ -204,6 +200,11 @@ func (s *Store) Edit(ctx context.Context, userID, operation string, request map[
 	}
 	var result *Setup
 	err = s.transaction(ctx, false, func(tx pgx.Tx) error {
+		if operation == "reset" || operation == "finish" {
+			if err := catalogLock(ctx, tx); err != nil {
+				return err
+			}
+		}
 		w, err := readWorkspace(ctx, tx, userID)
 		if err != nil {
 			return err
@@ -244,11 +245,23 @@ func (s *Store) Edit(ctx context.Context, userID, operation string, request map[
 			if len(w.Draft) == 0 {
 				return api.Failure(409, "NO_DRAFT_TO_APPLY", "No hay un borrador para aplicar.")
 			}
+			if !w.Completed {
+				var available bool
+				err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM wizard_defaults
+					WHERE specialty_id=$1 AND published_version=$2 AND public.template_available(specialty_id))`,
+					w.Specialty.ID, w.DraftSourceVersion).Scan(&available)
+				if err != nil {
+					return err
+				}
+				if !available {
+					return api.Failure(409, "TEMPLATE_APPROVAL_REQUIRED", "La revisión de este alta inicial ya no está disponible. Cargá una publicación aprobada vigente antes de finalizar.")
+				}
+			}
 			draft, err := wizard.Decode(w.Draft)
 			if err != nil {
 				return err
 			}
-			if err := s.validator.Validate(draft); err != nil {
+			if err := s.validator.ValidateStored(draft); err != nil {
 				return err
 			}
 			w.Definition = w.Draft
@@ -265,15 +278,22 @@ func (s *Store) Edit(ctx context.Context, userID, operation string, request map[
 			w.DraftSourceVersion = nil
 			w.Step = "completed"
 		case "reset":
+			available, err := templateAvailable(ctx, tx, w.Specialty.ID, false)
+			if err != nil {
+				return err
+			}
+			if !available {
+				return api.Failure(409, "SPECIALTY_NOT_AVAILABLE", "La especialidad no tiene una publicación aprobada disponible.")
+			}
 			d, err := defaultWizard(ctx, tx, w.Specialty.ID)
-			if err != nil || len(d.Published) == 0 {
-				return api.Failure(409, "SPECIALTY_NOT_AVAILABLE", "La especialidad no tiene una configuración publicada.")
+			if err != nil {
+				return err
 			}
 			definition, err := wizard.Decode(d.Published)
 			if err != nil {
 				return err
 			}
-			if err := s.validator.Validate(definition); err != nil {
+			if err := s.validator.ValidateStored(definition); err != nil {
 				return err
 			}
 			w.Draft = d.Published

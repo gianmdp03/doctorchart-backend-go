@@ -22,6 +22,7 @@ import (
 	"github.com/syntah/doctorchart-backend-go/internal/api"
 	"github.com/syntah/doctorchart-backend-go/internal/billing"
 	"github.com/syntah/doctorchart-backend-go/internal/bootstrap"
+	"github.com/syntah/doctorchart-backend-go/internal/testfixture"
 	"github.com/syntah/doctorchart-backend-go/internal/wizard"
 )
 
@@ -80,6 +81,7 @@ func newFixture(t *testing.T) *fixture {
 	if config.ConnConfig.Database != "doctorchart_clinics_test" || config.ConnConfig.Host != "127.0.0.1" || config.ConnConfig.User != "migration_fixture" {
 		t.Fatal("owned loopback fixture required")
 	}
+	config.ConnConfig.RuntimeParams["doctorchart.template_lab"] = "on"
 	pool, err := pgxpool.NewWithConfig(t.Context(), config)
 	if err != nil {
 		t.Fatal(err)
@@ -93,6 +95,9 @@ func newFixture(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	if err := bootstrap.Run(t.Context(), pool, v); err != nil {
+		t.Fatal(err)
+	}
+	if err := testfixture.ApprovePublishedTemplates(t.Context(), pool); err != nil {
 		t.Fatal(err)
 	}
 	for _, user := range []string{owner, other} {

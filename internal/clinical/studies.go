@@ -33,14 +33,15 @@ type study struct {
 	Description      *string `json:"description"`
 	Uploaded         string  `json:"uploadedAt"`
 	key              string
+	version          int64
 }
 
-const studyColumns = "id,patient_id,study_name,original_file_name,content_type,file_size,description,uploaded_at,stored_file_name"
+const studyColumns = "id,patient_id,study_name,original_file_name,content_type,file_size,description,uploaded_at,stored_file_name,version"
 
 func scanStudy(row pgx.Row) (study, error) {
 	var result study
 	var uploaded time.Time
-	err := row.Scan(&result.ID, &result.PatientID, &result.Name, &result.OriginalFileName, &result.ContentType, &result.Size, &result.Description, &uploaded, &result.key)
+	err := row.Scan(&result.ID, &result.PatientID, &result.Name, &result.OriginalFileName, &result.ContentType, &result.Size, &result.Description, &uploaded, &result.key, &result.version)
 	result.Uploaded = uploaded.UTC().Format(time.RFC3339Nano)
 	return result, err
 }
@@ -73,82 +74,21 @@ func (s *Service) ownedStudy(ctx context.Context, tx pgx.Tx, user string, patien
 	if err := s.studyOwner(ctx, tx, user, patientID); err != nil {
 		return study{}, err
 	}
-	result, err := scanStudy(tx.QueryRow(ctx, "SELECT "+studyColumns+" FROM patient_medical_studies WHERE id=$1 AND patient_id=$2", id, patientID))
+	result, err := scanStudy(tx.QueryRow(ctx, "SELECT "+studyColumns+" FROM patient_medical_studies WHERE id=$1 AND patient_id=$2 AND annulled_at IS NULL", id, patientID))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return result, storage.Missing()
 	}
 	return result, err
 }
-func enqueueStudyDeletion(ctx context.Context, tx pgx.Tx, key string) error {
-	_, err := tx.Exec(ctx, "INSERT INTO study_file_deletions(storage_key,requested_at) VALUES($1,$2) ON CONFLICT(storage_key) DO UPDATE SET requested_at=EXCLUDED.requested_at", key, time.Now().UTC())
-	return err
-}
-func (s *Service) DeletePatient(ctx context.Context, user string, id int64) error {
-	err := s.transaction(ctx, false, func(tx pgx.Tx) error {
-		// Keep the same patient-before-encounter ordering as encounter writers.
-		if err := lockPatient(ctx, tx, user, id); err != nil {
-			return err
-		}
-		patient, err := ownedPatient(ctx, tx, user, id)
-		if err != nil {
-			return err
-		}
-		rows, err := tx.Query(ctx, "SELECT stored_file_name FROM patient_medical_studies WHERE patient_id=$1", id)
-		if err != nil {
-			return err
-		}
-		keys := []string{}
-		for rows.Next() {
-			var key string
-			if err := rows.Scan(&key); err != nil {
-				rows.Close()
-				return err
-			}
-			keys = append(keys, key)
-		}
-		rows.Close()
-		if err := rows.Err(); err != nil {
-			return err
-		}
-		for _, key := range keys {
-			if err := enqueueStudyDeletion(ctx, tx, key); err != nil {
-				return err
-			}
-		}
-		for _, query := range []string{
-			"DELETE FROM prescription_medications WHERE record_id IN (SELECT id FROM patient_prescription_records WHERE patient_id=$1)",
-			"DELETE FROM prescription_diagnostic_orders WHERE record_id IN (SELECT id FROM patient_prescription_records WHERE patient_id=$1)",
-			"DELETE FROM patient_prescription_records WHERE patient_id=$1",
-			"DELETE FROM patient_medical_studies WHERE patient_id=$1",
-			"DELETE FROM patient_vaccinations WHERE patient_id=$1",
-			"DELETE FROM clinical_encounters WHERE patient_id=$1",
-		} {
-			if _, err := tx.Exec(ctx, query, id); err != nil {
-				return err
-			}
-		}
-		tag, err := tx.Exec(ctx, "DELETE FROM patients WHERE id=$1 AND version=$2", id, patient.Version)
-		if err != nil {
-			return err
-		}
-		if tag.RowsAffected() != 1 {
-			return api.Failure(409, "VERSION_CONFLICT", "La configuración cambió. Actualizá los datos antes de guardar.")
-		}
-		return nil
-	})
-	if err == nil {
-		s.deletePendingFiles(ctx)
-		if err := s.files.PruneRecovery(ctx); err != nil {
-			slog.Warn("media recovery retention awaits retry")
-		}
-	}
-	return err
-}
 func (s *Service) StudyRoutes(mux *http.ServeMux) {
 	s.handle(mux, "DELETE /api/doctorchart/patients/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id, err := pathID(r, "id")
 		if err == nil {
-			err = s.DeletePatient(r.Context(), api.User(r.Context()).UserID, id)
+			request, parseErr := readAnnulment(w, r)
+			err = parseErr
+			if err == nil {
+				err = s.annulPatient(r.Context(), api.User(r.Context()).UserID, id, request)
+			}
 		}
 		clinicalReply(w, nil, err, 204)
 	})
@@ -164,7 +104,7 @@ func (s *Service) StudyRoutes(mux *http.ServeMux) {
 				if err := s.studyOwner(r.Context(), tx, api.User(r.Context()).UserID, id); err != nil {
 					return err
 				}
-				rows, err := tx.Query(r.Context(), "SELECT "+studyColumns+" FROM patient_medical_studies WHERE patient_id=$1 ORDER BY uploaded_at DESC", id)
+				rows, err := tx.Query(r.Context(), "SELECT "+studyColumns+" FROM patient_medical_studies WHERE patient_id=$1 AND annulled_at IS NULL ORDER BY uploaded_at DESC", id)
 				if err != nil {
 					return err
 				}
@@ -279,6 +219,9 @@ func (s *Service) StudyRoutes(mux *http.ServeMux) {
 			if err == nil {
 				err = s.transaction(ctx, false, func(tx pgx.Tx) error {
 					// Ownership and feature access may have changed during queueing.
+					if err := lockPatient(ctx, tx, api.User(ctx).UserID, id); err != nil {
+						return err
+					}
 					if err := s.studyOwner(ctx, tx, api.User(ctx).UserID, id); err != nil {
 						return err
 					}
@@ -307,7 +250,11 @@ func (s *Service) StudyRoutes(mux *http.ServeMux) {
 							return err
 						}
 					}
-					err := tx.QueryRow(ctx, "INSERT INTO patient_medical_studies(patient_id,study_name,original_file_name,stored_file_name,content_type,file_size,description,uploaded_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id", id, name, stored.Name, stored.Key, stored.ContentType, stored.Size, description, at).Scan(&result.ID)
+					var assetID *string
+					if stored.Asset != nil {
+						assetID = &stored.Asset.ID
+					}
+					err := tx.QueryRow(ctx, "INSERT INTO patient_medical_studies(patient_id,study_name,original_file_name,stored_file_name,content_type,file_size,description,uploaded_at,media_asset_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id", id, name, stored.Name, stored.Key, stored.ContentType, stored.Size, description, at, assetID).Scan(&result.ID)
 					result.PatientID = id
 					result.Name = name
 					result.OriginalFileName = stored.Name
@@ -316,9 +263,6 @@ func (s *Service) StudyRoutes(mux *http.ServeMux) {
 					result.Description = description
 					result.Uploaded = at.Format(time.RFC3339Nano)
 					result.key = stored.Key
-					if err == nil && stored.Asset != nil {
-						_, err = tx.Exec(ctx, "UPDATE patient_medical_studies SET media_asset_id=$1 WHERE id=$2", stored.Asset.ID, result.ID)
-					}
 					return err
 				})
 			}
@@ -346,6 +290,9 @@ func (s *Service) StudyRoutes(mux *http.ServeMux) {
 			return
 		}
 		result, err := s.readStudy(r)
+		if err == nil {
+			accessReference(r.Context(), &result.ID, &result.PatientID, &result.version)
+		}
 		clinicalReply(w, result, err, 200)
 	})
 	s.handle(mux, "GET /api/doctorchart/patients/{patientId}/studies/{studyId}/file", func(w http.ResponseWriter, r *http.Request) {
@@ -358,44 +305,7 @@ func (s *Service) StudyRoutes(mux *http.ServeMux) {
 			api.WriteError(w, err)
 			return
 		}
-		file, _, err := s.files.Open(r.Context(), result.key)
-		if err != nil {
-			api.WriteError(w, err)
-			return
-		}
-		defer file.Close()
-		var seeker io.ReadSeeker
-		if local, ok := file.(io.ReadSeeker); ok {
-			seeker = local
-		} else {
-			temporary, err := os.CreateTemp("", "doctorchart-study-download-")
-			if err != nil {
-				api.WriteError(w, err)
-				return
-			}
-			defer os.Remove(temporary.Name())
-			defer temporary.Close()
-			if _, err := io.Copy(temporary, file); err != nil {
-				api.WriteError(w, err)
-				return
-			}
-			if _, err := temporary.Seek(0, io.SeekStart); err != nil {
-				api.WriteError(w, err)
-				return
-			}
-			seeker = temporary
-		}
-		contentType, _, err := mime.ParseMediaType(result.ContentType)
-		if err != nil {
-			contentType = "application/octet-stream"
-		}
-		w.Header().Set("Content-Type", contentType)
-		w.Header().Set("Cache-Control", "no-store")
-		w.Header().Del("Pragma")
-		w.Header().Del("Expires")
-		w.Header().Set("Content-Security-Policy", "default-src 'none'; sandbox")
-		w.Header().Set("Content-Disposition", studyDisposition(result.OriginalFileName))
-		http.ServeContent(w, r, "", time.Time{}, seeker)
+		s.serveStudy(w, r, result)
 	})
 	s.handle(mux, "DELETE /api/doctorchart/patients/{patientId}/studies/{studyId}", func(w http.ResponseWriter, r *http.Request) {
 		if err := prescriptionRole(r); err != nil {
@@ -408,24 +318,70 @@ func (s *Service) StudyRoutes(mux *http.ServeMux) {
 			err = idErr
 		}
 		if err == nil {
-			err = s.transaction(r.Context(), false, func(tx pgx.Tx) error {
-				item, err := s.ownedStudy(r.Context(), tx, api.User(r.Context()).UserID, patientID, id)
-				if err != nil {
-					return err
-				}
-				if err := enqueueStudyDeletion(r.Context(), tx, item.key); err != nil {
-					return err
-				}
-				_, err = tx.Exec(r.Context(), "DELETE FROM patient_medical_studies WHERE id=$1", id)
-				return err
-			})
-		}
-		if err == nil {
-			s.deletePendingFiles(r.Context())
+			request, parseErr := readAnnulment(w, r)
+			err = parseErr
+			if err == nil {
+				ctx := r.Context()
+				user := api.User(ctx).UserID
+				err = s.transaction(ctx, false, func(tx pgx.Tx) error {
+					if err := lockPatient(ctx, tx, user, patientID); err != nil {
+						return err
+					}
+					if _, err := s.ownedStudy(ctx, tx, user, patientID, id); err != nil {
+						return err
+					}
+					if err := bindRevision(ctx, tx, user, request.reason); err != nil {
+						return err
+					}
+					return annulOne(ctx, tx, "patient_medical_studies", id, request.expected)
+				})
+			}
 		}
 		clinicalReply(w, nil, err, 204)
 	})
 }
+func (s *Service) serveStudy(w http.ResponseWriter, r *http.Request, result study) {
+	accessReference(r.Context(), &result.ID, &result.PatientID, &result.version)
+	file, _, err := s.files.Open(r.Context(), result.key)
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+	defer file.Close()
+	var seeker io.ReadSeeker
+	if local, ok := file.(io.ReadSeeker); ok {
+		seeker = local
+	} else {
+		temporary, err := os.CreateTemp("", "doctorchart-study-download-")
+		if err != nil {
+			api.WriteError(w, err)
+			return
+		}
+		defer os.Remove(temporary.Name())
+		defer temporary.Close()
+		if _, err := io.Copy(temporary, file); err != nil {
+			api.WriteError(w, err)
+			return
+		}
+		if _, err := temporary.Seek(0, io.SeekStart); err != nil {
+			api.WriteError(w, err)
+			return
+		}
+		seeker = temporary
+	}
+	contentType, _, err := mime.ParseMediaType(result.ContentType)
+	if err != nil {
+		contentType = "application/octet-stream"
+	}
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Del("Pragma")
+	w.Header().Del("Expires")
+	w.Header().Set("Content-Security-Policy", "default-src 'none'; sandbox")
+	w.Header().Set("Content-Disposition", studyDisposition(result.OriginalFileName))
+	http.ServeContent(w, r, "", time.Time{}, seeker)
+}
+
 func (s *Service) readStudy(r *http.Request) (study, error) {
 	patientID, err := pathID(r, "patientId")
 	id, idErr := pathID(r, "studyId")

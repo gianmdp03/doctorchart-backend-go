@@ -37,6 +37,7 @@ func schemaFixture(t *testing.T) *pgxpool.Pool {
 		t.Fatal("invalid fixture configuration")
 	}
 	cfg.ConnConfig.RuntimeParams["search_path"] = "public"
+	cfg.ConnConfig.RuntimeParams["doctorchart.template_lab"] = "on"
 	pool, err := pgxpool.NewWithConfig(context.Background(), cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -85,7 +86,7 @@ func assertFixtureReady(t *testing.T, pool *pgxpool.Pool) {
 	if err := pool.QueryRow(context.Background(), "SELECT count(*) FROM vaccination_calendars").Scan(&calendars); err != nil {
 		t.Fatal(err)
 	}
-	if tables != 48 || constraints != 61 || specialties == 0 || calendars != 1 {
+	if tables != 55 || constraints != 70 || specialties == 0 || calendars != 1 {
 		t.Fatalf("startup produced %d tables, %d foreign keys, %d specialties and %d calendars", tables, constraints, specialties, calendars)
 	}
 	var expected map[string][]json.RawMessage

@@ -105,13 +105,19 @@ func TestBookingContextSnapshotsAndPatientLink(t *testing.T) {
 	if moved.Specialty != b.Specialty || moved.ContextID != b.ContextID || moved.ClinicSnapshot.Name != "Renamed clinic" || moved.Provenance.BlockID != b.Provenance.BlockID {
 		t.Fatal("reschedule lost history", moved)
 	}
+	if _, err := f.pool.Exec(t.Context(), "UPDATE patients SET annulled_at=now() WHERE id=$1", patient); err != nil {
+		t.Fatal(err)
+	}
 	assertCode(t, bookingRequestFixture(f, "PATCH", "/bookings/"+b.ID+"/status", owner, newBookingKey(), `{"expectedVersion":"3","status":"CANCELLED"}`), 200, "")
+	fresh := booked(t, bookingRequestFixture(f, "POST", "/bookings", owner, newBookingKey(), body))
+	assertCode(t, bookingRequestFixture(f, "PUT", "/bookings/"+fresh.ID+"/patient", owner, newBookingKey(), link("1", patient)), 404, "PATIENT_NOT_FOUND")
+	assertCode(t, bookingRequestFixture(f, "PATCH", "/bookings/"+fresh.ID+"/status", owner, newBookingKey(), `{"expectedVersion":"1","status":"CANCELLED"}`), 200, "")
 	agenda := agendaDTO(t, f, c)
 	agenda.Weekly = []ScheduleDay{}
 	agenda.Exceptions = []ScheduleException{}
 	putBlocks(t, f, c, agenda, 200, "")
 	retained := booked(t, f.request("GET", "/bookings/"+b.ID, owner, ""))
-	if retained.Provenance != moved.Provenance || retained.Specialty != b.Specialty {
+	if retained.Provenance != moved.Provenance || retained.Specialty != b.Specialty || retained.PatientID == nil || *retained.PatientID != patient {
 		t.Fatal("deleting retired block erased provenance", retained)
 	}
 }

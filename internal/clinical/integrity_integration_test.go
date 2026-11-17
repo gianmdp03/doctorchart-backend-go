@@ -19,6 +19,7 @@ import (
 	"github.com/syntah/doctorchart-backend-go/internal/billing"
 	"github.com/syntah/doctorchart-backend-go/internal/bootstrap"
 	"github.com/syntah/doctorchart-backend-go/internal/storage"
+	"github.com/syntah/doctorchart-backend-go/internal/testfixture"
 	"github.com/syntah/doctorchart-backend-go/internal/wizard"
 	"github.com/syntah/doctorchart-backend-go/internal/workspace"
 )
@@ -40,6 +41,7 @@ func integrityFixture(t *testing.T, patients, records int) ([2]*Service, *pgxpoo
 		t.Fatal("integrity tests require a loopback doctorchart_integrity_test database")
 	}
 	config.ConnConfig.RuntimeParams["search_path"] = "public"
+	config.ConnConfig.RuntimeParams["doctorchart.template_lab"] = "on"
 	pool, err := pgxpool.NewWithConfig(context.Background(), config)
 	if err != nil {
 		t.Fatal(err)
@@ -56,6 +58,9 @@ func integrityFixture(t *testing.T, patients, records int) ([2]*Service, *pgxpoo
 		t.Fatal(err)
 	}
 	if err := bootstrap.Run(context.Background(), pool, validator); err != nil {
+		t.Fatal(err)
+	}
+	if err := testfixture.ApprovePublishedTemplates(t.Context(), pool); err != nil {
 		t.Fatal(err)
 	}
 	for _, owner := range []string{"integrity-owner", "integrity-other"} {
@@ -332,9 +337,13 @@ func TestEncounterOptimisticVersionAfterPatientWait(t *testing.T) {
 		return err
 	})
 	integrityOneRejected(t, results, 409, "VERSION_CONFLICT")
+	var revisions int
+	if err := pool.QueryRow(t.Context(), "SELECT count(*) FROM clinical_revisions WHERE entity='ENCOUNTER' AND entity_id=$1 AND new_version=1", e.ID).Scan(&revisions); err != nil || revisions != 1 {
+		t.Fatalf("concurrent encounter updates recorded %d revisions: %v", revisions, err)
+	}
 }
 
-func TestEncounterCreateAndPatientDeleteSerialize(t *testing.T) {
+func TestEncounterCreateAndPatientAnnulmentSerialize(t *testing.T) {
 	s, pool := integrityFixture(t, -1, -1)
 	p := integrityPatient(t, s[0])
 	integrityPause(t, pool, "clinical_encounters", "INSERT")
@@ -343,17 +352,17 @@ func TestEncounterCreateAndPatientDeleteSerialize(t *testing.T) {
 			_, err := s[i].CreateEncounter(ctx, api.Identity{UserID: "integrity-owner", Plan: "BASIC"}, integrityEncounterRequest(p.ID, "FIRST_VISIT"))
 			return err
 		}
-		return s[i].DeletePatient(ctx, "integrity-owner", p.ID)
+		return s[i].annulPatient(ctx, "integrity-owner", p.ID, annulment{reason: "Synthetic annulment"})
 	})
 	if results[1] != nil {
-		t.Fatalf("patient deletion failed: %v", results[1])
+		t.Fatalf("patient annulment failed: %v", results[1])
 	}
 	if results[0] != nil {
 		integrityError(t, results[0], 404, "PATIENT_NOT_FOUND")
 	}
 	var count int
-	if err := pool.QueryRow(context.Background(), "SELECT count(*) FROM clinical_encounters WHERE patient_id=$1", p.ID).Scan(&count); err != nil || count != 0 {
-		t.Fatal("delete left an encounter behind", count, err)
+	if err := pool.QueryRow(context.Background(), "SELECT count(*) FROM clinical_encounters WHERE patient_id=$1 AND annulled_at IS NULL", p.ID).Scan(&count); err != nil || count != 0 {
+		t.Fatal("annulment left a current encounter", count, err)
 	}
 }
 

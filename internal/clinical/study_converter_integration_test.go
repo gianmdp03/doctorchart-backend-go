@@ -369,7 +369,7 @@ func TestLiveStudyHTTPConverterAndPersistence(t *testing.T) {
 	if err := pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM patient_prescription_records),(SELECT count(*) FROM prescription_medications),(SELECT count(*) FROM prescription_diagnostic_orders)`).Scan(&records, &medications, &orders); err != nil || records != 2 || medications != 1 || orders != 1 {
 		t.Fatal("document children or rejected writes mismatch", records, medications, orders, err)
 	}
-	if w := documentRequest("DELETE", recordPath, "fixture-owner", "DOCTOR", ""); w.Code != 204 {
+	if w := documentRequest("DELETE", recordPath, "fixture-owner", "DOCTOR", `{"reason":"Fixture"}`); w.Code != 204 {
 		t.Fatal("baseline document deletion failed", w.Code)
 	}
 	if err := pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM patient_prescription_records),(SELECT count(*) FROM prescription_medications),(SELECT count(*) FROM prescription_diagnostic_orders)`).Scan(&records, &medications, &orders); err != nil || records != 1 || medications != 0 || orders != 1 {

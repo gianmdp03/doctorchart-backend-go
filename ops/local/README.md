@@ -1,6 +1,8 @@
 # DoctorChart local en Windows
 
-Requisitos: Docker Desktop iniciado, Go 1.27.3, Node y dependencias Angular instaladas en el repositorio principal del frontend. La instancia compila los checkouts de `doctorchart-backend-go`, `doctorchart-frontend` y `api-ai-gateway-go`. Usa el adaptador de cuentas y permisos comerciales de desarrollo.
+Para pruebas funcionales con datos ficticios y baseline 20, usá el [entorno manual SP-05A](../../docs/manual-testing-sp05a.md). La guía que sigue corresponde a la instancia local anterior de turnos.
+
+Requisitos: Docker Desktop iniciado, Go 1.27.4, Node y dependencias Angular instaladas en el repositorio principal del frontend. La instancia compila los checkouts de `doctorchart-backend-go`, `doctorchart-frontend` y `api-ai-gateway-go`. Usa el adaptador de cuentas y permisos comerciales de desarrollo.
 
 | Servicio | Dirección |
 |---|---|

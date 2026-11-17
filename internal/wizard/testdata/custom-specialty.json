@@ -94,13 +94,13 @@
           "enabled": true,
           "fields": [
             {
-              "key": "identity",
+              "key": "customIdentityNote",
               "label": "Nombre completo",
               "type": "TEXT",
               "required": false
             },
             {
-              "key": "born",
+              "key": "customReferenceDate",
               "label": "Nacimiento",
               "type": "DATE",
               "required": false

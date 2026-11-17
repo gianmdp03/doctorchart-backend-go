@@ -66,9 +66,9 @@ const emptySQL = `SELECT NOT EXISTS(
 func catalogForMajor(major int) (string, error) {
 	switch major {
 	case 17:
-		return "bf375ef91ad4536433488538acc0ec9ea3bdd99cfd101fd02e8d33a9c8a9a7b2", nil
+		return "096da4d9eb2f7e16c98e851a085af94df6f73f4e781181d75c3c0a9efd73e845", nil
 	case 18:
-		return "560e680b5152477b572da881dfe1013545b75bf4996d16f9883e8717f788d09f", nil
+		return "75dac3f9e701024553655d726c87f6e5fa73d6afcb14d2a04677d04b2543f486", nil
 	default:
 		return "", fmt.Errorf("unsupported PostgreSQL major version %d; no schema changes performed", major)
 	}

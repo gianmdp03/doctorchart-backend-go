@@ -83,7 +83,7 @@ func loadCalendar(ctx context.Context, tx pgx.Tx) (calendar, error) {
 }
 func loadVaccinations(ctx context.Context, tx pgx.Tx, patientID int64) ([]vaccination, error) {
 	result := []vaccination{}
-	rows, err := tx.Query(ctx, `SELECT v.id,v.dose_id,v.applied_at::text,c.definition FROM patient_vaccinations v JOIN vaccination_doses d ON d.id=v.dose_id JOIN vaccination_calendars c ON c.id=d.calendar_id WHERE v.patient_id=$1`, patientID)
+	rows, err := tx.Query(ctx, `SELECT v.id,v.dose_id,v.applied_at::text,c.definition FROM patient_vaccinations v JOIN vaccination_doses d ON d.id=v.dose_id JOIN vaccination_calendars c ON c.id=d.calendar_id WHERE v.patient_id=$1 AND v.annulled_at IS NULL`, patientID)
 	if err != nil {
 		return result, err
 	}
@@ -207,10 +207,13 @@ type SavedVaccination struct {
 
 func (s *Service) SaveVaccination(ctx context.Context, userID string, patientID int64, doseID string, request map[string]any) (SavedVaccination, error) {
 	var result SavedVaccination
-	if err := api.Only(request, "expectedVersion", "calendarId", "applied", "appliedAt"); err != nil {
+	if err := api.Only(request, "expectedVersion", "calendarId", "applied", "appliedAt", "reason"); err != nil {
 		return result, err
 	}
 	err := s.transaction(ctx, false, func(tx pgx.Tx) error {
+		if err := lockPatient(ctx, tx, userID, patientID); err != nil {
+			return err
+		}
 		p, err := ownedPatient(ctx, tx, userID, patientID)
 		if err != nil {
 			return err
@@ -281,6 +284,13 @@ func (s *Service) SaveVaccination(ctx context.Context, userID string, patientID 
 		if !applied && date != nil {
 			return vaccinationError("Una dosis no aplicada no puede tener fecha de aplicación.")
 		}
+		reason, err := revisionReason(request["reason"], !applied && existing != nil)
+		if err != nil {
+			return err
+		}
+		if err := bindRevision(ctx, tx, userID, reason); err != nil {
+			return err
+		}
 		if applied {
 			dateText := time.Now().In(s.viewZone(ctx)).Format("2006-01-02")
 			if existing != nil {
@@ -307,13 +317,13 @@ func (s *Service) SaveVaccination(ctx context.Context, userID string, patientID 
 			if existing == nil {
 				_, err = tx.Exec(ctx, "INSERT INTO patient_vaccinations(patient_id,dose_id,applied_at) VALUES($1,$2,$3::date)", p.ID, doseID, dateText)
 			} else {
-				_, err = tx.Exec(ctx, "UPDATE patient_vaccinations SET applied_at=$2::date WHERE id=$1", existing.ID, dateText)
+				_, err = tx.Exec(ctx, "UPDATE patient_vaccinations SET applied_at=$2::date,version=version+1 WHERE id=$1 AND applied_at<>$2::date", existing.ID, dateText)
 			}
 			if err != nil {
 				return err
 			}
 		} else if existing != nil {
-			if _, err := tx.Exec(ctx, "DELETE FROM patient_vaccinations WHERE id=$1", existing.ID); err != nil {
+			if err := annulOne(ctx, tx, "patient_vaccinations", existing.ID, nil); err != nil {
 				return err
 			}
 		}

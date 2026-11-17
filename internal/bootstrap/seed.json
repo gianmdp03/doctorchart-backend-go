@@ -1234,7 +1234,7 @@
                   "required": false
                 },
                 {
-                  "key": "followUp",
+                  "key": "followUpInstructions",
                   "label": "Seguimiento",
                   "type": "TEXTAREA",
                   "required": false
@@ -1663,7 +1663,7 @@
                   "required": false
                 },
                 {
-                  "key": "followUp",
+                  "key": "followUpInstructions",
                   "label": "Seguimiento",
                   "type": "TEXTAREA",
                   "required": false

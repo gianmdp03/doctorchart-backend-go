@@ -92,20 +92,10 @@ func RetainUnreviewedHistory(previous, next map[string]any) {
 	}
 }
 
-func clinicalHistoryErrors(form, values map[string]any) []api.FieldError {
+func clinicalHistoryErrors(values map[string]any, visible func(string) bool) []api.FieldError {
 	issues := []api.FieldError{}
-	active := map[string]bool{}
-	for _, raw := range list(form["categories"]) {
-		category := object(raw)
-		if !flag(category["enabled"]) {
-			continue
-		}
-		for _, f := range list(category["fields"]) {
-			active[text(object(f)["key"])] = true
-		}
-	}
 	for _, group := range ClinicalHistoryGroups() {
-		if !active[group.Status] || !active[group.Details] {
+		if !visible(group.Status) || !visible(group.Details) {
 			continue
 		}
 		status, _ := values[group.Status].(string)

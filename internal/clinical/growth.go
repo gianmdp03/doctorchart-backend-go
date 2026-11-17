@@ -155,7 +155,7 @@ func (s *Service) PatientGrowth(ctx context.Context, user string, id int64, opti
 				}
 			}
 		}
-		rows, err := tx.Query(ctx, `SELECT id,encounter_date,weight_kg,height_cm,head_circumference_cm,form_values FROM clinical_encounters WHERE patient_id=$1 AND encounter_date<=$2 AND (encounter_date AT TIME ZONE $4)::date >= $3::date AND (weight_kg IS NOT NULL OR height_cm IS NOT NULL OR head_circumference_cm IS NOT NULL) ORDER BY encounter_date ASC,id ASC`, id, now.UTC(), p.BirthDate, s.viewZone(ctx).String())
+		rows, err := tx.Query(ctx, `SELECT id,encounter_date,weight_kg,height_cm,head_circumference_cm,form_values FROM clinical_encounters WHERE patient_id=$1 AND annulled_at IS NULL AND encounter_date<=$2 AND (encounter_date AT TIME ZONE $4)::date >= $3::date AND (weight_kg IS NOT NULL OR height_cm IS NOT NULL OR head_circumference_cm IS NOT NULL) ORDER BY encounter_date ASC,id ASC`, id, now.UTC(), p.BirthDate, s.viewZone(ctx).String())
 		if err != nil {
 			return err
 		}

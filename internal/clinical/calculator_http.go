@@ -187,7 +187,11 @@ func (s *Service) CalculatorRoutes(mux *http.ServeMux) {
 		if err == nil {
 			err = s.transaction(r.Context(), false, func(tx pgx.Tx) error {
 				ctx, user := r.Context(), api.User(r.Context()).UserID
-				patient, err := ownedPatient(ctx, tx, user, request["patientId"].(int64))
+				patientID := request["patientId"].(int64)
+				if err := lockPatient(ctx, tx, user, patientID); err != nil {
+					return err
+				}
+				patient, err := ownedPatient(ctx, tx, user, patientID)
 				if err != nil {
 					return err
 				}
@@ -229,6 +233,7 @@ func (s *Service) CalculatorRoutes(mux *http.ServeMux) {
 			})
 		}
 		if err == nil {
+			accessReference(r.Context(), &log.ID, &log.PatientID, nil)
 			scheme := "http"
 			if r.TLS != nil {
 				scheme = "https"
@@ -332,7 +337,7 @@ func (s *Service) CalculatorRoutes(mux *http.ServeMux) {
 				if err := s.workspaces.Feature(r.Context(), tx, user, "CALCULATORS"); err != nil {
 					return err
 				}
-				rows, err := tx.Query(r.Context(), "SELECT "+calculationLogColumns+" FROM patient_calculation_logs l JOIN patients p ON p.id=l.patient_id WHERE p.id=$1 AND p.user_id=$2 AND ($3::text IS NULL OR l.calculation_code=$3) AND ($4::timestamptz IS NULL OR l.created_at>=$4) AND ($5::timestamptz IS NULL OR l.created_at<=$5) ORDER BY l.created_at DESC", id, user, filter, from, to)
+				rows, err := tx.Query(r.Context(), "SELECT "+calculationLogColumns+" FROM patient_calculation_logs l JOIN patients p ON p.id=l.patient_id WHERE p.id=$1 AND p.user_id=$2 AND p.annulled_at IS NULL AND (l.encounter_id IS NULL OR EXISTS (SELECT 1 FROM clinical_encounters e WHERE e.id=l.encounter_id AND e.annulled_at IS NULL)) AND ($3::text IS NULL OR l.calculation_code=$3) AND ($4::timestamptz IS NULL OR l.created_at>=$4) AND ($5::timestamptz IS NULL OR l.created_at<=$5) ORDER BY l.created_at DESC", id, user, filter, from, to)
 				if err != nil {
 					return err
 				}
@@ -431,7 +436,7 @@ func (s *Service) calculatorAutofill(ctx context.Context, tx pgx.Tx, user string
 		result["heightCm"] = patient.Measurements.Height
 	}
 	aliases := map[string][]string{"creatinineMgDl": {"creatinine", "serumcreatinine", "creatinina", "creatinina_serica", "creatininaserica", "cr"}, "serumCalciumMgDl": {"calcium", "serumcalcium", "calcio", "calcio_serico", "calcioserico", "ca"}, "serumAlbuminGDl": {"albumin", "serumalbumin", "albumina", "albumina_serica", "albuminaserica", "alb"}}
-	rows, err := tx.Query(ctx, "SELECT encounter_date,id,vital_signs,form_values FROM clinical_encounters WHERE patient_id=$1 AND encounter_date<=$2 AND (encounter_date AT TIME ZONE $4)::date>=$3::date ORDER BY encounter_date DESC,id DESC", id, time.Now().UTC(), patient.BirthDate, s.viewZone(ctx).String())
+	rows, err := tx.Query(ctx, "SELECT encounter_date,id,vital_signs,form_values FROM clinical_encounters WHERE patient_id=$1 AND annulled_at IS NULL AND encounter_date<=$2 AND (encounter_date AT TIME ZONE $4)::date>=$3::date ORDER BY encounter_date DESC,id DESC", id, time.Now().UTC(), patient.BirthDate, s.viewZone(ctx).String())
 	if err != nil {
 		return nil, err
 	}

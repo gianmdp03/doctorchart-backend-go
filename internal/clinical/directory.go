@@ -216,17 +216,17 @@ func (s *Service) ListPatients(ctx context.Context, userID string, query url.Val
 	if err != nil {
 		return nil, err
 	}
-	pending := `EXISTS(SELECT 1 FROM vaccination_calendars c CROSS JOIN LATERAL jsonb_array_elements(c.definition->'vacunas') v CROSS JOIN LATERAL jsonb_array_elements(v->'aplicaciones') a WHERE c.id='argentina-2026-v1' AND a->'ageRule'<>'null'::jsonb AND p.birth_date<=($3::date-make_interval(months=>(a->'ageRule'->>'toMonths')::int+(a->'ageRule'->>'graceMonths')::int+1))::date AND NOT EXISTS(SELECT 1 FROM patient_vaccinations applied WHERE applied.patient_id=p.id AND applied.dose_id=a->>'id'))`
+	pending := `EXISTS(SELECT 1 FROM vaccination_calendars c CROSS JOIN LATERAL jsonb_array_elements(c.definition->'vacunas') v CROSS JOIN LATERAL jsonb_array_elements(v->'aplicaciones') a WHERE c.id='argentina-2026-v1' AND a->'ageRule'<>'null'::jsonb AND p.birth_date<=($3::date-make_interval(months=>(a->'ageRule'->>'toMonths')::int+(a->'ageRule'->>'graceMonths')::int+1))::date AND NOT EXISTS(SELECT 1 FROM patient_vaccinations applied WHERE applied.patient_id=p.id AND applied.annulled_at IS NULL AND applied.dose_id=a->>'id'))`
 	if category == "pending" {
 		category = pending
 	}
-	where := `$3::date IS NOT NULL AND p.user_id=$1 AND ($6::bigint=0 AND (SELECT count(*) FROM doctor_specialty_contexts scope_c JOIN doctor_workspaces scope_w ON scope_w.id=scope_c.workspace_id WHERE scope_w.user_id=$1)=1 OR p.specialty_context_id=$6) AND (lower(p.full_name) LIKE $2 ESCAPE '!' OR lower(p.national_id) LIKE $2 ESCAPE '!' OR lower(p.phone) LIKE $2 ESCAPE '!') AND (` + category + `) AND ($4::date IS NULL OR p.birth_date>$4::date) AND ($5::date IS NULL OR p.birth_date<=$5::date)`
+	where := `$3::date IS NOT NULL AND p.user_id=$1 AND p.annulled_at IS NULL AND ($6::bigint=0 AND (SELECT count(*) FROM doctor_specialty_contexts scope_c JOIN doctor_workspaces scope_w ON scope_w.id=scope_c.workspace_id WHERE scope_w.user_id=$1)=1 OR p.specialty_context_id=$6) AND (lower(p.full_name) LIKE $2 ESCAPE '!' OR lower(p.national_id) LIKE $2 ESCAPE '!' OR lower(p.phone) LIKE $2 ESCAPE '!') AND (` + category + `) AND ($4::date IS NULL OR p.birth_date>$4::date) AND ($5::date IS NULL OR p.birth_date<=$5::date)`
 	var total int64
 	err = tx.QueryRow(ctx, "SELECT count(*) FROM patients p WHERE "+where, userID, pattern, todayText, bounds.after, bounds.through, api.SpecialtyContextID(ctx)).Scan(&total)
 	if err != nil {
 		return nil, err
 	}
-	rows, err := tx.Query(ctx, `SELECT p.specialty_context_id,p.id,p.full_name,p.birth_date::text,p.national_id,p.phone,p.gender,(SELECT count(*) FROM clinical_encounters e WHERE e.patient_id=p.id),(SELECT max(e.encounter_date) FROM clinical_encounters e WHERE e.patient_id=p.id),`+pending+` FROM patients p WHERE `+where+` ORDER BY `+page.order+` LIMIT $7 OFFSET $8`, userID, pattern, todayText, bounds.after, bounds.through, api.SpecialtyContextID(ctx), page.size, page.number*page.size)
+	rows, err := tx.Query(ctx, `SELECT p.specialty_context_id,p.id,p.full_name,p.birth_date::text,p.national_id,p.phone,p.gender,(SELECT count(*) FROM clinical_encounters e WHERE e.patient_id=p.id AND e.annulled_at IS NULL),(SELECT max(e.encounter_date) FROM clinical_encounters e WHERE e.patient_id=p.id AND e.annulled_at IS NULL),`+pending+` FROM patients p WHERE `+where+` ORDER BY `+page.order+` LIMIT $7 OFFSET $8`, userID, pattern, todayText, bounds.after, bounds.through, api.SpecialtyContextID(ctx), page.size, page.number*page.size)
 	if err != nil {
 		return nil, err
 	}

@@ -122,3 +122,48 @@ func TestRemovedHistoryFieldsDoNotRemainMandatory(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestNewFormDoesNotStoreHiddenAnswers(t *testing.T) {
+	v, err := NewValidator()
+	if err != nil {
+		t.Fatal(err)
+	}
+	form := historyForm(t)
+	object(list(form["categories"])[0])["enabled"] = false
+	result, err := v.Evaluate(form, map[string]any{"sys_allergyStatus": "PRESENT", "sys_allergies": "Dato oculto"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Values["sys_allergyStatus"] != nil || result.Values["sys_allergies"] != nil {
+		t.Fatalf("new record retained hidden answers: %v", result.Values)
+	}
+}
+
+func TestConditionalVisibilityPreservesExistingHiddenAnswerOnEdit(t *testing.T) {
+	v, err := NewValidator()
+	if err != nil {
+		t.Fatal(err)
+	}
+	form, err := Decode([]byte(`{"categories":[{"key":"details","title":"Detalles","enabled":true,"fields":[
+		{"key":"ask","label":"Mostrar revisión","type":"BOOLEAN","required":false},
+		{"key":"review","label":"Revisado","type":"BOOLEAN","required":false,"visibleWhen":{"fieldKey":"ask","equals":true}},
+		{"key":"chiefComplaint","label":"Motivo","type":"TEXT","required":true,"visibleWhen":{"fieldKey":"review","equals":true}}
+	]}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	previous := map[string]any{"ask": true, "review": true, "chiefComplaint": "Motivo registrado"}
+	updated, err := v.EvaluateUpdate(form, map[string]any{"ask": false, "review": true, "chiefComplaint": "Motivo oculto nuevo"}, nil, previous)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Values["chiefComplaint"] != "Motivo registrado" || updated.Projections["encounter.chiefComplaint"] != nil {
+		t.Fatalf("hidden answer was replaced or projected: %+v", updated)
+	}
+	if got := VisibleValues(form, updated.Values); len(got) != 1 || got["ask"] != false {
+		t.Fatalf("a hidden controller activated another hidden field: %v", got)
+	}
+	if got := VisibleValues(form, previous); got["chiefComplaint"] != "Motivo registrado" {
+		t.Fatalf("a visible answer was excluded: %v", got)
+	}
+}

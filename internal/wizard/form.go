@@ -66,7 +66,70 @@ func date(value any) (time.Time, bool) {
 	return d, err == nil && d.Year() >= 1
 }
 
+func formFields(form map[string]any) (map[string]formField, []string) {
+	fields := map[string]formField{}
+	order := []string{}
+	for _, category := range list(form["categories"]) {
+		category := object(category)
+		for _, raw := range list(category["fields"]) {
+			data := object(raw)
+			key := text(data["key"])
+			fields[key] = formField{data, flag(category["enabled"])}
+			order = append(order, key)
+		}
+	}
+	return fields, order
+}
+
+func fieldVisibility(fields map[string]formField, values map[string]any) func(string) bool {
+	memo := map[string]bool{}
+	visiting := map[string]bool{}
+	var visible func(string) bool
+	visible = func(key string) bool {
+		if cached, ok := memo[key]; ok {
+			return cached
+		}
+		field, ok := fields[key]
+		if !ok || !field.enabled || visiting[key] {
+			return false
+		}
+		visiting[key] = true
+		shown := true
+		if condition, ok := field.data["visibleWhen"].(map[string]any); ok {
+			controller := text(condition["fieldKey"])
+			value, boolean := values[controller].(bool)
+			shown = boolean && value == condition["equals"] && fields[controller].data["type"] == "BOOLEAN" && visible(controller)
+		}
+		delete(visiting, key)
+		memo[key] = shown
+		return shown
+	}
+	return visible
+}
+
+// VisibleValues projects stored answers using the record's own form snapshot.
+func VisibleValues(form, values map[string]any) map[string]any {
+	fields, _ := formFields(form)
+	visible := fieldVisibility(fields, values)
+	result := make(map[string]any)
+	for key, value := range values {
+		if visible(key) && fields[key].data["type"] != "FORMULA" {
+			result[key] = value
+		}
+	}
+	return result
+}
+
 func (v *Validator) Evaluate(form, values, context map[string]any) (Evaluation, error) {
+	return v.evaluate(form, values, context, nil)
+}
+
+// EvaluateUpdate preserves previously stored answers that the editor cannot see.
+func (v *Validator) EvaluateUpdate(form, values, context, previous map[string]any) (Evaluation, error) {
+	return v.evaluate(form, values, context, previous)
+}
+
+func (v *Validator) evaluate(form, values, context, previous map[string]any) (Evaluation, error) {
 	form = WithClinicalHistory(form)
 	result := Evaluation{Projections: map[string]any{}, Results: map[string]FormulaResult{}, Values: map[string]any{}}
 	wrapped := map[string]any{"schemaVersion": json.Number("1"), "patientForm": form, "encounterForm": map[string]any{"categories": []any{}}, "modulesConfig": map[string]any{"MEDICATION_CATALOG": false, "AI_ASSISTANT": false, "GROWTH_CHARTS": false}}
@@ -81,21 +144,18 @@ func (v *Validator) Evaluate(form, values, context map[string]any) (Evaluation, 
 		wrapped["encounterForm"] = form
 		wrapped["patientForm"] = minimalPatientForm()
 	}
-	if err := v.Validate(wrapped); err != nil {
+	// Historical snapshots can contain semantic aliases rejected for new definitions.
+	if err := v.ValidateStored(wrapped); err != nil {
 		return result, err
 	}
-	fields := map[string]formField{}
-	order := []string{}
-	for _, category := range list(form["categories"]) {
-		category := object(category)
-		for _, raw := range list(category["fields"]) {
-			data := object(raw)
-			key := text(data["key"])
-			fields[key] = formField{data, flag(category["enabled"])}
-			order = append(order, key)
+	fields, order := formFields(form)
+	for key, value := range previous {
+		if _, known := fields[key]; !known {
+			result.Values[key] = value
 		}
 	}
-	violations := clinicalHistoryErrors(form, values)
+	visible := fieldVisibility(fields, values)
+	violations := clinicalHistoryErrors(values, visible)
 	issue := func(key, code string) {
 		violations = append(violations, api.FieldError{Path: valuePath(key), Code: code})
 	}
@@ -115,30 +175,6 @@ func (v *Validator) Evaluate(form, values, context map[string]any) (Evaluation, 
 			issue(key, "FORMULA_INPUT_FORBIDDEN")
 		}
 	}
-	memo := map[string]bool{}
-	var visible func(string, map[string]any, map[string]bool) bool
-	visible = func(key string, answers map[string]any, visiting map[string]bool) bool {
-		if cached, ok := memo[key]; ok {
-			return cached
-		}
-		field, ok := fields[key]
-		if !ok || !field.enabled {
-			return false
-		}
-		if visiting[key] {
-			return false
-		}
-		visiting[key] = true
-		shown := true
-		if condition, ok := field.data["visibleWhen"].(map[string]any); ok {
-			controller := text(condition["fieldKey"])
-			value, boolean := answers[controller].(bool)
-			shown = visible(controller, answers, visiting) && boolean && value == condition["equals"]
-		}
-		delete(visiting, key)
-		memo[key] = shown
-		return shown
-	}
 	reference, _ := date(context["referenceDate"])
 	for _, key := range order {
 		field := fields[key].data
@@ -146,11 +182,16 @@ func (v *Validator) Evaluate(form, values, context map[string]any) (Evaluation, 
 		if kind == "FORMULA" {
 			continue
 		}
+		if !visible(key) {
+			if saved, exists := previous[key]; exists {
+				result.Values[key] = saved
+			}
+			continue
+		}
 		value := values[key]
-		shown := visible(key, values, map[string]bool{})
 		result.Values[key] = value
 		if value == nil {
-			if shown && flag(field["required"]) {
+			if flag(field["required"]) {
 				issue(key, "REQUIRED")
 			}
 			continue
@@ -178,7 +219,7 @@ func (v *Validator) Evaluate(form, values, context map[string]any) (Evaluation, 
 			issue(key, "INVALID_TYPE")
 			continue
 		}
-		if shown && flag(field["required"]) {
+		if flag(field["required"]) {
 			if value, ok := value.(string); ok && strings.TrimSpace(value) == "" {
 				issue(key, "REQUIRED")
 			}
@@ -226,7 +267,7 @@ func (v *Validator) Evaluate(form, values, context map[string]any) (Evaluation, 
 	}
 	for _, key := range order {
 		field := fields[key].data
-		shown := visible(key, result.Values, map[string]bool{})
+		shown := visible(key)
 		if field["type"] == "FORMULA" {
 			if !shown {
 				result.Results[key] = unavailable("NOT_APPLICABLE")
@@ -238,7 +279,7 @@ func (v *Validator) Evaluate(form, values, context map[string]any) (Evaluation, 
 			for name, raw := range object(formula["inputs"]) {
 				operand := object(raw)
 				if source, ok := operand["fieldKey"].(string); ok {
-					if visible(source, result.Values, map[string]bool{}) {
+					if visible(source) {
 						inputs[name] = result.Values[source]
 					} else {
 						hidden = true
@@ -254,17 +295,9 @@ func (v *Validator) Evaluate(form, values, context map[string]any) (Evaluation, 
 			} else {
 				result.Results[key] = Calculate(text(formula["kind"]), text(formula["operation"]), inputs)
 			}
-		} else if shown && result.Values[key] != nil {
-			projectValue(key, result.Values[key], result.Projections)
 		}
 	}
-	if _, ok := result.Projections["patient.fullName"]; !ok {
-		first, firstOK := result.Projections["patient.firstName"].(string)
-		last, lastOK := result.Projections["patient.lastName"].(string)
-		if firstOK || lastOK {
-			result.Projections["patient.fullName"] = strings.TrimSpace(strings.TrimSpace(first) + " " + strings.TrimSpace(last))
-		}
-	}
+	result.Projections = ClinicalProjections(form, result.Values)
 	return result, nil
 }
 
@@ -332,6 +365,8 @@ func projectValue(key string, value any, projections map[string]any) {
 		target = "encounter.primaryDiagnosisDescription"
 	case "treatment", "treatmentPlan":
 		target = "encounter.treatmentPlan"
+	case "followUp":
+		target = "encounter.followUpInstructions"
 	case "followUpInstructions", "followUpDate":
 		target = "encounter." + key
 	case "weightKg", "weight":

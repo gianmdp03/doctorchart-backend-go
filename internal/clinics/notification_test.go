@@ -99,11 +99,22 @@ func TestNotificationAtomicOutboxImmediateRecoveryAndPrivacy(t *testing.T) {
 	if sender.count() != 1 {
 		t.Fatal("confirmation not delivered")
 	}
+	const publicAnswer = "Cobertura sintética"
+	var supplied string
+	if err := f.pool.QueryRow(t.Context(), "SELECT answers->>'insurance' FROM booking_public_details WHERE booking_id=$1", b.ID).Scan(&supplied); err != nil || supplied != publicAnswer {
+		t.Fatal("fixture did not persist the free-text answer", err)
+	}
+	_, transfer, ok := strings.Cut(string(sender.messages[0]), "\r\n\r\n")
+	decoded, err := base64.StdEncoding.DecodeString(transfer)
+	if !ok || err != nil || strings.Contains(string(decoded), publicAnswer) ||
+		strings.Contains(string(decoded), "Persona atendida") || strings.Contains(string(decoded), "12345678") {
+		t.Fatal("notification exposed an answer or attendee data")
+	}
 	// Query existing administrative information without depending on live Billing.
 	f.mode.Store(1)
 	w := pubRequest(f, "POST", "/public/appointments/confirmation", "", map[string]string{"accessCode": receipt.AccessCode})
 	assertCode(t, w, 200, "")
-	for _, secret := range []string{"patientId", "bookingId", "clinicId", "email", "document", "answers", "attendeeName", "contactName", owner} {
+	for _, secret := range []string{"patientId", "bookingId", "clinicId", "email", "document", "answers", "attendeeName", "contactName", owner, publicAnswer} {
 		if strings.Contains(w.Body.String(), secret) {
 			t.Fatal("recovery leaked private field", secret)
 		}

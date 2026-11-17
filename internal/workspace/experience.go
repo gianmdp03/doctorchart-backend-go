@@ -2,6 +2,8 @@ package workspace
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"github.com/jackc/pgx/v5"
 	"github.com/syntah/doctorchart-backend-go/internal/api"
 )
@@ -54,9 +56,22 @@ func (s *Store) Experience(ctx context.Context, id int64) (Experience, error) {
 			}
 			return err
 		}
-		result = specialty.experience()
-		return nil
+		result, err = draftExperience(ctx, tx, specialty)
+		return err
 	})
+	return result, err
+}
+
+func draftExperience(ctx context.Context, tx pgx.Tx, specialty Specialty) (Experience, error) {
+	result := specialty.experience()
+	var raw []byte
+	err := tx.QueryRow(ctx, "SELECT draft_experience FROM wizard_defaults WHERE specialty_id=$1", specialty.ID).Scan(&raw)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return result, nil
+	}
+	if err == nil && len(raw) > 0 {
+		err = json.Unmarshal(raw, &result)
+	}
 	return result, err
 }
 func (s *Store) UpdateExperience(ctx context.Context, id int64, key string, request map[string]any) (Experience, error) {
@@ -73,6 +88,9 @@ func (s *Store) UpdateExperience(ctx context.Context, id int64, key string, requ
 		return result, err
 	}
 	err = s.transaction(ctx, false, func(tx pgx.Tx) error {
+		if err := catalogLock(ctx, tx); err != nil {
+			return err
+		}
 		specialty, err := specialty(ctx, tx, id)
 		if err != nil {
 			if failure, ok := err.(*api.Error); ok && failure.Status == 404 {
@@ -83,19 +101,30 @@ func (s *Store) UpdateExperience(ctx context.Context, id int64, key string, requ
 		if err := version(specialty.Version, expected, "La especialidad cambió. Volvé a cargarla antes de guardar."); err != nil {
 			return err
 		}
-		column := "navigation"
-		switch key {
-		case "patientRecordTabs":
-			column = "patient_record_tabs"
-		case "patientRecordActions":
-			column = "patient_record_actions"
-		}
-		row, err := scanSpecialty(tx.QueryRow(ctx, "UPDATE specialties SET "+column+"=$2,version=version+1,updated_at=greatest(clock_timestamp(),updated_at+interval '1 microsecond') WHERE id=$1 AND version=$3 RETURNING "+specialtyColumns, id, value, *expected))
+		draft, err := draftExperience(ctx, tx, specialty)
 		if err != nil {
 			return err
 		}
-		result = row.experience()
-		return nil
+		switch key {
+		case "navigation":
+			draft.Navigation = value
+		case "patientRecordTabs":
+			draft.Tabs = value
+		case "patientRecordActions":
+			draft.Actions = value
+		}
+		tag, err := tx.Exec(ctx, `UPDATE wizard_defaults SET draft_experience=public.template_experience($2,$3,$4),
+			version=version+1,updated_at=greatest(clock_timestamp(),updated_at+interval '1 microsecond') WHERE specialty_id=$1`, id, draft.Navigation, draft.Tabs, draft.Actions)
+		if err != nil {
+			return err
+		}
+		if tag.RowsAffected() != 1 {
+			return api.Failure(409, "SPECIALTY_NOT_AVAILABLE", "La especialidad no tiene un borrador.")
+		}
+		err = tx.QueryRow(ctx, `UPDATE specialties SET version=version+1,
+			updated_at=greatest(clock_timestamp(),updated_at+interval '1 microsecond') WHERE id=$1 RETURNING version`, id).Scan(&draft.Version)
+		result = draft
+		return err
 	})
 	return result, err
 }

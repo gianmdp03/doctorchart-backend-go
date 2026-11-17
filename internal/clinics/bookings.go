@@ -412,6 +412,12 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 	if _, err = tx.Exec(ctx, "SET LOCAL lock_timeout='5s'; SET LOCAL statement_timeout='10s'"); err != nil {
 		return err
 	}
+	if public != nil {
+		// Match the catalog-before-workspace lock order used by context selection.
+		if _, err = tx.Exec(ctx, "SELECT pg_advisory_xact_lock_shared($1,$2)", db.LockNamespace, db.TemplateCatalogLockKey); err != nil {
+			return err
+		}
+	}
 	if err = rights.Fence(ctx, tx, snapshot); err != nil {
 		return unavailable()
 	}
@@ -472,7 +478,7 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 			return err
 		}
 		var valid bool
-		if err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM patients WHERE id=$1 AND user_id=$2 AND specialty_context_id=$3 AND workspace_id=$4)", *request.PatientID, user, previous.ContextID, workspace).Scan(&valid); err != nil {
+		if err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM patients WHERE id=$1 AND user_id=$2 AND specialty_context_id=$3 AND workspace_id=$4 AND annulled_at IS NULL FOR SHARE)", *request.PatientID, user, previous.ContextID, workspace).Scan(&valid); err != nil {
 			return err
 		}
 		if !valid {
@@ -551,7 +557,7 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 				return err
 			}
 			var valid bool
-			if err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM patients WHERE id=$1 AND workspace_id=$2 AND specialty_context_id=$3)", *request.PatientID, workspace, slot.contextID).Scan(&valid); err != nil {
+			if err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM patients WHERE id=$1 AND workspace_id=$2 AND specialty_context_id=$3 AND annulled_at IS NULL FOR SHARE)", *request.PatientID, workspace, slot.contextID).Scan(&valid); err != nil {
 				return err
 			}
 			if !valid {

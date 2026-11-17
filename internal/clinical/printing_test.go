@@ -40,6 +40,11 @@ func TestClinicalPDFIssuanceDate(t *testing.T) {
 	service := &Service{zone: zone}
 	at := time.Date(2026, 10, 15, 1, 30, 0, 0, time.UTC)
 	doc := printDocument{Source: "PRESCRIPTION_RECORD", ID: 1, Code: "RX-1-1", at: at, IssuanceZone: zone.String(), Issued: api.FormatInstant(at), Patient: printPatient{Name: "Paciente de prueba", Insurance: json.RawMessage("null")}, Medications: json.RawMessage("[]"), Orders: []string{"Laboratorio clínico de demostración"}}
+	doc.Code = "DC-0123456789abcdef0123456789abcdef"
+	doc.Author.UserID = "11111111-1111-4111-8111-111111111111"
+	specialty := "Medicina General"
+	doc.Author.Specialty = &specialty
+	doc.emitted = true
 	data, err := service.printPDF(doc, url.Values{"doctorName": {"Profesional de prueba"}})
 	if err != nil {
 		t.Fatal(err)

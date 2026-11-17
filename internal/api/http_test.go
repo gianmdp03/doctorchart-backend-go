@@ -1,12 +1,42 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
+
+type failingPrivacyResponse struct{ *httptest.ResponseRecorder }
+
+func (f failingPrivacyResponse) Write([]byte) (int, error) {
+	return 0, errors.New("synthetic-private-write-error")
+}
+
+type failingPrivacyValue struct{}
+
+func (failingPrivacyValue) MarshalJSON() ([]byte, error) {
+	return nil, errors.New("synthetic-private-encode-error")
+}
+
+func TestJSONResponseLogsExcludeSensitiveErrorValues(t *testing.T) {
+	var logs bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+	WriteJSON(httptest.NewRecorder(), 200, failingPrivacyValue{})
+	WriteJSON(failingPrivacyResponse{httptest.NewRecorder()}, 200, map[string]string{"record": "synthetic-private-body"})
+	if strings.Contains(logs.String(), "synthetic-private") ||
+		!strings.Contains(logs.String(), "errorType") ||
+		!strings.Contains(logs.String(), "response write failed") {
+		t.Fatal("response error logging exposed a value or lost its operational type")
+	}
+}
 
 func TestGatewayIdentityBoundary(t *testing.T) {
 	const secret = "fixture-gateway-secret-32-characters"

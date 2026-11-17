@@ -10,6 +10,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/syntah/doctorchart-backend-go/db"
+	"github.com/syntah/doctorchart-backend-go/internal/testfixture"
 	"github.com/syntah/doctorchart-backend-go/internal/wizard"
 	"github.com/syntah/doctorchart-backend-go/internal/workspace"
 )
@@ -125,6 +126,9 @@ func TestNewSpecialtyWizardPersonalizationLifecycle(t *testing.T) {
 	pool := schemaFixture(t)
 	initializeFixture(t, pool)
 	ctx := t.Context()
+	if err := testfixture.ApprovePublishedTemplates(ctx, pool); err != nil {
+		t.Fatal(err)
+	}
 	validator, err := wizard.NewValidator()
 	if err != nil {
 		t.Fatal(err)

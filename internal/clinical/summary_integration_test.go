@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/syntah/doctorchart-backend-go/internal/api"
 	"testing"
+
+	"github.com/syntah/doctorchart-backend-go/internal/api"
+	"github.com/syntah/doctorchart-backend-go/internal/wizard"
 )
 
 // Uses only the explicitly opted-in disposable fixture from integrity tests.
@@ -22,6 +24,12 @@ func TestClinicalSummaryPersistenceOwnershipAndConflicts(t *testing.T) {
 	}
 	if saved.Version != p.Version+1 {
 		t.Fatal("patient version not advanced")
+	}
+	var previousMatches bool
+	if err := pool.QueryRow(ctx, `SELECT NULLIF(previous_content->'personal_history','null'::jsonb) IS NOT DISTINCT FROM $2::jsonb
+		FROM clinical_revisions WHERE patient_id=$1 AND entity='PATIENT' AND new_version=$3`,
+		p.ID, p.Personal, saved.Version).Scan(&previousMatches); err != nil || !previousMatches {
+		t.Fatal("clinical profile did not preserve the original patient history", err)
 	}
 	if _, err := s.SaveClinicalProfile(ctx, "integrity-owner", p.ID, request); err == nil {
 		t.Fatal("stale version accepted")
@@ -143,6 +151,52 @@ func TestSummaryDerivesHistoryFromPatientAndEncounters(t *testing.T) {
 	result, err = s.ClinicalSummary(ctx, owner.UserID, patient.ID)
 	if err != nil || result.History["ALLERGY"].Status != "NONE" || result.History["ALLERGY"].SourceID != reviewed.ID {
 		t.Fatal("negative review did not override earlier data", err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE doctor_specialty_contexts SET definition=jsonb_set(definition,'{encounterForm,categories}',
+ (SELECT jsonb_agg(CASE WHEN c->>'key'='sys_clinical_history' THEN jsonb_set(c,'{enabled}','false') ELSE c END ORDER BY ordinal)
+  FROM jsonb_array_elements(definition->'encounterForm'->'categories') WITH ORDINALITY AS rows(c, ordinal)))
+ WHERE workspace_id=(SELECT id FROM doctor_workspaces WHERE user_id='integrity-owner')`); err != nil {
+		t.Fatal(err)
+	}
+	hidden := integrityEncounterRequest(patient.ID, "FOLLOW_UP")
+	hidden["values"].(map[string]any)["sys_conditionStatus"] = "NONE"
+	later, err := s.CreateEncounter(ctx, owner, hidden)
+	if err != nil {
+		t.Fatal(err)
+	}
+	newValues, err := wizard.Decode(later.Values)
+	if err != nil || newValues["sys_conditionStatus"] != nil {
+		t.Fatalf("hidden answer persisted in new consultation: %v %v", newValues, err)
+	}
+	// Simulate data already stored by an old version, even after creation is fixed.
+	if _, err := pool.Exec(ctx, `UPDATE clinical_encounters SET form_values=form_values || '{"sys_conditionStatus":"NONE"}'::jsonb WHERE id=$1`, later.ID); err != nil {
+		t.Fatal(err)
+	}
+	result, err = s.ClinicalSummary(ctx, owner.UserID, patient.ID)
+	if err != nil || result.History["PROBLEM"].SourceID != encounter.ID || result.History["PROBLEM"].Status != "PRESENT" {
+		t.Fatalf("a hidden response replaced the visible historical record: %+v %v", result.History, err)
+	}
+	editValues := integrityEncounterRequest(patient.ID, "FOLLOW_UP")["values"].(map[string]any)
+	editValues["chiefComplaint"] = "Edición posterior"
+	editValues["sys_conditionStatus"] = "PRESENT"
+	editValues["sys_conditions"] = "Dato nuevo oculto"
+	edited, err := s.UpdateEncounter(ctx, owner.UserID, later.ID, map[string]any{
+		"expectedVersion": json.Number("0"), "consultationType": "FOLLOW_UP", "values": editValues,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacyValues, err := wizard.Decode(edited.Values)
+	if err != nil || legacyValues["sys_conditionStatus"] != "NONE" || legacyValues["sys_conditions"] != nil {
+		t.Fatalf("editing replaced a historically stored hidden answer: %v %v", legacyValues, err)
+	}
+	var oldValues []byte
+	if err := pool.QueryRow(ctx, `SELECT form_values FROM clinical_encounters WHERE id=$1`, encounter.ID).Scan(&oldValues); err != nil {
+		t.Fatal(err)
+	}
+	oldAnswers, err := wizard.Decode(oldValues)
+	if err != nil || oldAnswers["sys_conditions"] != "Asma" {
+		t.Fatalf("editing a later form touched visible historical data: %v %v", oldAnswers, err)
 	}
 	// Removing it from future consultations preserves already recorded history.
 	if _, err := pool.Exec(ctx, `UPDATE doctor_specialty_contexts SET definition=jsonb_set(definition,'{encounterForm,categories}',

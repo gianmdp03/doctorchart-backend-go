@@ -74,6 +74,16 @@ func genderOptions(field map[string]any) bool {
 }
 
 func (v *Validator) Validate(definition map[string]any) error {
+	return v.validate(definition, true)
+}
+
+// ValidateStored retains structural checks for snapshots and definitions
+// already accepted under the historical projection rules.
+func (v *Validator) ValidateStored(definition map[string]any) error {
+	return v.validate(definition, false)
+}
+
+func (v *Validator) validate(definition map[string]any, rejectCollisions bool) error {
 	errorsFound := []api.FieldError{}
 	issue := func(path, code string) { errorsFound = append(errorsFound, api.FieldError{Path: path, Code: code}) }
 	if err := v.schema.Validate(definition); err != nil {
@@ -115,6 +125,11 @@ func (v *Validator) Validate(definition map[string]any) error {
 		return invalidDefinition(errorsFound)
 	}
 	for _, section := range []string{"patientForm", "encounterForm"} {
+		if rejectCollisions {
+			for _, collision := range projectionCollisions(object(definition[section])) {
+				issue("/"+section+collision, "CLINICAL_PROJECTION_COLLISION")
+			}
+		}
 		categories := list(object(definition[section])["categories"])
 		categoryKeys := map[string]bool{}
 		fields := map[string]field{}

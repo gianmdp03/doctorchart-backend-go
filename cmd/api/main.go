@@ -32,6 +32,10 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	reviews, err := workspace.NewReviewAuthority(os.Getenv("DOCTORCHART_TEMPLATE_REVIEW_MANIFEST"), os.Getenv("DOCTORCHART_SYNTHETIC_TEMPLATE_REVIEWER"))
+	if err != nil {
+		return err
+	}
 	mediaConfig, err := common.Load("doctorchart")
 	if err != nil {
 		return err
@@ -101,7 +105,7 @@ func run() error {
 			return err
 		}
 	}
-	workspaces := workspace.New(pool, validator)
+	workspaces := workspace.New(pool, validator).WithReviewAuthority(reviews)
 	workspaces.Routes(mux)
 	clinics.NewWithBookings(pool, entitlements, c.SchedulesEnabled, c.BookingsEnabled).WithPublicBookings(c.PublicBookingsEnabled, c.GatewaySecret).WithStaff(c.StaffEnabled, c.StaffOrigin).WithNotifications(notices).Routes(mux)
 	clinicalService, err := clinical.New(pool, workspaces, validator, rules, files)
@@ -161,6 +165,12 @@ func openPool(ctx context.Context, url string, maxConnections int32) (*pgxpool.P
 	config.ConnConfig.RuntimeParams["timezone"] = "UTC"
 	config.ConnConfig.RuntimeParams["search_path"] = "public"
 	config.ConnConfig.RuntimeParams["row_security"] = "on"
+	config.ConnConfig.RuntimeParams["doctorchart.template_lab"] = "off"
+	if config.ConnConfig.User == db.AppRole {
+		if err := configureTemplateLab(config.ConnConfig); err != nil {
+			return nil, err
+		}
+	}
 	return pgxpool.NewWithConfig(ctx, config)
 }
 

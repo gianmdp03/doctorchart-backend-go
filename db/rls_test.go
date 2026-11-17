@@ -113,10 +113,16 @@ func TestClinicalRLSWithoutQueryFilters(t *testing.T) {
 	for _, table := range tables {
 		count(conn, table, 0)
 	}
-	for _, table := range []string{"patients", "clinical_encounters", "patient_medical_studies", "patient_prescription_records"} {
-		tag, err := conn.Exec(ctx, "DELETE FROM public."+pgx.Identifier{table}.Sanitize())
-		if err != nil || tag.RowsAffected() != 0 {
-			t.Fatalf("unscoped DELETE from %s changed rows: %v", table, err)
+	for _, table := range append(tables, "clinical_revisions") {
+		_, err := conn.Exec(ctx, "DELETE FROM public."+pgx.Identifier{table}.Sanitize())
+		var denied *pgconn.PgError
+		if !errors.As(err, &denied) || denied.Code != "42501" {
+			t.Fatalf("ordinary runtime role can delete from %s: %v", table, err)
+		}
+	}
+	for _, statement := range []string{"UPDATE clinical_revisions SET reason='not allowed'", "INSERT INTO clinical_revisions DEFAULT VALUES"} {
+		if _, err := conn.Exec(ctx, statement); err == nil {
+			t.Fatalf("ordinary runtime role can write history: %s", statement)
 		}
 	}
 	tx, err := conn.Begin(ctx)
@@ -130,7 +136,10 @@ func TestClinicalRLSWithoutQueryFilters(t *testing.T) {
 	for _, table := range tables {
 		count(tx, table, 1)
 	}
-	if tag, err := tx.Exec(ctx, "UPDATE patients SET phone='5551234567'"); err != nil || tag.RowsAffected() != 1 {
+	if _, err := tx.Exec(ctx, "SELECT set_config('doctorchart.revision_actor','m1-owner',true)"); err != nil {
+		t.Fatal(err)
+	}
+	if tag, err := tx.Exec(ctx, "UPDATE patients SET phone='5551234567', version=version+1"); err != nil || tag.RowsAffected() != 1 {
 		t.Fatalf("unfiltered update exceeded the selected scope: %v %v", tag, err)
 	}
 	var quota int
@@ -140,13 +149,12 @@ func TestClinicalRLSWithoutQueryFilters(t *testing.T) {
 	if tag, err := tx.Exec(ctx, "UPDATE patients SET full_name='not allowed' WHERE id=3"); err != nil || tag.RowsAffected() != 0 {
 		t.Fatalf("cross-context update: %v %v", tag, err)
 	}
-	if tag, err := tx.Exec(ctx, "DELETE FROM patients WHERE id=2"); err != nil || tag.RowsAffected() != 0 {
-		t.Fatalf("cross-owner delete: %v %v", tag, err)
-	}
+	count(tx, "clinical_revisions", 1)
 	if err := tx.Commit(ctx); err != nil {
 		t.Fatal(err)
 	}
 	count(conn, "patients", 0)
+	count(conn, "clinical_revisions", 0)
 	tx, err = conn.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -156,6 +164,7 @@ func TestClinicalRLSWithoutQueryFilters(t *testing.T) {
 		t.Fatal(err)
 	}
 	count(tx, "patients", 1)
+	count(tx, "clinical_revisions", 0)
 	count(tx, "patient_medical_studies", 0)
 	var referenced bool
 	if err := tx.QueryRow(ctx, "SELECT public.study_file_referenced('00000000-0000-0000-0000-000000000003')").Scan(&referenced); err != nil || !referenced {

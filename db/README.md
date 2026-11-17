@@ -1,6 +1,6 @@
 # Esquema inicial de DoctorChart
 
-`db/schema.sql` define la estructura completa de la versión 16. Contiene 48 tablas y 61 claves foráneas. El código embebe ese archivo y el bootstrap carga los seeds administrados. Las entregas históricas de M1–M6 se conservan en `docs/`.
+`db/schema.sql` define la estructura completa de la versión 20. Contiene 55 tablas y 70 claves foráneas. El código embebe ese archivo y el bootstrap carga los seeds administrados. Las entregas históricas de M1–M6 se conservan en `docs/`.
 
 ## Arranque
 

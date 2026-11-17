@@ -1,0 +1,531 @@
+{
+  "status": "PROVISIONAL_TEST_ONLY",
+  "createSpecialty": {
+    "code": "geriatrics",
+    "name": "Geriatría",
+    "description": "Plantilla provisional de consulta ambulatoria de Geriatría para revisión profesional.",
+    "definition": {
+      "schemaVersion": 1,
+      "patientForm": {
+        "categories": [
+          {
+            "key": "sys_patient_profile",
+            "title": "Datos Personales",
+            "enabled": true,
+            "system": true,
+            "fields": [
+              {
+                "key": "sys_firstName",
+                "type": "TEXT",
+                "label": "Nombre",
+                "system": true,
+                "required": true
+              },
+              {
+                "key": "sys_lastName",
+                "type": "TEXT",
+                "label": "Apellido",
+                "system": true,
+                "required": true
+              },
+              {
+                "key": "sys_dni",
+                "type": "TEXT",
+                "label": "DNI",
+                "system": true,
+                "required": true
+              },
+              {
+                "key": "sys_dob",
+                "type": "DATE",
+                "label": "Fecha de nacimiento",
+                "system": true,
+                "required": true
+              },
+              {
+                "key": "sys_sex",
+                "type": "SELECT",
+                "label": "Sexo",
+                "system": true,
+                "options": [
+                  {
+                    "label": "Masculino",
+                    "value": "MALE"
+                  },
+                  {
+                    "label": "Femenino",
+                    "value": "FEMALE"
+                  },
+                  {
+                    "label": "Otro",
+                    "value": "OTHER"
+                  },
+                  {
+                    "label": "Sin información",
+                    "value": "UNKNOWN"
+                  }
+                ],
+                "required": true
+              },
+              {
+                "key": "sys_phone",
+                "type": "TEXT",
+                "label": "Teléfono",
+                "system": true,
+                "required": false
+              },
+              {
+                "key": "sys_email",
+                "type": "TEXT",
+                "label": "Email",
+                "system": true,
+                "required": false
+              },
+              {
+                "key": "sys_insurance",
+                "type": "TEXT",
+                "label": "Obra social / Cobertura",
+                "system": true,
+                "required": false
+              },
+              {
+                "key": "address",
+                "type": "TEXT",
+                "label": "Dirección",
+                "required": false
+              }
+            ]
+          },
+          {
+            "key": "geriatricHistory",
+            "title": "Situación habitual, apoyo e informantes",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "geriatricPersonalHistory",
+                "label": "Antecedentes geriátricos relevantes",
+                "type": "TEXTAREA",
+                "required": false
+              },
+              {
+                "key": "geriatricLivingSituation",
+                "label": "Situación de convivencia",
+                "type": "TEXTAREA",
+                "required": false
+              },
+              {
+                "key": "supportNetwork",
+                "label": "Redes de apoyo",
+                "type": "TEXTAREA",
+                "required": false
+              },
+              {
+                "key": "baselineFunction",
+                "label": "Situación funcional habitual",
+                "type": "TEXTAREA",
+                "required": false
+              },
+              {
+                "key": "informantName",
+                "label": "Persona informante o cuidadora, si corresponde (sin acceso al sistema)",
+                "type": "TEXT",
+                "required": false
+              },
+              {
+                "key": "informantRelationship",
+                "label": "Vínculo de la persona informante o cuidadora",
+                "type": "TEXT",
+                "required": false
+              },
+              {
+                "key": "informantContact",
+                "label": "Datos de contacto pertinentes de la persona informante o cuidadora",
+                "type": "TEXT",
+                "required": false
+              },
+              {
+                "key": "informationSourceNotes",
+                "label": "Fuente de la información registrada",
+                "type": "TEXTAREA",
+                "required": false
+              }
+            ]
+          },
+          {
+            "key": "sys_clinical_history",
+            "title": "Antecedentes clínicos",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "sys_allergyStatus",
+                "label": "Alergias conocidas",
+                "type": "SELECT",
+                "required": false,
+                "options": [
+                  {
+                    "value": "UNKNOWN",
+                    "label": "Sin información / no revisado"
+                  },
+                  {
+                    "value": "NONE",
+                    "label": "No refiere alergias conocidas"
+                  },
+                  {
+                    "value": "PRESENT",
+                    "label": "Tiene alergias conocidas"
+                  }
+                ]
+              },
+              {
+                "key": "sys_allergies",
+                "label": "Alergias y reacciones",
+                "type": "TEXTAREA",
+                "required": false,
+                "placeholder": "Una alergia por línea. Incluí la reacción, si se conoce."
+              },
+              {
+                "key": "sys_conditionStatus",
+                "label": "Enfermedades o problemas actuales",
+                "type": "SELECT",
+                "required": false,
+                "options": [
+                  {
+                    "value": "UNKNOWN",
+                    "label": "Sin información / no revisado"
+                  },
+                  {
+                    "value": "NONE",
+                    "label": "No refiere enfermedades actuales"
+                  },
+                  {
+                    "value": "PRESENT",
+                    "label": "Tiene enfermedades o problemas actuales"
+                  }
+                ]
+              },
+              {
+                "key": "sys_conditions",
+                "label": "Enfermedades y problemas de salud",
+                "type": "TEXTAREA",
+                "required": false,
+                "placeholder": "Un problema actual por línea. Ej.: asma en seguimiento."
+              },
+              {
+                "key": "sys_medicationStatus",
+                "label": "Medicación habitual",
+                "type": "SELECT",
+                "required": false,
+                "options": [
+                  {
+                    "value": "UNKNOWN",
+                    "label": "Sin información / no revisado"
+                  },
+                  {
+                    "value": "NONE",
+                    "label": "No utiliza medicación habitual"
+                  },
+                  {
+                    "value": "PRESENT",
+                    "label": "Utiliza medicación habitual"
+                  }
+                ]
+              },
+              {
+                "key": "sys_medications",
+                "label": "Tratamiento habitual",
+                "type": "TEXTAREA",
+                "required": false,
+                "placeholder": "Un medicamento por línea, con dosis y frecuencia cuando se conozcan."
+              },
+              {
+                "key": "sys_historySource",
+                "label": "Origen de la información revisada",
+                "type": "SELECT",
+                "required": false,
+                "options": [
+                  {
+                    "value": "REPORTED",
+                    "label": "Informado por el paciente o su familia"
+                  },
+                  {
+                    "value": "CONFIRMED",
+                    "label": "Corroborado por el profesional"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "encounterForm": {
+        "categories": [
+          {
+            "key": "reason",
+            "title": "Motivo y evolución",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "chiefComplaint",
+                "label": "Motivo de consulta",
+                "type": "TEXTAREA",
+                "required": false
+              },
+              {
+                "key": "presentIllness",
+                "label": "Evolución clínica",
+                "type": "TEXTAREA",
+                "required": false
+              }
+            ]
+          },
+          {
+            "key": "functionAndSupport",
+            "title": "Cambios y necesidades de apoyo",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "functionalChanges",
+                "label": "Cambios en la funcionalidad",
+                "type": "TEXTAREA",
+                "required": false
+              },
+              {
+                "key": "mobilityAndFalls",
+                "label": "Movilidad y caídas: descripción informada u observada",
+                "type": "TEXTAREA",
+                "required": false
+              },
+              {
+                "key": "cognitiveObservations",
+                "label": "Aspectos cognitivos observados o informados",
+                "type": "TEXTAREA",
+                "required": false
+              },
+              {
+                "key": "moodObservations",
+                "label": "Estado de ánimo documentado",
+                "type": "TEXTAREA",
+                "required": false
+              },
+              {
+                "key": "nutritionNotes",
+                "label": "Alimentación y aspectos nutricionales relevantes",
+                "type": "TEXTAREA",
+                "required": false
+              },
+              {
+                "key": "supportNeeds",
+                "label": "Necesidades de apoyo",
+                "type": "TEXTAREA",
+                "required": false
+              },
+              {
+                "key": "visitInformationSource",
+                "label": "Fuente de información de esta consulta, cuando corresponda",
+                "type": "TEXTAREA",
+                "required": false
+              }
+            ]
+          },
+          {
+            "key": "sys_clinical_history",
+            "title": "Antecedentes clínicos",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "sys_allergyStatus",
+                "label": "Alergias conocidas",
+                "type": "SELECT",
+                "required": false,
+                "options": [
+                  {
+                    "value": "UNKNOWN",
+                    "label": "Sin información / no revisado"
+                  },
+                  {
+                    "value": "NONE",
+                    "label": "No refiere alergias conocidas"
+                  },
+                  {
+                    "value": "PRESENT",
+                    "label": "Tiene alergias conocidas"
+                  }
+                ]
+              },
+              {
+                "key": "sys_allergies",
+                "label": "Alergias y reacciones",
+                "type": "TEXTAREA",
+                "required": false,
+                "placeholder": "Una alergia por línea. Incluí la reacción, si se conoce."
+              },
+              {
+                "key": "sys_conditionStatus",
+                "label": "Enfermedades o problemas actuales",
+                "type": "SELECT",
+                "required": false,
+                "options": [
+                  {
+                    "value": "UNKNOWN",
+                    "label": "Sin información / no revisado"
+                  },
+                  {
+                    "value": "NONE",
+                    "label": "No refiere enfermedades actuales"
+                  },
+                  {
+                    "value": "PRESENT",
+                    "label": "Tiene enfermedades o problemas actuales"
+                  }
+                ]
+              },
+              {
+                "key": "sys_conditions",
+                "label": "Enfermedades y problemas de salud",
+                "type": "TEXTAREA",
+                "required": false,
+                "placeholder": "Un problema actual por línea. Ej.: asma en seguimiento."
+              },
+              {
+                "key": "sys_medicationStatus",
+                "label": "Medicación habitual",
+                "type": "SELECT",
+                "required": false,
+                "options": [
+                  {
+                    "value": "UNKNOWN",
+                    "label": "Sin información / no revisado"
+                  },
+                  {
+                    "value": "NONE",
+                    "label": "No utiliza medicación habitual"
+                  },
+                  {
+                    "value": "PRESENT",
+                    "label": "Utiliza medicación habitual"
+                  }
+                ]
+              },
+              {
+                "key": "sys_medications",
+                "label": "Tratamiento habitual",
+                "type": "TEXTAREA",
+                "required": false,
+                "placeholder": "Un medicamento por línea, con dosis y frecuencia cuando se conozcan."
+              },
+              {
+                "key": "sys_historySource",
+                "label": "Origen de la información revisada",
+                "type": "SELECT",
+                "required": false,
+                "options": [
+                  {
+                    "value": "REPORTED",
+                    "label": "Informado por el paciente o su familia"
+                  },
+                  {
+                    "value": "CONFIRMED",
+                    "label": "Corroborado por el profesional"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "key": "physicalExam",
+            "title": "Examen físico",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "physicalExam",
+                "label": "Examen físico narrativo",
+                "type": "TEXTAREA",
+                "required": false
+              }
+            ]
+          },
+          {
+            "key": "complementaryStudies",
+            "title": "Estudios revisados",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "reviewedStudies",
+                "label": "Estudios revisados",
+                "type": "TEXTAREA",
+                "required": false
+              }
+            ]
+          },
+          {
+            "key": "assessment",
+            "title": "Evaluación clínica",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "clinicalAssessment",
+                "label": "Evaluación clínica",
+                "type": "TEXTAREA",
+                "required": false
+              },
+              {
+                "key": "diagnosis",
+                "label": "Diagnóstico",
+                "type": "TEXTAREA",
+                "required": false
+              }
+            ]
+          },
+          {
+            "key": "plan",
+            "title": "Tratamiento y seguimiento",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "treatment",
+                "label": "Tratamiento e indicaciones",
+                "type": "TEXTAREA",
+                "required": false
+              },
+              {
+                "key": "followUpInstructions",
+                "label": "Indicaciones de seguimiento",
+                "type": "TEXTAREA",
+                "required": false
+              },
+              {
+                "key": "followUpDate",
+                "label": "Próximo control",
+                "type": "DATE",
+                "required": false
+              }
+            ]
+          }
+        ]
+      },
+      "modulesConfig": {
+        "MEDICATION_CATALOG": true,
+        "AI_ASSISTANT": false,
+        "GROWTH_CHARTS": false
+      }
+    }
+  },
+  "experience": {
+    "navigation": [
+      "DASHBOARD",
+      "PATIENTS",
+      "WIZARD"
+    ],
+    "patientRecordTabs": [
+      "SUMMARY",
+      "ENCOUNTERS",
+      "PRESCRIPTIONS",
+      "STUDIES"
+    ],
+    "patientRecordActions": [
+      "EDIT_PATIENT",
+      "NEW_ENCOUNTER",
+      "PRINT_DOCUMENT"
+    ]
+  }
+}

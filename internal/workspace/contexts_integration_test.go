@@ -17,11 +17,17 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/syntah/doctorchart-backend-go/internal/api"
 	"github.com/syntah/doctorchart-backend-go/internal/bootstrap"
+	"github.com/syntah/doctorchart-backend-go/internal/testfixture"
 	"github.com/syntah/doctorchart-backend-go/internal/wizard"
 	"github.com/syntah/doctorchart-backend-go/internal/workspace"
 )
 
 func contextFixture(t *testing.T) (*workspace.Store, *pgxpool.Pool) {
+	t.Helper()
+	return templateContextFixture(t, true)
+}
+
+func templateContextFixture(t *testing.T, approveLegacy bool) (*workspace.Store, *pgxpool.Pool) {
 	t.Helper()
 	raw := os.Getenv("BASELINE_TEST_ADMIN_DSN")
 	if raw == "" {
@@ -41,6 +47,11 @@ func contextFixture(t *testing.T) (*workspace.Store, *pgxpool.Pool) {
 		t.Fatal(err)
 	}
 	u.Path = "/" + name
+	if approveLegacy {
+		query := u.Query()
+		query.Set("doctorchart.template_lab", "on")
+		u.RawQuery = query.Encode()
+	}
 	pool, err := pgxpool.New(t.Context(), u.String())
 	if err != nil {
 		t.Fatal(err)
@@ -58,6 +69,11 @@ func contextFixture(t *testing.T) (*workspace.Store, *pgxpool.Pool) {
 	}
 	if err = bootstrap.Run(t.Context(), pool, v); err != nil {
 		t.Fatal(err)
+	}
+	if approveLegacy {
+		if err := testfixture.ApprovePublishedTemplates(t.Context(), pool); err != nil {
+			t.Fatal(err)
+		}
 	}
 	return workspace.New(pool, v), pool
 }

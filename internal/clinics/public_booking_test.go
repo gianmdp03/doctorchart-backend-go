@@ -127,6 +127,20 @@ func TestPublicBookingNoLoginSharedEngineAndSnapshots(t *testing.T) {
 	if actor != "PUBLIC_BOOKING" {
 		t.Fatal("simulated doctor identity", actor)
 	}
+	if _, err := f.pool.Exec(t.Context(), `INSERT INTO wizard_approval_revocations(approval_id,actor,reason)
+		SELECT w.published_approval_id,'fixture-admin','Controlled template revocation'
+		FROM doctor_specialty_contexts c JOIN wizard_defaults w ON w.specialty_id=c.specialty_id
+		WHERE c.id=$1::text::bigint`, b.ContextID); err != nil {
+		t.Fatal(err)
+	}
+	assertCode(t, pubRequest(f, "GET", "/public/appointments/doctors/"+p.PublicID, "", nil), 404, "")
+	body.Challenge, body.Solution, body.ContextID = "fixture-challenge", "0", b.ContextID
+	assertCode(t, pubRequest(f, "POST", path, newOpaqueID(), body), 404, "")
+	retained := f.request("GET", "/bookings/"+b.ID+"/public-details", owner, "")
+	assertCode(t, retained, 200, "")
+	if retained.Body.String() != details.Body.String() {
+		t.Fatal("template revocation changed the historical booking snapshot")
+	}
 }
 func TestPublicConcurrentVisitorsAndManualReservation(t *testing.T) {
 	f, c, start, p := publicFixture(t)

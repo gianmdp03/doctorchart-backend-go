@@ -67,6 +67,12 @@ func scheduleFixture(t *testing.T) *sql.DB {
 	t.Helper()
 	pool := initializedFixture(t)
 	clinicalFixture(t, pool)
+	seedScheduleFixture(t, pool)
+	return pool
+}
+
+func seedScheduleFixture(t *testing.T, pool *sql.DB) {
+	t.Helper()
 	if _, err := pool.Exec(`
 INSERT INTO clinics(id,workspace_id,name,country,province,city,address,timezone,status)
  VALUES(1,1,'Centro','Argentina','Buenos Aires','City','Synthetic','UTC','ACTIVE'),
@@ -84,7 +90,6 @@ INSERT INTO bookings(workspace_id,clinic_id,start_at,end_at,contact_name,special
 `); err != nil {
 		t.Fatal(err)
 	}
-	return pool
 }
 func TestClinicsIntegrityAndRestart(t *testing.T) {
 	pool := initializedFixture(t)

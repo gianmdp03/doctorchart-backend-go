@@ -52,7 +52,7 @@ func Invalid(message string) *Error { return Failure(400, "INVALID_REQUEST", mes
 func WriteJSON(w http.ResponseWriter, status int, value any) {
 	data, err := json.Marshal(value)
 	if err != nil {
-		slog.Error("encode response", "error", err)
+		slog.Error("encode response", "errorType", fmt.Sprintf("%T", err))
 		WriteError(w, Failure(500, "INTERNAL_ERROR", "No se pudo completar la solicitud."))
 		return
 	}
@@ -61,7 +61,7 @@ func WriteJSON(w http.ResponseWriter, status int, value any) {
 	}
 	w.WriteHeader(status)
 	if _, err := w.Write(data); err != nil {
-		slog.Debug("response write failed", "error", err)
+		slog.Debug("response write failed", "errorType", fmt.Sprintf("%T", err))
 	}
 }
 func WriteError(w http.ResponseWriter, err error) {

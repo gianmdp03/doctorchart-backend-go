@@ -21,10 +21,10 @@ func dashboardFollowUps(ctx context.Context, tx pgx.Tx, owner, from, until strin
 	rows, err := tx.Query(ctx, `SELECT e.id,p.id,p.full_name,e.follow_up_date::text
 		FROM patients p
 		JOIN LATERAL (
-			SELECT id,follow_up_date FROM clinical_encounters WHERE patient_id=p.id
+			SELECT id,follow_up_date FROM clinical_encounters WHERE patient_id=p.id AND annulled_at IS NULL
 			ORDER BY encounter_date DESC,id DESC LIMIT 1
 		) e ON true
-		WHERE p.user_id=$1 AND ($4::bigint=0 AND (SELECT count(*) FROM doctor_specialty_contexts scope_c JOIN doctor_workspaces scope_w ON scope_w.id=scope_c.workspace_id WHERE scope_w.user_id=$1)=1 OR p.specialty_context_id=$4) AND e.follow_up_date >= $2::date AND e.follow_up_date < $3::date
+		WHERE p.user_id=$1 AND p.annulled_at IS NULL AND ($4::bigint=0 AND (SELECT count(*) FROM doctor_specialty_contexts scope_c JOIN doctor_workspaces scope_w ON scope_w.id=scope_c.workspace_id WHERE scope_w.user_id=$1)=1 OR p.specialty_context_id=$4) AND e.follow_up_date >= $2::date AND e.follow_up_date < $3::date
 		ORDER BY e.follow_up_date,lower(p.full_name),p.id`, owner, from, until, api.SpecialtyContextID(ctx))
 	if err != nil {
 		return nil, err

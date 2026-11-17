@@ -119,7 +119,7 @@ func TestPatientContextClinicalHTTPIsolation(t *testing.T) {
 			t.Fatal("document disclosure")
 		}
 	}
-	assertCode(call("DELETE", fmt.Sprintf("/patients/%d", pA.ID), "integrity-other", fmt.Sprint(b.ContextID), nil), 404, "PATIENT_NOT_FOUND")
+	assertCode(call("DELETE", fmt.Sprintf("/patients/%d", pA.ID), "integrity-other", fmt.Sprint(b.ContextID), map[string]any{"reason": "Fixture"}), 404, "PATIENT_NOT_FOUND")
 	assertCode(call("PUT", fmt.Sprintf("/patients/%d", pA.ID), "integrity-owner", fmt.Sprint(a.ContextID), map[string]any{"expectedVersion": 0, "specialtyContextId": b.ContextID, "values": integrityPatientRequest()["values"]}), 400, "INVALID_REQUEST")
 	list := call("GET", "/patients?search=12345678", "integrity-owner", fmt.Sprint(a.ContextID), nil)
 	assertCode(list, 200, "")

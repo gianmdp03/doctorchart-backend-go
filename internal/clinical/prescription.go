@@ -6,7 +6,6 @@ import (
 	"math"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -32,6 +31,7 @@ type Prescription struct {
 	Instructions string             `json:"generalInstructions"`
 	Medications  []PrescriptionItem `json:"prescriptions"`
 	Orders       []string           `json:"diagnosticOrders"`
+	version      int64
 }
 
 func prescriptionText(body map[string]any, key string, limit int) (string, error) {
@@ -165,7 +165,7 @@ func prescriptionChildren(ctx context.Context, tx pgx.Tx, p *Prescription) error
 func ownedPrescription(ctx context.Context, tx pgx.Tx, user string, patientID, id int64) (Prescription, error) {
 	var p Prescription
 	var date time.Time
-	err := tx.QueryRow(ctx, `SELECT id,patient_id,author_user_id,created_at,type,diagnosis_description,general_instructions,issuance_zone FROM patient_prescription_records WHERE id=$1 AND patient_id=$2 AND author_user_id=$3`, id, patientID, user).Scan(&p.ID, &p.PatientID, &p.Author, &date, &p.Type, &p.Diagnosis, &p.Instructions, &p.IssuanceZone)
+	err := tx.QueryRow(ctx, `SELECT id,patient_id,author_user_id,created_at,type,diagnosis_description,general_instructions,issuance_zone,version FROM patient_prescription_records WHERE annulled_at IS NULL AND id=$1 AND patient_id=$2 AND author_user_id=$3`, id, patientID, user).Scan(&p.ID, &p.PatientID, &p.Author, &date, &p.Type, &p.Diagnosis, &p.Instructions, &p.IssuanceZone, &p.version)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return p, api.Failure(404, "PRESCRIPTION_NOT_FOUND", "No se encontró la receta u orden.")
 	}
@@ -185,6 +185,9 @@ func (s *Service) prescriptionAccess(ctx context.Context, tx pgx.Tx, user string
 func (s *Service) CreatePrescription(ctx context.Context, user string, patientID int64, body map[string]any) (Prescription, error) {
 	var result Prescription
 	err := s.transaction(ctx, false, func(tx pgx.Tx) error {
+		if err := lockPatient(ctx, tx, user, patientID); err != nil {
+			return err
+		}
 		if err := s.prescriptionAccess(ctx, tx, user, patientID); err != nil {
 			return err
 		}
@@ -258,7 +261,7 @@ func (s *Service) PrescriptionRoutes(mux *http.ServeMux) {
 				if err := s.prescriptionAccess(ctx, tx, user, id); err != nil {
 					return err
 				}
-				rows, err := tx.Query(ctx, `SELECT id,patient_id,author_user_id,created_at,type,diagnosis_description,general_instructions,issuance_zone FROM patient_prescription_records WHERE patient_id=$1 AND author_user_id=$2 ORDER BY created_at DESC,id DESC`, id, user)
+				rows, err := tx.Query(ctx, `SELECT id,patient_id,author_user_id,created_at,type,diagnosis_description,general_instructions,issuance_zone FROM patient_prescription_records WHERE annulled_at IS NULL AND patient_id=$1 AND author_user_id=$2 ORDER BY created_at DESC,id DESC`, id, user)
 				if err != nil {
 					return err
 				}
@@ -295,11 +298,20 @@ func (s *Service) PrescriptionRoutes(mux *http.ServeMux) {
 		if err == nil {
 			err = prescriptionRole(r)
 		}
+		var request annulment
+		if err == nil && r.Method == "DELETE" {
+			request, err = readAnnulment(w, r)
+		}
 		var p Prescription
 		if err == nil {
 			err = s.transaction(r.Context(), r.Method == "GET", func(tx pgx.Tx) error {
 				ctx := r.Context()
 				user := api.User(ctx).UserID
+				if r.Method == "DELETE" {
+					if err := lockPatient(ctx, tx, user, patientID); err != nil {
+						return err
+					}
+				}
 				if err := s.prescriptionAccess(ctx, tx, user, patientID); err != nil {
 					return err
 				}
@@ -309,15 +321,10 @@ func (s *Service) PrescriptionRoutes(mux *http.ServeMux) {
 					return err
 				}
 				if r.Method == "DELETE" {
-					for _, table := range []string{"prescription_medications", "prescription_diagnostic_orders", "patient_prescription_records"} {
-						column := "record_id"
-						if strings.HasPrefix(table, "patient_") {
-							column = "id"
-						}
-						if _, err := tx.Exec(ctx, "DELETE FROM "+table+" WHERE "+column+"=$1", id); err != nil {
-							return err
-						}
+					if err := bindRevision(ctx, tx, user, request.reason); err != nil {
+						return err
 					}
+					return annulOne(ctx, tx, "patient_prescription_records", id, request.expected)
 				}
 				return nil
 			})
@@ -325,6 +332,8 @@ func (s *Service) PrescriptionRoutes(mux *http.ServeMux) {
 		status := 200
 		if r.Method == "DELETE" {
 			status = 204
+		} else if err == nil {
+			accessReference(r.Context(), &id, &patientID, &p.version)
 		}
 		clinicalReply(w, p, err, status)
 	}

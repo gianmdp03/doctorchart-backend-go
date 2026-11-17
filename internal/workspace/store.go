@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/syntah/doctorchart-backend-go/db"
 	"github.com/syntah/doctorchart-backend-go/internal/api"
 	"github.com/syntah/doctorchart-backend-go/internal/wizard"
 )
@@ -18,9 +19,17 @@ import (
 type Store struct {
 	pool      *pgxpool.Pool
 	validator *wizard.Validator
+	reviews   ReviewAuthority
 }
 
-func New(pool *pgxpool.Pool, validator *wizard.Validator) *Store { return &Store{pool, validator} }
+func New(pool *pgxpool.Pool, validator *wizard.Validator) *Store {
+	return &Store{pool: pool, validator: validator}
+}
+
+func (s *Store) WithReviewAuthority(authority ReviewAuthority) *Store {
+	s.reviews = authority
+	return s
+}
 
 type Specialty struct {
 	ID          int64    `json:"id"`
@@ -200,7 +209,7 @@ func databaseError(err error) error {
 	return err
 }
 func catalogLock(ctx context.Context, tx pgx.Tx) error {
-	_, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(17209,41001)")
+	_, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1,$2)", db.LockNamespace, db.TemplateCatalogLockKey)
 	return err
 }
 
@@ -209,7 +218,7 @@ func (s *Store) Specialties(ctx context.Context, admin bool) ([]Specialty, error
 	err := s.transaction(ctx, true, func(tx pgx.Tx) error {
 		query := "SELECT " + specialtyColumns + " FROM specialties"
 		if !admin {
-			query += " WHERE lower(code) IN ('pediatrics','general_medicine','dermatology') AND active=true AND EXISTS(SELECT 1 FROM wizard_defaults w WHERE w.specialty_id=specialties.id AND w.published_definition IS NOT NULL)"
+			query += " WHERE public.template_available(id)"
 		}
 		query += " ORDER BY display_name,id"
 		rows, err := tx.Query(ctx, query)
@@ -249,7 +258,11 @@ func (s *Store) Wizard(ctx context.Context, id int64, published bool) (any, erro
 		if err != nil {
 			return err
 		}
-		if !supportedSpecialty(specialty.Code) || !specialty.Active || len(d.Published) == 0 {
+		available, err := templateAvailable(ctx, tx, id, true)
+		if err != nil {
+			return err
+		}
+		if !available {
 			return api.Failure(404, "SPECIALTY_NOT_FOUND", "La especialidad no está disponible.")
 		}
 		result = struct {

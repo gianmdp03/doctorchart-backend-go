@@ -14,7 +14,7 @@ Para ejecutar DoctorChart desde los repositorios principales, consultá la [guí
 
 Las comprobaciones públicas tienen objetivos separados: `GET /api/doctorchart/ping` devuelve 200 mientras el proceso atiende HTTP (liveness). `GET /api/doctorchart/health` es readiness: comprueba PostgreSQL con contexto máximo de un segundo y la disponibilidad del snapshot vigente de límites Billing. Devuelve 200/UP cuando ambos están disponibles y 503/DOWN en caso contrario, sin detalles de conexión ni secretos. Los probes no realizan llamadas HTTP a Billing; el refresco conserva su ciclo y caché acotada. Usar ping para comprobar el proceso y health para decidir si recibe tráfico. Una interrupción de PostgreSQL y su recuperación no requieren reiniciar el servicio.
 
-Requiere Go 1.27.3 y una base PostgreSQL 17 o 18 dedicada. El comando separado `init-db` crea el esquema completo de [db/schema.sql](db/schema.sql), embebido en el binario: versión 16, 48 tablas y 61 claves foráneas. Inicializa DDL, catálogos y metadata en una sola transacción READ COMMITTED bajo advisory lock `(17209, 3)`. Un fallo revierte toda la inicialización. La API usa logins restringidos y valida identidad, versión, checksum, fingerprint y permisos antes de iniciar HTTP o jobs. Las políticas RLS aíslan los registros clínicos por cuenta y contexto de especialidad, incluso si una consulta omite el filtro SQL.
+Requiere Go 1.27.4 y una base PostgreSQL 17 o 18 dedicada. El comando separado `init-db` crea el esquema completo de [db/schema.sql](db/schema.sql), embebido en el binario: versión 20, 55 tablas y 70 claves foráneas. Inicializa DDL, catálogos y metadata en una sola transacción READ COMMITTED bajo advisory lock `(17209, 3)`. Un fallo revierte toda la inicialización. La API usa logins restringidos y valida identidad, versión, checksum, fingerprint y permisos antes de iniciar HTTP o jobs. Las políticas RLS aíslan los registros clínicos por cuenta y contexto de especialidad, incluso si una consulta omite el filtro SQL.
 
 Una base parcial, incompatible, con drift o sin marcador válido se rechaza explícitamente. El backend no adopta, repara, vacía ni borra una base existente. No se requieren migraciones preproducción ni backfills. El dueño del esquema inicializa mediante `init-db`; el administrador provisiona antes `doctorchart_app` y `doctorchart_media` con claves distintas y sin privilegios administrativos ni membresías. Ver [política, roles y pruebas](db/README.md). El reset de desarrollo requiere autorización posterior y no forma parte del arranque. Nunca ejecutar pruebas contra bases existentes.
 
@@ -84,7 +84,7 @@ Para crear un nuevo fixture Go descartable, migration/fixture.py prepare registr
 Control de calidad completo, con `govulncheck` instalado y una plataforma compatible con race:
 
 ```powershell
-python .agents/skills/go-backend/scripts/check_go.py . --target go1.27.2 --require-vulncheck
+python .agents/skills/go-backend/scripts/check_go.py . --target go1.27.4 --require-vulncheck
 ```
 
 El control completo y race se ejecutaron en Linux mediante Docker. Las [evidencias](migration/evidence/summary.json) registran 365 casos diferenciales, 41 verificaciones de rollback, nueve casos de arranque y 14 de documentos. Una ejecución aprobada acredita esos casos; las diferencias y límites del informe siguen vigentes. El finalizador Java histórico también fue retirado; las capturas conservadas no sustituyen la ejecución de los controles actuales.

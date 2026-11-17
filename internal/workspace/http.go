@@ -36,6 +36,7 @@ func pathID(r *http.Request) (int64, error) {
 }
 
 func (s *Store) Routes(mux *http.ServeMux) {
+	s.reviewRoutes(mux)
 	register(mux, "GET /api/doctorchart/workspace/contexts", func(w http.ResponseWriter, r *http.Request) (any, int, error) {
 		values, err := s.Contexts(r.Context(), api.User(r.Context()).UserID)
 		return values, 200, err

@@ -96,14 +96,18 @@ func (s *Store) AddContext(ctx context.Context, user string, request map[string]
 		if err != nil {
 			return err
 		}
-		if !spec.Active || !supportedSpecialty(spec.Code) || len(d.Published) == 0 {
+		available, err := templateAvailable(ctx, tx, id, true)
+		if err != nil {
+			return err
+		}
+		if !available {
 			return api.Failure(409, "SPECIALTY_NOT_AVAILABLE", "La especialidad no está publicada para su selección.")
 		}
 		definition, err := wizard.Decode(d.Published)
 		if err != nil {
 			return err
 		}
-		if err = s.validator.Validate(definition); err != nil {
+		if err = s.validator.ValidateStored(definition); err != nil {
 			return err
 		}
 		w := &workspace{UserID: user, Setup: Setup{ID: workspaceID, Specialty: spec.summary(), Experience: spec.experience(), Draft: json.RawMessage(d.Published), DraftSourceVersion: &d.PublishedVersion, Step: firstStep(definition)}}

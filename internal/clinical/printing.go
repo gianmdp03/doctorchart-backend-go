@@ -39,6 +39,8 @@ type printDocument struct {
 	Medications   json.RawMessage `json:"prescriptions"`
 	Orders        []string        `json:"diagnosticOrders"`
 	at            time.Time
+	version       int64
+	emitted       bool
 }
 
 func printAge(birth, reference time.Time) *string {
@@ -62,121 +64,128 @@ func printAge(birth, reference time.Time) *string {
 func (s *Service) printable(ctx context.Context, user string, patientID, id int64, encounter bool) (printDocument, error) {
 	var doc printDocument
 	err := s.transaction(ctx, true, func(tx pgx.Tx) error {
-		patient, err := ownedPatient(ctx, tx, user, patientID)
-		if err != nil {
-			return err
-		}
-		if err := s.workspaces.Feature(ctx, tx, user, "PRINT_DOCUMENT"); err != nil {
-			return err
-		}
-		if encounter {
-			record, err := scanEncounter(tx.QueryRow(ctx, "SELECT "+encounterColumns+encounterFrom+"WHERE e.id=$1 AND e.patient_id=$2", id, patientID))
-			if errors.Is(err, pgx.ErrNoRows) {
-				return api.Failure(404, "ENCOUNTER_NOT_FOUND", "No se encontró el documento del paciente.")
-			}
-			if err != nil {
-				return err
-			}
-			doc.Source = "ENCOUNTER"
-			doc.ID = record.ID
-			doc.Code = fmt.Sprintf("HC-%d-%d", id, patientID)
-			doc.at = record.instant
-			var origin map[string]any
-			if err := json.Unmarshal(record.Context, &origin); err != nil {
-				return err
-			}
-			zone, _ := origin["zone"].(string)
-			doc.IssuanceZone = s.documentZone(zone).String()
-			doc.Author = printAuthor{UserID: patient.owner, Specialty: &record.Specialty.Name}
-			doc.DiagnosisCode = record.DiagnosisCode
-			doc.Diagnosis = record.Diagnosis
-			doc.Instructions = record.FollowUp
-			if len(record.Prescriptions) == 0 || string(record.Prescriptions) == "null" {
-				doc.Medications = json.RawMessage("[]")
-			} else {
-				var medications []map[string]any
-				if err := json.Unmarshal(record.Prescriptions, &medications); err != nil {
-					return err
-				}
-				normalized := []map[string]any{}
-				for _, item := range medications {
-					fields := map[string]any{}
-					for _, key := range []string{"medicationName", "dosage", "administrationRoute", "frequency", "durationDays", "instructions"} {
-						fields[key] = item[key]
-					}
-					normalized = append(normalized, fields)
-				}
-				doc.Medications, err = json.Marshal(normalized)
-				if err != nil {
-					return err
-				}
-			}
-			doc.Orders = []string{}
-			if len(record.Orders) > 0 && string(record.Orders) != "null" {
-				if err := json.Unmarshal(record.Orders, &doc.Orders); err != nil {
-					return err
-				}
-			}
-			doc.Type = "PRESCRIPTION"
-			if string(doc.Medications) == "[]" {
-				doc.Type = "STUDY_ORDERS"
-			}
-		} else {
-			if err := s.workspaces.Feature(ctx, tx, user, "PRESCRIPTIONS"); err != nil {
-				return err
-			}
-			record, err := ownedPrescription(ctx, tx, user, patientID, id)
-			var failure *api.Error
-			if errors.As(err, &failure) && failure.Code == "PRESCRIPTION_NOT_FOUND" {
-				return api.Failure(404, "PRESCRIPTION_NOT_FOUND", "No se encontró el documento del paciente.")
-			}
-			if err != nil {
-				return err
-			}
-			doc.Source = "PRESCRIPTION_RECORD"
-			doc.ID = record.ID
-			doc.Code = fmt.Sprintf("RX-%d-%d", id, patientID)
-			doc.at, err = time.Parse(time.RFC3339Nano, record.Created)
-			if err != nil {
-				return err
-			}
-			doc.IssuanceZone = s.documentZone(record.IssuanceZone).String()
-			doc.Type = record.Type
-			doc.Diagnosis = &record.Diagnosis
-			doc.Instructions = &record.Instructions
-			doc.Orders = record.Orders
-			doc.Author.UserID = record.Author
-			var specialty string
-			err = tx.QueryRow(ctx, "SELECT s.display_name FROM doctor_specialty_contexts c JOIN specialties s ON s.id=c.specialty_id WHERE c.id=$1", patient.ContextID).Scan(&specialty)
-			if err == nil {
-				doc.Author.Specialty = &specialty
-			} else if !errors.Is(err, pgx.ErrNoRows) {
-				return err
-			}
-			doc.Medications, err = json.Marshal(record.Medications)
-			if err != nil {
-				return err
-			}
-		}
-		if string(doc.Medications) == "[]" && len(doc.Orders) == 0 {
-			return api.Failure(400, "EMPTY_DOCUMENT", "El documento no tiene medicamentos ni estudios registrados para imprimir.")
-		}
-		if err := s.detail(ctx, tx, &patient); err != nil {
-			return err
-		}
-		birth, err := time.Parse("2006-01-02", patient.BirthDate)
-		if err != nil {
-			return err
-		}
-		local := doc.at.In(s.documentZone(doc.IssuanceZone))
-		reference := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.UTC)
-		doc.Patient = printPatient{patient.ID, patient.FullName, patient.NationalID, patient.BirthDate, printAge(birth, reference), patient.Insurance}
-		doc.Issued = api.FormatInstant(doc.at)
-		return nil
+		return s.readPrintable(ctx, tx, user, patientID, id, encounter, &doc)
 	})
 	return doc, err
 }
+
+func (s *Service) readPrintable(ctx context.Context, tx pgx.Tx, user string, patientID, id int64, encounter bool, doc *printDocument) error {
+	patient, err := ownedPatient(ctx, tx, user, patientID)
+	if err != nil {
+		return err
+	}
+	if err := s.workspaces.Feature(ctx, tx, user, "PRINT_DOCUMENT"); err != nil {
+		return err
+	}
+	if encounter {
+		record, err := scanEncounter(tx.QueryRow(ctx, "SELECT "+encounterColumns+encounterFrom+"WHERE e.id=$1 AND e.patient_id=$2", id, patientID))
+		if errors.Is(err, pgx.ErrNoRows) {
+			return api.Failure(404, "ENCOUNTER_NOT_FOUND", "No se encontró el documento del paciente.")
+		}
+		if err != nil {
+			return err
+		}
+		doc.Source = "ENCOUNTER"
+		doc.ID = record.ID
+		doc.version = record.Version
+		doc.Code = fmt.Sprintf("HC-%d-%d", id, patientID)
+		doc.at = record.instant
+		var origin map[string]any
+		if err := json.Unmarshal(record.Context, &origin); err != nil {
+			return err
+		}
+		zone, _ := origin["zone"].(string)
+		doc.IssuanceZone = s.documentZone(zone).String()
+		doc.Author = printAuthor{UserID: patient.owner, Specialty: &record.Specialty.Name}
+		doc.DiagnosisCode = record.DiagnosisCode
+		doc.Diagnosis = record.Diagnosis
+		doc.Instructions = record.FollowUp
+		if len(record.Prescriptions) == 0 || string(record.Prescriptions) == "null" {
+			doc.Medications = json.RawMessage("[]")
+		} else {
+			var medications []map[string]any
+			if err := json.Unmarshal(record.Prescriptions, &medications); err != nil {
+				return err
+			}
+			normalized := []map[string]any{}
+			for _, item := range medications {
+				fields := map[string]any{}
+				for _, key := range []string{"medicationName", "dosage", "administrationRoute", "frequency", "durationDays", "instructions"} {
+					fields[key] = item[key]
+				}
+				normalized = append(normalized, fields)
+			}
+			doc.Medications, err = json.Marshal(normalized)
+			if err != nil {
+				return err
+			}
+		}
+		doc.Orders = []string{}
+		if len(record.Orders) > 0 && string(record.Orders) != "null" {
+			if err := json.Unmarshal(record.Orders, &doc.Orders); err != nil {
+				return err
+			}
+		}
+		doc.Type = "PRESCRIPTION"
+		if string(doc.Medications) == "[]" {
+			doc.Type = "STUDY_ORDERS"
+		}
+	} else {
+		if err := s.workspaces.Feature(ctx, tx, user, "PRESCRIPTIONS"); err != nil {
+			return err
+		}
+		record, err := ownedPrescription(ctx, tx, user, patientID, id)
+		var failure *api.Error
+		if errors.As(err, &failure) && failure.Code == "PRESCRIPTION_NOT_FOUND" {
+			return api.Failure(404, "PRESCRIPTION_NOT_FOUND", "No se encontró el documento del paciente.")
+		}
+		if err != nil {
+			return err
+		}
+		doc.Source = "PRESCRIPTION_RECORD"
+		doc.ID = record.ID
+		doc.version = record.version
+		doc.Code = fmt.Sprintf("RX-%d-%d", id, patientID)
+		doc.at, err = time.Parse(time.RFC3339Nano, record.Created)
+		if err != nil {
+			return err
+		}
+		doc.IssuanceZone = s.documentZone(record.IssuanceZone).String()
+		doc.Type = record.Type
+		doc.Diagnosis = &record.Diagnosis
+		doc.Instructions = &record.Instructions
+		doc.Orders = record.Orders
+		doc.Author.UserID = record.Author
+		var specialty string
+		err = tx.QueryRow(ctx, "SELECT s.display_name FROM doctor_specialty_contexts c JOIN specialties s ON s.id=c.specialty_id WHERE c.id=$1", patient.ContextID).Scan(&specialty)
+		if err == nil {
+			doc.Author.Specialty = &specialty
+		} else if !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+		doc.Medications, err = json.Marshal(record.Medications)
+		if err != nil {
+			return err
+		}
+	}
+	if string(doc.Medications) == "[]" && len(doc.Orders) == 0 {
+		return api.Failure(400, "EMPTY_DOCUMENT", "El documento no tiene medicamentos ni estudios registrados para imprimir.")
+	}
+	if err := s.detail(ctx, tx, &patient); err != nil {
+		return err
+	}
+	birth, err := time.Parse("2006-01-02", patient.BirthDate)
+	if err != nil {
+		return err
+	}
+	local := doc.at.In(s.documentZone(doc.IssuanceZone))
+	reference := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.UTC)
+	doc.Patient = printPatient{patient.ID, patient.FullName, patient.NationalID, patient.BirthDate, printAge(birth, reference), patient.Insurance}
+	doc.Issued = api.FormatInstant(doc.at)
+	return nil
+}
 func (s *Service) PrintRoutes(mux *http.ServeMux) {
+	s.documentRoutes(mux)
 	handler := func(encounter, pdf bool) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			var err error
@@ -199,6 +208,7 @@ func (s *Service) PrintRoutes(mux *http.ServeMux) {
 				api.WriteError(w, err)
 				return
 			}
+			accessReference(r.Context(), &id, &patientID, &doc.version)
 			if !pdf {
 				api.WriteJSON(w, 200, doc)
 				return

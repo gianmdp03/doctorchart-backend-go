@@ -33,6 +33,12 @@ func rollbackClinicalTx(ctx context.Context, tx pgx.Tx) error {
 // Query context also works for multipart/files/PDF without new CORS headers.
 func (s *Service) handle(mux *http.ServeMux, pattern string, fn http.HandlerFunc) {
 	mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
+		var audit *accessWriter
+		if operation := accessOperations[pattern]; operation != "" {
+			audit = s.accessBoundary(w, r, operation)
+			w = audit
+			r = r.WithContext(context.WithValue(r.Context(), accessKey{}, audit))
+		}
 		values := r.URL.Query()["specialtyContextId"]
 		if len(values) != 1 || values[0] == "" {
 			api.WriteError(w, api.Failure(400, "SPECIALTY_CONTEXT_REQUIRED", "Indicá el contexto clínico de la solicitud."))
@@ -58,6 +64,9 @@ func (s *Service) handle(mux *http.ServeMux, pattern string, fn http.HandlerFunc
 		if setup == nil {
 			api.WriteError(w, api.Failure(404, "SPECIALTY_CONTEXT_NOT_FOUND", "El contexto clínico no está disponible."))
 			return
+		}
+		if audit != nil {
+			audit.contextID = &id
 		}
 		if !setup.Completed || len(setup.Definition) == 0 {
 			api.WriteError(w, api.Failure(409, "ONBOARDING_REQUIRED", "Terminá la configuración de esta especialidad antes de atender."))

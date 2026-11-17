@@ -1,6 +1,6 @@
 # Contexto de este repositorio
 
-Backend DoctorChart: servicio doctorchart, base doctorchart, propietario doctorchart_app, puerto interno 8083. Preservar siempre los cambios locales del propietario. El bootstrap del código desplegado reconstruye el esquema sobre una base vacía.
+Backend DoctorChart: servicio doctorchart, base doctorchart, puerto interno 8083. El código vigente usa `doctorchart_app` como rol restringido de ejecución. El propietario efectivo de la base y del esquema en el VPS requiere comprobación antes de operar.
 
 # Operación del VPS ByCode
 
@@ -49,7 +49,7 @@ No inferir que se despliegan con Compose ni inventar una plataforma de hosting.
 - Publicación del puerto: 127.0.0.1:55432 hacia 5432 del contenedor.
 - Volumen compartido: postgres-data, montado en /var/lib/postgresql.
 - Pointly: base pointly, propietario/usuario pointly_app.
-- DoctorChart: base doctorchart, propietario/usuario doctorchart_app.
+- DoctorChart: base doctorchart. La referencia histórica identificó `doctorchart_app` como propietario o usuario. El binario vigente exige que este rol de ejecución carezca de propiedad de tablas, creación de esquema y bypass de RLS. El laboratorio usa un propietario separado para `init-db`. La configuración efectiva del VPS queda pendiente de comprobación.
 - Ambos conectan con DATABASE_URL a postgres:5432 desde la red Docker.
 - Billing usa DB_URL y puede usar DB_USERNAME/DB_PASSWORD. Su nombre de base y
   propietario productivos deben inspeccionarse, no deducirse de los defaults locales.
@@ -187,22 +187,22 @@ Confirmar el producto y alcance del pedido actual, y la identidad del contenedor
 base y propietario. Respaldar cuando corresponda al pedido; no añadir confirmaciones
 repetidas si el propietario ya autorizó expresamente ese wipe.
 
-Las aplicaciones tienen bootstrap de esquema antes de atender HTTP/jobs. Una base
-vacía se reconstruye al iniciar el backend. No ejecutar schema.sql manualmente ni
+La inicialización de DoctorChart se ejecuta con `init-db` y el propietario del
+esquema antes de arrancar el API con su usuario restringido. No ejecutar schema.sql manualmente ni
 alterar app_schema_state/checksums para adoptar una base incompatible.
 La política y excepciones de AGENTS.md de cada proyecto mandan sobre el esquema.
 
-Ejemplo acotado a los dos productos cuyas identidades fueron verificadas.
+El ejemplo siguiente sólo aplica a Pointly. DoctorChart requiere comprobar
+primero el propietario separado y el procedimiento de inicialización.
 Elegir service explícitamente; no agregar otros productos a esta lista sin
 identificar antes su base real:
 
 ~~~bash
 (
 set -eu
-service=doctorchart
+service=pointly
 
 case "$service" in
-  doctorchart) database=doctorchart; owner=doctorchart_app ;;
   pointly) database=pointly; owner=pointly_app ;;
   *) printf '%s\n' 'Servicio sin identidad de base verificada'; exit 1 ;;
 esac

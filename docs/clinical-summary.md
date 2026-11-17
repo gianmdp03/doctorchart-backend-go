@@ -3,12 +3,12 @@
 El resumen es una vista de lectura alimentada por los datos del paciente y sus
 consultas. No tiene un formulario paralelo de alergias, enfermedades ni medicación.
 
-## Bloque común a todas las especialidades
+## Bloque de antecedentes por especialidad
 
-`sys_clinical_history` (Antecedentes clínicos) pertenece al sistema y aparece en
-los formularios de paciente y consulta. Su categoría, campos, etiquetas y opciones
-no pueden modificarse, desactivarse ni eliminarse. El editor permite consultar
-su estructura y explica su función. El servidor valida la definición canónica.
+`sys_clinical_history` (Antecedentes clínicos) puede estar presente en los
+formularios de paciente y consulta. El médico puede editar, desactivar o quitar
+el bloque. El servidor valida la definición y reconoce los campos de abajo para
+armar el resumen cuando están visibles.
 
 Campos estables:
 
@@ -44,6 +44,14 @@ existente `personal_history.clinicalHistoryDates`. Una edición de teléfono u o
 dato filiatorio no altera esas fechas. Las consultas usan su fecha clínica. Los
 antecedentes sin fecha permanecen identificados como tales.
 
+El resumen evalúa cada respuesta contra la visibilidad de su propio snapshot y
+sus respuestas de control guardadas. Cambiar el wizard afecta las capturas
+futuras. Una observación histórica visible al registrarse sigue disponible en
+su registro y puede contribuir al resumen. Una respuesta almacenada cuando el
+campo estaba oculto queda fuera del resumen. Las altas descartan las respuestas
+de campos ocultos y las ediciones conservan el valor previo de esos campos sin
+admitir cambios mientras estén ocultos. Las lecturas no reescriben los registros.
+
 Se muestran además hasta cinco diagnósticos distintos registrados en consultas,
 con enlace y fecha, expresamente como de vigencia a revisar. Un diagnóstico
 histórico no se convierte automáticamente en un problema activo. Tampoco se
@@ -58,12 +66,10 @@ registrada requiere revisar el carnet.
 No cambia ninguna tabla, columna, índice, constraint, baseline, checksum ni
 fingerprint. No hay migraciones ni reconstrucciones que ejecutar.
 
-Las configuraciones anteriores se complementan en memoria con el bloque común al
-leerlas. No se reescriben masivamente las configuraciones de los médicos ni se
-alteran los seeds administrados. Los snapshots clínicos existentes se leen sin
-reescribirlos. Al guardar una edición explícita se conserva el formulario original
-y se incorpora el bloque común si faltaba. Los clientes anteriores que omiten
-secciones clínicas en una edición no borran esas respuestas.
+Al leer configuraciones anteriores se normalizan en memoria los bloqueos del
+antiguo bloque común. Un bloque ausente sigue ausente. Al editar, se usa el
+formulario guardado. Los clientes anteriores que omiten secciones de
+antecedentes en una edición conservan esas respuestas.
 
 Los registros y el endpoint de perfil de la implementación anterior se mantienen
 por compatibilidad y conservación de datos. La interfaz ya no usa ese endpoint

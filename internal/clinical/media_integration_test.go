@@ -111,6 +111,7 @@ func TestManagedStudyHTTPRecoveryAndRetention(t *testing.T) {
 	service.files = files
 	mux := http.NewServeMux()
 	service.StudyRoutes(mux)
+	service.Routes(mux)
 	secret := strings.Repeat("g", 64)
 	handler := api.Gateway(secret, api.Dispatch(mux))
 	request := func(method, path, owner string, body io.Reader, contentType string) *httptest.ResponseRecorder {
@@ -182,13 +183,42 @@ func TestManagedStudyHTTPRecoveryAndRetention(t *testing.T) {
 	if response := request("GET", filePath, "integrity-other", nil, ""); response.Code != 404 {
 		t.Fatalf("other owner accessed clinical file: %d", response.Code)
 	}
-	response = request("DELETE", fmt.Sprintf("%s/%d", base, first.ID), "integrity-owner", nil, "")
+	response = request("DELETE", fmt.Sprintf("%s/%d", base, first.ID), "integrity-owner", strings.NewReader(`{"reason":"Carga de prueba anulada"}`), "application/json")
 	if response.Code != 204 {
 		t.Fatalf("delete: %d %s", response.Code, response.Body.String())
 	}
 	var queued bool
-	if err := pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM study_file_deletions WHERE storage_key=$1)", assetID).Scan(&queued); err != nil || !queued {
-		t.Fatal("durable retirement intent missing", queued, err)
+	if err := pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM study_file_deletions WHERE storage_key=$1)", assetID).Scan(&queued); err != nil || queued {
+		t.Fatal("historical file must not be queued", queued, err)
+	}
+	archivedPath := fmt.Sprintf("/api/doctorchart/patients/%d/revisions/studies/%d/file", patient.ID, first.ID)
+	if w := request("GET", filePath, "integrity-owner", nil, ""); w.Code != 404 {
+		t.Fatal("annulled file remained visible as current", w.Code)
+	}
+	if w := request("GET", archivedPath, "integrity-owner", nil, ""); w.Code != 200 || !bytes.Equal(w.Body.Bytes(), original) {
+		t.Fatal("annulled file was not retained", w.Code)
+	}
+	if w := request("GET", archivedPath, "integrity-other", nil, ""); w.Code != 404 {
+		t.Fatal("other owner accessed the archived file", w.Code)
+	}
+	var authorizedDownloads int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM clinical_access_events
+		WHERE actor_user_id='integrity-owner' AND patient_id=$1 AND entity_id=$2 AND outcome='AUTHORIZED'
+		  AND ((operation='STUDY_DOWNLOAD' AND record_version=0) OR
+		       (operation='ARCHIVED_STUDY_DOWNLOAD' AND record_version=1))`, patient.ID, first.ID).
+		Scan(&authorizedDownloads); err != nil || authorizedDownloads != 2 {
+		t.Fatal("missing current or historical download access event", authorizedDownloads, err)
+	}
+	if _, err := pool.Exec(ctx, "ALTER TABLE clinical_access_events ADD CONSTRAINT fixture_access_unavailable CHECK (false) NOT VALID"); err != nil {
+		t.Fatal(err)
+	}
+	blockedFile := request("GET", archivedPath, "integrity-owner", nil, "")
+	if blockedFile.Code != 503 || blockedFile.Header().Get("Content-Type") != "application/json" ||
+		blockedFile.Header().Get("Content-Disposition") != "" || bytes.Contains(blockedFile.Body.Bytes(), original) {
+		t.Fatal("historical download released file content or metadata after audit failure", blockedFile.Code)
+	}
+	if _, err := pool.Exec(ctx, "ALTER TABLE clinical_access_events DROP CONSTRAINT fixture_access_unavailable"); err != nil {
+		t.Fatal(err)
 	}
 	objects, err := common.NewObjects(cfg.Objects)
 	if err != nil {
@@ -198,8 +228,8 @@ func TestManagedStudyHTTPRecoveryAndRetention(t *testing.T) {
 		t.Fatal("retention removed physical clinical bytes", err)
 	}
 	retired, err := (common.Catalog{DB: catalogDB}).Get(ctx, assetID)
-	if err != nil || retired.Status != common.PendingDelete || retired.DeleteAfter == nil || retired.DeleteAfter.Before(retired.UpdatedAt.Add(72*time.Hour)) {
-		t.Fatal("retirement bypassed recovery window", retired, err)
+	if err != nil || retired.Status != common.Associated || retired.DeleteAfter != nil {
+		t.Fatal("clinical annulment retired the associated archive", retired, err)
 	}
 	// A second upload survives a simulated restoration that loses SQL references.
 	second := upload()
