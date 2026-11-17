@@ -219,7 +219,9 @@ func (s *Service) availabilityFor(w http.ResponseWriter, r *http.Request, user s
 	}
 	q := r.URL.Query()
 	for key, values := range q {
-		if (key != "from" && key != "days" && key != "specialtyContextId") || len(values) != 1 {
+		known := key == "from" || key == "days" || key == "specialtyContextId"
+		includeHours := public == nil && key == "includeHours" && len(values) == 1 && values[0] == "true"
+		if (!known && !includeHours) || len(values) != 1 {
 			return api.Invalid("Parámetros de disponibilidad inválidos.")
 		}
 	}
@@ -232,6 +234,7 @@ func (s *Service) availabilityFor(w http.ResponseWriter, r *http.Request, user s
 		return field("days", "INVALID_RANGE")
 	}
 	ctx := r.Context()
+	includeHours := staffFrom(ctx) != nil || (public == nil && q.Get("includeHours") == "true")
 	selectedContext := q.Get("specialtyContextId")
 	if selectedContext != "" {
 		if _, err = decimal(selectedContext, true); err != nil {
@@ -359,7 +362,17 @@ func (s *Service) availabilityFor(w http.ResponseWriter, r *http.Request, user s
 			}
 		}
 		slots = filtered
-		result = append(result, AvailabilityDay{Date: date.Format("2006-01-02"), Slots: removeOccupiedSlots(slots, occupied)})
+		day := AvailabilityDay{Date: date.Format("2006-01-02"), Slots: removeOccupiedSlots(slots, occupied)}
+		if includeHours && clinic.Status == "ACTIVE" && agenda.Configured {
+			for _, hours := range agenda.rangesOn(date) {
+				if readyContexts[hours.ContextID] && (selectedContext == "" || selectedContext == hours.ContextID) {
+					day.Hours = append(day.Hours, staffAgendaHours{Start: hours.Start, End: hours.End})
+				}
+			}
+			exception := agenda.exceptionOn(date)
+			day.Closed = exception != nil && len(exception.Ranges) == 0
+		}
+		result = append(result, day)
 	}
 	if public != nil {
 		api.WriteJSON(w, 200, map[string]any{"timezone": clinic.Timezone, "days": result})

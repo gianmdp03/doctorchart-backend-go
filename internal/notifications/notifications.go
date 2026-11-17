@@ -42,18 +42,21 @@ type Service struct {
 	origin string
 }
 type Message struct {
-	Date      time.Time `json:"date"`
-	To        string    `json:"to"`
-	Doctor    string    `json:"doctor,omitempty"`
-	Clinic    string    `json:"clinic,omitempty"`
-	Specialty string    `json:"specialty,omitempty"`
-	Address   string    `json:"address,omitempty"`
-	Timezone  string    `json:"timezone,omitempty"`
-	Start     time.Time `json:"start,omitempty"`
-	Reference string    `json:"reference,omitempty"`
-	Code      string    `json:"code,omitempty"`
-	Expires   time.Time `json:"expires,omitempty"`
+	Date        time.Time `json:"date"`
+	To          string    `json:"to"`
+	Doctor      string    `json:"doctor,omitempty"`
+	Clinic      string    `json:"clinic,omitempty"`
+	Specialty   string    `json:"specialty,omitempty"`
+	Address     string    `json:"address,omitempty"`
+	Timezone    string    `json:"timezone,omitempty"`
+	Start       time.Time `json:"start,omitempty"`
+	Reference   string    `json:"reference,omitempty"`
+	Code        string    `json:"code,omitempty"`
+	Expires     time.Time `json:"expires,omitempty"`
+	StaffOrigin string    `json:"staffOrigin,omitempty"`
 }
+
+const staffInvitationKeyPrefix = "staff-invitation:"
 
 func Token() string {
 	var raw [32]byte
@@ -227,6 +230,11 @@ func (s *Service) Code(ctx context.Context, id string) (string, time.Time, error
 	raw, err := s.open(data, "booking:"+id)
 	return string(raw), expires, err
 }
+func (s *Service) Invitation(ctx context.Context, tx pgx.Tx, access, email, code, origin string, expires time.Time) error {
+	return s.enqueue(ctx, tx, staffInvitationKeyPrefix+Hash(code), "STAFF_INVITATION", nil, nil, access, nil, time.Now().UTC(),
+		Message{To: email, Code: code, StaffOrigin: origin, Expires: expires})
+}
+
 func (s *Service) Recovery(ctx context.Context, tx pgx.Tx, account, email string) error {
 	id, code := uuid(), Token()
 	expires := time.Now().UTC().Add(15 * time.Minute)

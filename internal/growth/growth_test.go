@@ -309,3 +309,19 @@ func TestInvalidConvertedHeightNeverProducesBMI(t *testing.T) {
 		t.Fatal("recumbent school-age height was silently converted")
 	}
 }
+
+func TestAdolescentHeightCanBeEvaluatedAfterCorrectingPosition(t *testing.T) {
+	r := references(t)
+	height := 110.0
+	definition := Catalog()[10]
+	observation := Observation{AgeDays: 4912, Height: &height, Mode: "RECUMBENT"}
+	recorded := r.Point(definition, observation)
+	if recorded == nil || recorded.Evaluation != nil || recorded.Value != height {
+		t.Fatalf("unsupported posture should preserve height without evaluating: %+v", recorded)
+	}
+	observation.Mode = "STANDING"
+	corrected := r.Point(definition, observation)
+	if corrected == nil || corrected.Evaluation == nil || corrected.Value != height || corrected.AdjustmentCm != 0 {
+		t.Fatalf("standing posture should evaluate the original height: %+v", corrected)
+	}
+}

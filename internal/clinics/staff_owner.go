@@ -242,6 +242,12 @@ func (s *Service) staffOwnerWrite(w http.ResponseWriter, r *http.Request, user, 
 	if err != nil {
 		return err
 	}
+	emailQueued := op == "invite" && s.notices != nil
+	if emailQueued {
+		if err = s.notices.Invitation(r.Context(), tx, id, req.Email, code, s.staffOrigin, expiry); err != nil {
+			return err
+		}
+	}
 	if err = staffAudit(r.Context(), tx, "", id, "OWNER_"+strings.ToUpper(op)); err != nil {
 		return err
 	}
@@ -249,7 +255,7 @@ func (s *Service) staffOwnerWrite(w http.ResponseWriter, r *http.Request, user, 
 		return err
 	}
 	if op == "invite" {
-		api.WriteJSON(w, 201, map[string]any{"id": id, "invitationCode": code, "expiresAt": expiry})
+		api.WriteJSON(w, 201, map[string]any{"id": id, "invitationCode": code, "expiresAt": expiry, "emailQueued": emailQueued})
 	} else if op == "revoke" {
 		w.WriteHeader(204)
 	} else {

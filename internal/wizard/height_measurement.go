@@ -7,9 +7,17 @@ import (
 
 const heightMeasurementModeKey = "heightMeasurementMode"
 
-// WithHeightMeasurementMode pairs the optional position with the numeric height field
-// of a new encounter. Existing encounter snapshots keep their original definition.
-func WithHeightMeasurementMode(form map[string]any) map[string]any {
+// DefaultStandingHeight records the measurement workflow for new encounters.
+// Explicit positions from existing API clients take precedence.
+func (e Evaluation) DefaultStandingHeight() {
+	if e.Projections["encounter.heightCm"] != nil && e.Values[heightMeasurementModeKey] == nil {
+		e.Values[heightMeasurementModeKey] = "STANDING"
+	}
+}
+
+// NewEncounterForm prepares measurement metadata and makes legacy appointment
+// dates optional. Existing encounters keep their saved definitions.
+func NewEncounterForm(form map[string]any) map[string]any {
 	next := maps.Clone(form)
 	categories := append([]any{}, list(form["categories"])...)
 	target, height := -1, -1
@@ -22,11 +30,20 @@ func WithHeightMeasurementMode(form map[string]any) map[string]any {
 		fields = slices.DeleteFunc(fields, func(raw any) bool {
 			return text(object(raw)["key"]) == heightMeasurementModeKey
 		})
+		for j, rawField := range fields {
+			field := object(rawField)
+			switch text(field["key"]) {
+			case "followUpDate", "encounter.followUpDate":
+				optional := maps.Clone(field)
+				optional["required"] = false
+				fields[j] = optional
+			}
+		}
 		if target < 0 || !flag(object(categories[target])["enabled"]) && flag(category["enabled"]) {
 			for j, rawField := range fields {
 				field := object(rawField)
 				key := text(field["key"])
-				if field["type"] == "NUMBER" && (key == "heightCm" || key == "height") {
+				if field["type"] == "NUMBER" && (key == "heightCm" || key == "height" || key == "encounter.heightCm") {
 					target, height = i, j
 					break
 				}

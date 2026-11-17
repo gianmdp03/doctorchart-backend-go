@@ -245,7 +245,7 @@ func (s *Service) CreateEncounter(ctx context.Context, identity api.Identity, re
 		if !ok {
 			return api.Failure(409, "INVALID_WIZARD_DEFINITION", "La configuración no es válida.")
 		}
-		form = wizard.WithHeightMeasurementMode(form)
+		form = wizard.NewEncounterForm(form)
 		context, err := s.encounterContext(ctx, tx, p, date, nil)
 		if err != nil {
 			return err
@@ -254,6 +254,7 @@ func (s *Service) CreateEncounter(ctx context.Context, identity api.Identity, re
 		if err != nil {
 			return err
 		}
+		evaluation.DefaultStandingHeight()
 		e := Encounter{EncounterSummary: EncounterSummary{ContextID: p.ContextID, PatientID: p.ID, PatientName: p.FullName, Date: date.Format(time.RFC3339Nano), SpecialtyID: setup.Specialty.ID, Specialty: setup.Specialty, Type: kind, Prescriptions: json.RawMessage("[]"), WorkspaceVersion: setup.Version}, Secondary: json.RawMessage("[]"), Orders: json.RawMessage("[]"), instant: date, owner: identity.UserID}
 		form = wizard.WithClinicalHistory(form)
 		e.Snapshot, err = json.Marshal(form)

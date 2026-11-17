@@ -99,7 +99,9 @@ func (r *References) Point(d Definition, o Observation) *Point {
 		if !ok {
 			if (d.Indicator == "LENGTH" || d.Indicator == "HEIGHT") && positive(o.Height) {
 				note := "Posición de medición sin confirmar: valor registrado, sin evaluación OMS."
-				if o.Mode == "RECUMBENT" || o.Mode == "STANDING" {
+				if o.Mode == "RECUMBENT" && o.AgeDays > 1856 {
+					note = "La talla figura como medida acostado. La referencia OMS para esta edad usa la estatura de pie."
+				} else if o.Mode == "RECUMBENT" || o.Mode == "STANDING" {
 					note = "La medida o su posición no permite la conversión OMS para esta edad; se conserva el valor registrado sin evaluación."
 				}
 				return &Point{Observation: o, X: x, Value: *o.Height, Note: note}

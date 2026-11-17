@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -195,6 +196,38 @@ func TestStaffMultipleOwnersIndependentPermissionsAndClinicalBoundary(t *testing
 	w = httptest.NewRecorder()
 	f.handler.ServeHTTP(w, r)
 	assertCode(t, w, 401, "STAFF_UNAUTHENTICATED")
+}
+
+func TestStaffAvailabilityIncludesConfiguredHoursBeyondBookingHorizon(t *testing.T) {
+	f, c, start := staffFixture(t)
+	_, code := staffInvite(t, f, owner, c, []string{"view"})
+	client := staffActivateTest(t, f, code)
+	from := start.AddDate(0, 0, -7).Format("2006-01-02")
+	path := "/clinics/" + c.ID + "/availability?from=" + from + "&days=1"
+	w := staffReq(f, client, "GET", "/owners/"+owner+path, nil)
+	assertCode(t, w, 200, "")
+	var result struct{ Days []AvailabilityDay }
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Days) != 1 || len(result.Days[0].Slots) != 0 ||
+		len(result.Days[0].Hours) != 1 || result.Days[0].Hours[0] != (staffAgendaHours{Start: "09:00", End: "12:00"}) {
+		t.Fatal("staff hours must remain visible independently of reservable slots", result.Days)
+	}
+	w = f.request("GET", path, owner, "")
+	assertCode(t, w, 200, "")
+	if strings.Contains(w.Body.String(), `"hours"`) {
+		t.Fatal("doctor availability without an explicit request must retain the default response")
+	}
+	w = f.request("GET", path+"&includeHours=true", owner, "")
+	assertCode(t, w, 200, "")
+	var doctor struct{ Days []AvailabilityDay }
+	if err := json.Unmarshal(w.Body.Bytes(), &doctor); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(result.Days, doctor.Days) {
+		t.Fatalf("doctor and staff availability differ: staff=%+v doctor=%+v", result.Days, doctor.Days)
+	}
 }
 func TestStaffConcurrentLastSlotCommercialExpiryAndRevocation(t *testing.T) {
 	f, c, start := staffFixture(t)
