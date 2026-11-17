@@ -227,24 +227,26 @@ func TestNotificationOutboxFailureRollsBackWithM4(t *testing.T) {
 		t.Fatal("partial confirmation committed despite database event failure")
 	}
 }
-func TestNotificationStaffInvitationIsManualAndEmailRecoveryStillWorks(t *testing.T) {
+func TestNotificationStaffInvitationAndEmailRecovery(t *testing.T) {
 	f, c, _, _, n, sender := notificationFixture(t)
+	_, firstCode := staffInvite(t, f, owner, c, []string{"view"})
 	_, code := staffInvite(t, f, owner, c, []string{"view"})
-	if processed, err := n.ProcessOne(t.Context()); err != nil || processed {
-		t.Fatal("manual invitation queued an email", processed, err)
+	processMail(t, n)
+	processMail(t, n)
+	if sender.count() != 1 {
+		t.Fatal("only the most recent invitation should be delivered")
+	}
+	invitation := decodeTestMail(t, sender.messages[0])
+	if !strings.Contains(invitation, staffTestOrigin+"/staff/activate#invite="+code) ||
+		strings.Contains(invitation, firstCode) {
+		t.Fatal("email did not contain the current private activation link")
 	}
 	client := staffActivateTest(t, f, code)
 	assertCode(t, staffReq(f, staffTestClient{}, "POST", "/recovery-email", map[string]string{"email": "assistant@example.invalid"}), 202, "")
 	processMail(t, n)
 	// Only decrypt the captured test mailbox's MIME body, never query a plaintext token.
-	message := string(sender.messages[0])
-	parts := strings.SplitN(message, "\r\n\r\n", 2)
-	raw, err := base64.StdEncoding.DecodeString(strings.ReplaceAll(parts[1], "\r\n", ""))
-	if err != nil {
-		t.Fatal(err)
-	}
 	var emailCode string
-	for _, line := range strings.Split(string(raw), "\r\n") {
+	for _, line := range strings.Split(decodeTestMail(t, sender.messages[1]), "\r\n") {
 		if len(line) == 43 {
 			emailCode = line
 			break
@@ -262,6 +264,19 @@ func TestNotificationStaffInvitationIsManualAndEmailRecoveryStillWorks(t *testin
 		assertCode(t, staffReq(f, staffTestClient{}, "POST", "/recovery-email", map[string]string{"email": "unknown@example.invalid"}), 202, "")
 	}
 	assertCode(t, staffReq(f, staffTestClient{}, "POST", "/recovery-email", map[string]string{"email": "unknown@example.invalid"}), 429, "STAFF_RATE_LIMITED")
+}
+
+func decodeTestMail(t *testing.T, message []byte) string {
+	t.Helper()
+	_, body, ok := strings.Cut(string(message), "\r\n\r\n")
+	if !ok {
+		t.Fatal("missing MIME body")
+	}
+	raw, err := base64.StdEncoding.DecodeString(strings.ReplaceAll(body, "\r\n", ""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(raw)
 }
 
 func TestNotificationPublicRecoveryRateAndNoReferenceOverride(t *testing.T) {
@@ -295,9 +310,11 @@ func TestNotificationAttendedReservationsAndLegacyInvitationsNeverSend(t *testin
 		t.Fatal("attended booking sent obsolete confirmation/reminder")
 	}
 	access, _ := staffInvite(t, f, owner, c, []string{"view"})
+	assertCode(t, f.request("DELETE", "/secretaries/"+access, owner, ""), 204, "")
 	if _, err := f.pool.Exec(t.Context(), "INSERT INTO notification_outbox(dedup_key,kind,access_id,payload,due_at) VALUES('legacy-invitation','STAFF_INVITATION',$1,$2,now())", access, []byte("legacy payload")); err != nil {
 		t.Fatal(err)
 	}
+	processMail(t, n)
 	processMail(t, n)
 	var state string
 	if err := f.pool.QueryRow(t.Context(), "SELECT state FROM notification_outbox WHERE dedup_key='legacy-invitation'").Scan(&state); err != nil || state != "OBSOLETE" || sender.count() != 0 {
@@ -309,6 +326,7 @@ func TestNotificationConcurrentEmailRecoveryTokensAreSingleUse(t *testing.T) {
 	f, c, _, _, n, sender := notificationFixture(t)
 	_, code := staffInvite(t, f, owner, c, []string{"view"})
 	_ = staffActivateTest(t, f, code)
+	processMail(t, n)
 	assertCode(t, staffReq(f, staffTestClient{}, "POST", "/recovery-email", map[string]string{"email": "assistant@example.invalid"}), 202, "")
 	processMail(t, n)
 	parts := strings.SplitN(string(sender.messages[0]), "\r\n\r\n", 2)

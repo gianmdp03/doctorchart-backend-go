@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/mail"
 	"net/smtp"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -101,7 +102,20 @@ func (s *Service) render(kind, key string, m Message) ([]byte, error) {
 		return nil, errors.New("invalid recipient")
 	}
 	subject, text := "", ""
-	if kind == "STAFF_RECOVERY" {
+	if kind == "STAFF_INVITATION" {
+		link, err := url.Parse(m.StaffOrigin)
+		if err != nil || link.Scheme != "https" || link.Host == "" || link.User != nil ||
+			link.Path != "" || link.RawQuery != "" || link.ForceQuery || link.Fragment != "" || len(m.Code) != 43 {
+			return nil, errors.New("invalid staff invitation")
+		}
+		link.Path = "/staff/activate"
+		link.Fragment = "invite=" + m.Code
+		subject = "Invitación a la agenda de DoctorChart"
+		text = "Un profesional te invitó a gestionar su agenda en DoctorChart.\n\n" +
+			"Aceptá la invitación desde este enlace privado:\n" + link.String() +
+			"\n\nEl enlace es de un solo uso y vence el " + m.Expires.UTC().Format("02/01/2006 15:04") +
+			" UTC. Si ya tenés cuenta de secretaría, usá tu contraseña actual."
+	} else if kind == "STAFF_RECOVERY" {
 		subject = "Recuperación de acceso a Doctor Chart"
 		text = "Recibimos una solicitud para recuperar tu acceso local de secretaría.\nAbrí " + s.origin + "/staff/recover y elegí recuperación por email. Ingresá este código:\n\n" + m.Code + "\n\nVence en 15 minutos. Si no lo solicitaste, ignorá este correo: tu contraseña y sesiones no fueron modificadas. Nunca compartas contraseñas ni tu código personal de recuperación."
 	} else {

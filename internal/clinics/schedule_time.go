@@ -41,8 +41,15 @@ type AvailableSlot struct {
 	End                time.Time `json:"end"`
 }
 type AvailabilityDay struct {
-	Date  string          `json:"date"`
-	Slots []AvailableSlot `json:"slots"`
+	Date   string             `json:"date"`
+	Slots  []AvailableSlot    `json:"slots"`
+	Hours  []staffAgendaHours `json:"hours,omitempty"`
+	Closed bool               `json:"closed,omitempty"`
+}
+
+type staffAgendaHours struct {
+	Start string `json:"start"`
+	End   string `json:"end"`
 }
 
 func civilDate(raw string) (time.Time, error) {
@@ -149,12 +156,20 @@ func (c ScheduleConfig) Validate() error {
 	}
 	return nil
 }
-func (c ScheduleConfig) rangesOn(date time.Time) []ScheduleRange {
+func (c ScheduleConfig) exceptionOn(date time.Time) *ScheduleException {
 	key := date.Format("2006-01-02")
-	for _, e := range c.Exceptions {
-		if key >= e.From && key <= e.Through {
-			return e.Ranges
+	for i := range c.Exceptions {
+		exception := &c.Exceptions[i]
+		if key >= exception.From && key <= exception.Through {
+			return exception
 		}
+	}
+	return nil
+}
+
+func (c ScheduleConfig) rangesOn(date time.Time) []ScheduleRange {
+	if exception := c.exceptionOn(date); exception != nil {
+		return exception.Ranges
 	}
 	weekday := (int(date.Weekday())+6)%7 + 1
 	for _, d := range c.Weekly {
