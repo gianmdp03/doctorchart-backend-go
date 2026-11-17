@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -216,7 +217,16 @@ func TestStaffAvailabilityIncludesConfiguredHoursBeyondBookingHorizon(t *testing
 	w = f.request("GET", path, owner, "")
 	assertCode(t, w, 200, "")
 	if strings.Contains(w.Body.String(), `"hours"`) {
-		t.Fatal("staff availability metadata must be scoped to the delegated endpoint")
+		t.Fatal("doctor availability without an explicit request must retain the default response")
+	}
+	w = f.request("GET", path+"&includeHours=true", owner, "")
+	assertCode(t, w, 200, "")
+	var doctor struct{ Days []AvailabilityDay }
+	if err := json.Unmarshal(w.Body.Bytes(), &doctor); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(result.Days, doctor.Days) {
+		t.Fatalf("doctor and staff availability differ: staff=%+v doctor=%+v", result.Days, doctor.Days)
 	}
 }
 func TestStaffConcurrentLastSlotCommercialExpiryAndRevocation(t *testing.T) {
