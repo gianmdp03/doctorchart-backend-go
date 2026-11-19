@@ -165,6 +165,9 @@ func (s *Service) updateSchedule(w http.ResponseWriter, r *http.Request, user st
 	if !snapshot.ClinicManagement {
 		return api.Failure(403, "CLINIC_MANAGEMENT_DISABLED", "Tu cobertura no habilita la gestión de consultorios.")
 	}
+	if err = appointmentRight(snapshot, current.Modality == teleconsultation); err != nil {
+		return err
+	}
 	var count int64
 	if err = tx.QueryRow(ctx, "SELECT count(*) FROM clinics WHERE workspace_id=$1 AND status<>'ARCHIVED' AND modality='IN_PERSON'", workspace).Scan(&count); err != nil {
 		return err

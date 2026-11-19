@@ -37,11 +37,13 @@ func (r *Rules) InvalidateEntitlements(ctx context.Context) error {
 const rulesRefreshInterval = time.Minute
 const rulesMaxAge = 10 * time.Minute
 
+var patientLimitsByPlan = map[string]int{"BASIC": 300, "PRO": 1000, "UNLIMITED": -1}
+
 func New(url string) *Rules {
 	return &Rules{url: strings.TrimSuffix(url, "/") + "/api/billing/limits/DOCTORCHART", client: &http.Client{Timeout: 6 * time.Second}, tiers: map[string]map[string]any{
-		"BASIC":     {"max_patients": 50, "max_records_per_patient": 100},
-		"PRO":       {"max_patients": 500, "max_records_per_patient": 1000},
-		"UNLIMITED": {"max_patients": -1, "max_records_per_patient": -1},
+		"BASIC":     {"max_patients": patientLimitsByPlan["BASIC"], "max_records_per_patient": 100},
+		"PRO":       {"max_patients": patientLimitsByPlan["PRO"], "max_records_per_patient": 1000},
+		"UNLIMITED": {"max_patients": patientLimitsByPlan["UNLIMITED"], "max_records_per_patient": -1},
 	}}
 }
 
@@ -235,6 +237,14 @@ func (r *Rules) Int(tier, key string, fallback int) int {
 		}
 	}
 	return fallback
+}
+
+func (r *Rules) PatientLimit(plan string) int {
+	fallback, ok := patientLimitsByPlan[plan]
+	if !ok {
+		fallback = patientLimitsByPlan["BASIC"]
+	}
+	return r.Int(plan, "max_patients", fallback)
 }
 
 func Plan(value string) string {

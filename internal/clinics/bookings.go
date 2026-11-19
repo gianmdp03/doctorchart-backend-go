@@ -492,6 +492,9 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 		if err != nil {
 			return err
 		}
+		if err = appointmentRight(snapshot, clinic.Modality == teleconsultation); err != nil {
+			return err
+		}
 		if clinic.Modality != teleconsultation && *snapshot.MaxClinics != -1 && count > *snapshot.MaxClinics {
 			if public != nil {
 				return publicDenied()
@@ -545,6 +548,15 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 			return slotUnavailable()
 		}
 		if op == "create" {
+			if p := snapshot.PlanPolicy; p != nil && p.MaxAppointments >= 0 {
+				var used int64
+				if err = tx.QueryRow(ctx, "SELECT count(*) FROM bookings WHERE workspace_id=$1 AND status IN ('CONFIRMED','CHECKED_IN') AND end_at>clock_timestamp()", workspace).Scan(&used); err != nil {
+					return err
+				}
+				if used >= p.MaxAppointments {
+					return api.Failure(409, "APPOINTMENT_LIMIT_REACHED", "Se alcanzó el cupo de turnos activos de la cobertura.")
+				}
+			}
 			status = 201
 			result, err = scanBooking(tx.QueryRow(ctx, "INSERT INTO bookings AS b(workspace_id,clinic_id,start_at,end_at,contact_name,contact_phone,attendee_name,specialty_context_id,specialty_snapshot,clinic_snapshot,provenance) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING "+bookingColumns, workspace, clinic.ID, start, end, request.ContactName, request.ContactPhone, request.AttendeeName, slot.contextID, json.RawMessage(specialty), json.RawMessage(clinicSnapshot), json.RawMessage(provenance)))
 		} else {

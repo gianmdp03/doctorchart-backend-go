@@ -79,7 +79,7 @@ func run() error {
 		files.SetCatalog(mediaDB)
 	}
 	rules := billing.New(c.BillingURL)
-	entitlements := billing.NewEntitlements(pool, c.BillingURL, c.BillingSecret)
+	entitlements := billing.NewEntitlements(pool, c.BillingURL, c.BillingSecret).WithPlanPolicy()
 	rules.SetInvalidator(entitlements.Invalidate)
 	rules.Load(startup)
 	mux := http.NewServeMux()

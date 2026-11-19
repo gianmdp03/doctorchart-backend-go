@@ -258,7 +258,7 @@ func (s *Service) capabilities(w http.ResponseWriter, r *http.Request, user stri
 	if err == nil {
 		ent["revision"], ent["validUntil"], ent["clinicManagement"], ent["max_clinics"] = snapshot.Revision, snapshot.ValidUntil, snapshot.ClinicManagement, snapshot.MaxClinics
 		ent["status"], reason = "DENIED", "CLINIC_MANAGEMENT_DISABLED"
-		if snapshot.ClinicManagement {
+		if snapshot.ClinicManagement && snapshot.AllowsAppointments() {
 			ent["status"], reason = "VERIFIED", nil
 			max := *snapshot.MaxClinics
 			over := max != -1 && count > max
@@ -269,8 +269,22 @@ func (s *Service) capabilities(w http.ResponseWriter, r *http.Request, user stri
 				reason = "CLINIC_LIMIT_REACHED"
 			}
 		}
+		if snapshot.ClinicManagement && !snapshot.AllowsAppointments() {
+			actions["deactivate"], actions["archive"] = true, true
+			reason = "APPOINTMENTS_DISABLED"
+		}
 	}
 	api.WriteJSON(w, 200, map[string]any{"entitlements": ent, "usage": map[string]int64{"counted": count}, "actions": actions, "reason": reason})
+	return nil
+}
+
+func appointmentRight(snapshot billing.Snapshot, virtual bool) error {
+	if !snapshot.AllowsAppointments() {
+		return api.Failure(403, "APPOINTMENTS_DISABLED", "Tu cobertura no habilita la agenda de turnos.")
+	}
+	if virtual && !snapshot.AllowsTeleconsultation() {
+		return api.Failure(403, "TELECONSULTATION_DISABLED", "Tu cobertura no habilita teleconsultas.")
+	}
 	return nil
 }
 
@@ -432,6 +446,11 @@ func (s *Service) mutate(w http.ResponseWriter, r *http.Request, user, op string
 		return api.Failure(403, "CLINIC_MANAGEMENT_DISABLED", "Tu cobertura no habilita la gestión de consultorios.")
 	}
 	virtual := fields["modality"] == teleconsultation || current.Modality == teleconsultation
+	if op != "status" || fields["status"] == "ACTIVE" || current.Status == "ARCHIVED" && fields["status"] == "INACTIVE" {
+		if err = appointmentRight(snapshot, virtual); err != nil {
+			return err
+		}
+	}
 	if virtual {
 		if contextIDs != nil {
 			return field("specialtyContextIds", "UNEXPECTED_FIELD")

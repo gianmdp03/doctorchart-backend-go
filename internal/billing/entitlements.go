@@ -22,22 +22,39 @@ import (
 var ErrEntitlementsUnavailable = errors.New("effective entitlements unavailable")
 
 type Snapshot struct {
-	SecretaryManagement *bool      `json:"secretaryManagement,omitempty"`
-	OnlineBooking       *bool      `json:"onlineBooking,omitempty"`
-	OwnerID             string     `json:"ownerId"`
-	Module              string     `json:"module"`
-	Revision            string     `json:"revision"`
-	IssuedAt            time.Time  `json:"issuedAt"`
-	ValidUntil          time.Time  `json:"validUntil"`
-	CoverageExpiresAt   *time.Time `json:"coverageExpiresAt"`
-	ClinicManagement    bool       `json:"clinicManagement"`
-	MaxClinics          *int64     `json:"max_clinics"`
+	PlanPolicy          *PlanPolicy `json:"planPolicy,omitempty"`
+	SecretaryManagement *bool       `json:"secretaryManagement,omitempty"`
+	OnlineBooking       *bool       `json:"onlineBooking,omitempty"`
+	OwnerID             string      `json:"ownerId"`
+	Module              string      `json:"module"`
+	Revision            string      `json:"revision"`
+	IssuedAt            time.Time   `json:"issuedAt"`
+	ValidUntil          time.Time   `json:"validUntil"`
+	CoverageExpiresAt   *time.Time  `json:"coverageExpiresAt"`
+	ClinicManagement    bool        `json:"clinicManagement"`
+	MaxClinics          *int64      `json:"max_clinics"`
 	generation          int64
+}
+
+type PlanPolicy struct {
+	AppointmentsEnabled     bool  `json:"appointmentsEnabled"`
+	MaxAppointments         int64 `json:"maxAppointments"`
+	TeleconsultationEnabled bool  `json:"teleconsultationEnabled"`
+	MaxSecretaries          int64 `json:"maxSecretaries"`
+}
+
+func (s Snapshot) AllowsAppointments() bool {
+	return s.PlanPolicy == nil || s.PlanPolicy.AppointmentsEnabled
+}
+
+func (s Snapshot) AllowsTeleconsultation() bool {
+	return s.AllowsAppointments() && (s.PlanPolicy == nil || s.PlanPolicy.TeleconsultationEnabled)
 }
 
 // Memory holds only signed, bounded leases. PostgreSQL fences invalidation
 // across instances and requests already in flight. Restart means empty cache.
 type Entitlements struct {
+	v4           bool
 	v3           bool
 	v2           bool
 	pool         *pgxpool.Pool
@@ -63,6 +80,14 @@ func (s Snapshot) valid(owner string, now time.Time) bool {
 	}
 	if s.OnlineBooking != nil && *s.OnlineBooking && !s.ClinicManagement {
 		return false
+	}
+	if p := s.PlanPolicy; p != nil {
+		if p.MaxAppointments < -1 || p.MaxAppointments > 2147483647 || p.MaxSecretaries < -1 || p.MaxSecretaries > 2147483647 {
+			return false
+		}
+		if !s.ClinicManagement && *p != (PlanPolicy{}) {
+			return false
+		}
 	}
 	if s.ClinicManagement {
 		return s.CoverageExpiresAt != nil && !s.ValidUntil.After(*s.CoverageExpiresAt) && s.CoverageExpiresAt.After(now) && s.MaxClinics != nil && *s.MaxClinics >= -1 && *s.MaxClinics <= 2147483647
@@ -92,6 +117,9 @@ func (e *Entitlements) Resolve(ctx context.Context, owner string) (Snapshot, err
 	}
 	if e.v3 {
 		endpoint = "/entitlements-v3"
+	}
+	if e.v4 {
+		endpoint = "/entitlements-v4"
 	}
 	req, err := http.NewRequestWithContext(ctx, "GET", e.base+"/internal/doctorchart/owners/"+url.PathEscape(owner)+endpoint, nil)
 	if err != nil {
@@ -125,6 +153,9 @@ func (e *Entitlements) Resolve(ctx context.Context, owner string) (Snapshot, err
 	if e.v3 {
 		expectedFields = 10
 	}
+	if e.v4 {
+		expectedFields = 11
+	}
 	if json.Unmarshal(body, &required) != nil || len(required) != expectedFields {
 		return Snapshot{}, ErrEntitlementsUnavailable
 	}
@@ -146,6 +177,17 @@ func (e *Entitlements) Resolve(ctx context.Context, owner string) (Snapshot, err
 	}
 	if e.v3 && snapshot.SecretaryManagement == nil {
 		return Snapshot{}, ErrEntitlementsUnavailable
+	}
+	if e.v4 {
+		var policy map[string]json.RawMessage
+		if snapshot.PlanPolicy == nil || json.Unmarshal(required["planPolicy"], &policy) != nil || len(policy) != 4 {
+			return Snapshot{}, ErrEntitlementsUnavailable
+		}
+		for _, key := range []string{"appointmentsEnabled", "maxAppointments", "teleconsultationEnabled", "maxSecretaries"} {
+			if raw := policy[key]; raw == nil || string(raw) == "null" {
+				return Snapshot{}, ErrEntitlementsUnavailable
+			}
+		}
 	}
 	if !snapshot.valid(owner, e.now()) {
 		return Snapshot{}, ErrEntitlementsUnavailable
@@ -191,13 +233,25 @@ func (e *Entitlements) Invalidate(ctx context.Context) error {
 
 // PublicBookings uses a separate signed v2 lease cache; v1 remains strict/legacy compatible.
 func (e *Entitlements) PublicBookings() *Entitlements {
+	if e.v4 {
+		return e
+	}
 	next := NewEntitlements(e.pool, e.base, e.secret)
 	next.v2 = true
 	return next
 }
 
 func (e *Entitlements) Secretaries() *Entitlements {
+	if e.v4 {
+		return e
+	}
 	next := e.PublicBookings()
 	next.v3 = true
+	return next
+}
+
+func (e *Entitlements) WithPlanPolicy() *Entitlements {
+	next := e.Secretaries()
+	next.v4 = true
 	return next
 }

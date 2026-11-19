@@ -433,7 +433,7 @@ func (s *Service) CreatePatient(ctx context.Context, identity api.Identity, requ
 			if err := tx.QueryRow(ctx, "SELECT public.patient_quota_count()").Scan(&count); err != nil {
 				return err
 			}
-			max := s.rules.Int(plan, "max_patients", 50)
+			max := s.rules.PatientLimit(plan)
 			if max != -1 && count >= int64(max) {
 				return api.Failure(403, "FORBIDDEN", "No se pudo completar la solicitud.")
 			}

@@ -157,19 +157,29 @@ func (s *Service) staffOwnerWrite(w http.ResponseWriter, r *http.Request, user, 
 	if _, err = tx.Exec(r.Context(), "SELECT id FROM doctor_workspaces WHERE id=$1 FOR UPDATE", workspace); err != nil {
 		return err
 	}
+	if op != "revoke" {
+		if err = s.staffRights.Fence(r.Context(), tx, snapshot); err != nil {
+			return unavailable()
+		}
+	}
 	id := r.PathValue("id")
 	var version string
 	if op == "invite" {
 		id = newOpaqueID()
 
 		var existing, savedPhone string
-		var activated bool
-		err = tx.QueryRow(r.Context(), "SELECT id::text,account_id IS NOT NULL,phone FROM staff_access WHERE workspace_id=$1 AND email=$2", workspace, req.Email).Scan(&existing, &activated, &savedPhone)
+		var activated, active bool
+		err = tx.QueryRow(r.Context(), "SELECT id::text,account_id IS NOT NULL,active,phone FROM staff_access WHERE workspace_id=$1 AND email=$2", workspace, req.Email).Scan(&existing, &activated, &active, &savedPhone)
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			return err
 		}
 		if activated {
 			return api.Failure(409, "STAFF_ACCESS_EXISTS", "La relación ya está activada. Editala desde la lista.")
+		}
+		if !active {
+			if quotaErr := staffSeatAvailable(r.Context(), tx, workspace, snapshot); quotaErr != nil {
+				return quotaErr
+			}
 		}
 		if req.Phone != savedPhone {
 			phone, valid := telephone.Normalize(req.Phone)
@@ -190,7 +200,8 @@ func (s *Service) staffOwnerWrite(w http.ResponseWriter, r *http.Request, user, 
 		}
 
 	} else {
-		err = tx.QueryRow(r.Context(), "SELECT version::text FROM staff_access WHERE id=$1 AND workspace_id=$2 FOR UPDATE", id, workspace).Scan(&version)
+		var active bool
+		err = tx.QueryRow(r.Context(), "SELECT version::text,active FROM staff_access WHERE id=$1 AND workspace_id=$2 FOR UPDATE", id, workspace).Scan(&version, &active)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return staffForbidden()
 		}
@@ -200,6 +211,11 @@ func (s *Service) staffOwnerWrite(w http.ResponseWriter, r *http.Request, user, 
 		if op == "edit" {
 			if version != req.ExpectedVersion {
 				return api.Failure(409, "VERSION_CONFLICT", "La asignación cambió. Recargá la lista.")
+			}
+			if !active {
+				if err = staffSeatAvailable(r.Context(), tx, workspace, snapshot); err != nil {
+					return err
+				}
 			}
 			_, err = tx.Exec(r.Context(), "UPDATE staff_access SET permissions=$1,active=true,version=version+1 WHERE id=$2", req.Permissions, id)
 		} else {
@@ -273,6 +289,21 @@ func (s *Service) staffOwnerWrite(w http.ResponseWriter, r *http.Request, user, 
 				break
 			}
 		}
+	}
+	return nil
+}
+
+func staffSeatAvailable(ctx context.Context, tx pgx.Tx, workspace int64, snapshot billing.Snapshot) error {
+	p := snapshot.PlanPolicy
+	if p == nil || p.MaxSecretaries < 0 {
+		return nil
+	}
+	var used int64
+	if err := tx.QueryRow(ctx, "SELECT count(*) FROM staff_access WHERE workspace_id=$1 AND active", workspace).Scan(&used); err != nil {
+		return err
+	}
+	if used >= p.MaxSecretaries {
+		return api.Failure(409, "SECRETARY_LIMIT_REACHED", "Se alcanzó el cupo de secretarías activas de tu cobertura.")
 	}
 	return nil
 }

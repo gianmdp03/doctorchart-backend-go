@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/jackc/pgx/v5"
-	"github.com/syntah/doctorchart-backend-go/internal/api"
 	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/syntah/doctorchart-backend-go/internal/api"
+	"github.com/syntah/doctorchart-backend-go/internal/billing"
 )
 
 type PublicQuestion struct {
@@ -101,25 +103,25 @@ func (s *Service) readPublicDoctor(ctx context.Context, q scheduleReader, id str
 	}
 	return d, nil
 }
-func (s *Service) onlineRights(ctx context.Context, owner string) error {
+func (s *Service) onlineRights(ctx context.Context, owner string) (billing.Snapshot, error) {
 	snap, err := s.publicRights.Resolve(ctx, owner)
 	if err != nil {
-		return unavailable()
+		return snap, unavailable()
 	}
-	if !snap.ClinicManagement || snap.OnlineBooking == nil || !*snap.OnlineBooking {
-		return publicDenied()
+	if !snap.ClinicManagement || snap.OnlineBooking == nil || !*snap.OnlineBooking || !snap.AllowsAppointments() {
+		return snap, publicDenied()
 	}
 	if snap.MaxClinics == nil {
-		return unavailable()
+		return snap, unavailable()
 	}
 	var count int64
 	if err = s.pool.QueryRow(ctx, "SELECT count(*) FROM clinics c JOIN doctor_workspaces w ON c.workspace_id=w.id WHERE w.user_id=$1 AND c.status<>'ARCHIVED' AND c.modality='IN_PERSON'", owner).Scan(&count); err != nil {
-		return err
+		return snap, err
 	}
 	if *snap.MaxClinics != -1 && count > *snap.MaxClinics {
-		return publicDenied()
+		return snap, publicDenied()
 	}
-	return nil
+	return snap, nil
 }
 func (s *Service) publicProfile(w http.ResponseWriter, r *http.Request) error {
 	d, err := s.readPublicDoctor(r.Context(), s.pool, r.PathValue("publicId"))
@@ -129,8 +131,15 @@ func (s *Service) publicProfile(w http.ResponseWriter, r *http.Request) error {
 	if !d.published || len(d.Clinics) == 0 {
 		return publicMissing()
 	}
-	if err = s.onlineRights(r.Context(), d.owner); err != nil {
+	snap, err := s.onlineRights(r.Context(), d.owner)
+	if err != nil {
 		return err
+	}
+	if !snap.AllowsTeleconsultation() {
+		filterPublicOffers(&d, inPerson, "", "", "", "")
+		if len(d.Clinics) == 0 {
+			return publicMissing()
+		}
 	}
 	api.WriteJSON(w, 200, d)
 	return nil
@@ -196,14 +205,22 @@ func (s *Service) publicDirectory(w http.ResponseWriter, r *http.Request) error 
 		if e != nil {
 			return e
 		}
-		if e = s.onlineRights(r.Context(), d.owner); e != nil {
+		snap, e := s.onlineRights(r.Context(), d.owner)
+		if e != nil {
 			if failure, ok := e.(*api.Error); ok && failure.Status == 403 {
 				continue
 			}
 			return e
 		}
+		modality := q.Get("modality")
+		if !snap.AllowsTeleconsultation() {
+			if modality == teleconsultation {
+				continue
+			}
+			modality = inPerson
+		}
 		if d.published && len(d.Clinics) > 0 {
-			filterPublicOffers(&d, q.Get("modality"), q.Get("specialty"), q.Get("country"), q.Get("province"), q.Get("city"))
+			filterPublicOffers(&d, modality, q.Get("specialty"), q.Get("country"), q.Get("province"), q.Get("city"))
 			if len(d.Clinics) > 0 {
 				result = append(result, d)
 			}
@@ -335,7 +352,7 @@ func (s *Service) putPublication(w http.ResponseWriter, r *http.Request, user st
 		keys[q.Key] = true
 	}
 	if p.Published {
-		if err := s.onlineRights(r.Context(), user); err != nil {
+		if _, err := s.onlineRights(r.Context(), user); err != nil {
 			return err
 		}
 	}
@@ -360,7 +377,7 @@ func (s *Service) putPublication(w http.ResponseWriter, r *http.Request, user st
 		if e = s.publicRights.Fence(ctx, tx, snap); e != nil {
 			return unavailable()
 		}
-		if snap.OnlineBooking == nil || !*snap.OnlineBooking {
+		if snap.OnlineBooking == nil || !*snap.OnlineBooking || !snap.AllowsAppointments() {
 			return publicDenied()
 		}
 	}

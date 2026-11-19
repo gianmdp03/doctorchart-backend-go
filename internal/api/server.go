@@ -49,7 +49,7 @@ func BaseRoutes(mux *http.ServeMux, rules *billing.Rules, billingSecret string, 
 			w.WriteHeader(503)
 			return
 		}
-		WriteJSON(w, 200, map[string]any{"plan": plan, "limits": map[string]int{"max_patients": rules.Int(plan, "max_patients", 50), "max_records_per_patient": rules.Int(plan, "max_records_per_patient", 100)}})
+		WriteJSON(w, 200, map[string]any{"plan": plan, "limits": map[string]int{"max_patients": rules.PatientLimit(plan), "max_records_per_patient": rules.Int(plan, "max_records_per_patient", 100)}})
 	})
 	webhook := func(w http.ResponseWriter, r *http.Request) {
 		if strings.TrimSpace(billingSecret) == "" {

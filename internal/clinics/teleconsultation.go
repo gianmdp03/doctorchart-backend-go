@@ -102,6 +102,11 @@ func (s *Service) setTeleconsultation(w http.ResponseWriter, r *http.Request, us
 	if !snapshot.ClinicManagement {
 		return api.Failure(403, "CLINIC_MANAGEMENT_DISABLED", "Tu cobertura no habilita la gestión de teleconsultas.")
 	}
+	if enabled {
+		if err = appointmentRight(snapshot, true); err != nil {
+			return err
+		}
+	}
 	updated, err := tx.Exec(ctx, `
 	 UPDATE doctor_specialty_contexts SET teleconsultation_enabled=$3
 	 WHERE id=$1 AND workspace_id=$2 AND onboarding_completed AND definition IS NOT NULL`, contextID, workspace, enabled)

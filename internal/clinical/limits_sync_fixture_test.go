@@ -34,7 +34,12 @@ func TestLimitsSyncDoctorChartFixture(t *testing.T) {
 	if !filepath.IsAbs(ready) {
 		t.Fatal("absolute readiness file required")
 	}
-	services, _ := integrityFixture(t, 50, 100)
+	services, pool := integrityFixture(t, 50, 100)
+	var specialtyContextID int64
+	if err := pool.QueryRow(t.Context(), `SELECT c.id FROM doctor_specialty_contexts c
+		JOIN doctor_workspaces w ON w.id=c.workspace_id WHERE w.user_id='integrity-owner'`).Scan(&specialtyContextID); err != nil {
+		t.Fatal(err)
+	}
 	var failNext atomic.Bool
 	client := &http.Client{Timeout: 3 * time.Second}
 	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -87,7 +92,7 @@ func TestLimitsSyncDoctorChartFixture(t *testing.T) {
 		app := servers[i]
 		t.Cleanup(func() { app.CloseClientConnections(); app.Close() })
 	}
-	data, err := json.Marshal(map[string]string{"url": servers[0].URL, "replica": servers[1].URL})
+	data, err := json.Marshal(map[string]any{"url": servers[0].URL, "replica": servers[1].URL, "specialtyContextId": specialtyContextID})
 	if err != nil {
 		t.Fatal(err)
 	}

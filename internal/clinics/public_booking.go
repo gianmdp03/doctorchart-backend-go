@@ -107,7 +107,7 @@ func (a *publicAdmission) check(ctx context.Context, tx pgx.Tx, s *Service, work
 	if a.management == "status" {
 		return nil
 	}
-	if snap.OnlineBooking == nil || !*snap.OnlineBooking || !snap.ClinicManagement {
+	if snap.OnlineBooking == nil || !*snap.OnlineBooking || !snap.ClinicManagement || !snap.AllowsAppointments() {
 		return publicDenied()
 	}
 	current, err := s.readPublicDoctor(ctx, tx, a.doctorID)
@@ -277,8 +277,12 @@ func (s *Service) publicAvailability(w http.ResponseWriter, r *http.Request) err
 	if !d.published {
 		return publicMissing()
 	}
-	if err = s.onlineRights(r.Context(), d.owner); err != nil {
+	snap, err := s.onlineRights(r.Context(), d.owner)
+	if err != nil {
 		return err
+	}
+	if !snap.AllowsTeleconsultation() {
+		filterPublicOffers(&d, inPerson, "", "", "", "")
 	}
 	var id string
 	err = s.pool.QueryRow(r.Context(), "SELECT clinic_id::text FROM clinic_publications WHERE public_id=$1 AND workspace_id=$2 AND enabled", r.PathValue("publicClinicId"), d.workspace).Scan(&id)
