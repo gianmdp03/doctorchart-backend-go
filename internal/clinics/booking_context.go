@@ -58,7 +58,7 @@ func resolveBookingSlot(ctx context.Context, q scheduleReader, clinic Clinic, st
 	for _, slot := range slots {
 		if slot.Start.Equal(start) && slot.blockID != "" && slot.contextID != "" {
 			var ready bool
-			if err = q.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM doctor_specialty_contexts WHERE id=$1 AND onboarding_completed AND definition IS NOT NULL)", slot.contextID).Scan(&ready); err != nil {
+			if err = q.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM doctor_specialty_contexts WHERE id=$1 AND onboarding_completed AND definition IS NOT NULL AND ($2='IN_PERSON' OR teleconsultation_enabled))", slot.contextID, clinic.Modality).Scan(&ready); err != nil {
 				return AvailableSlot{}, err
 			}
 			if !ready {

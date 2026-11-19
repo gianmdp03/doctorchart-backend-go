@@ -30,7 +30,7 @@ La base anterior en el volumen `doctorchart-local-actual_postgres-data` se conse
 
 Antes de reinicializar, respaldá PostgreSQL, `turnos/storage`, `turnos/settings.json`, las claves y la configuración local. Un respaldo físico con `pg_basebackup` conserva el fingerprint del catálogo. Verificalo con `pg_verifybackup` y ensayá la restauración en una copia aislada de la misma versión de PostgreSQL. La contraseña de PostgreSQL está en el campo `database` de `settings.json`.
 
-Las invitaciones y los correos de turnos se capturan en Mailpit con SMTP STARTTLS. El adaptador es exclusivo de desarrollo. Usa cuentas locales, JWT firmado y permisos comerciales simulados. La validación de Google OAuth, cobros y servicios externos requiere sus entornos propios.
+Las invitaciones y los correos de recuperación de secretaría se capturan en Mailpit con SMTP STARTTLS. Los turnos públicos muestran su constancia en pantalla. El adaptador es exclusivo de desarrollo. Usa cuentas locales, JWT firmado y permisos comerciales simulados. La validación de Google OAuth, cobros y servicios externos requiere sus entornos propios.
 
 Las pruebas Go de integración se pueden ejecutar en contenedores Linux con PostgreSQL descartable para evitar avisos del firewall de Windows. Consultá las [pruebas del esquema inicial](../../db/README.md).
 

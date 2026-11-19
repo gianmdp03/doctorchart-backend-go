@@ -207,7 +207,14 @@ func PublicAppointments(method, p string) bool {
 	if method == "GET" {
 		return len(parts) == 2 && parts[1] == "doctors" || len(parts) == 3 && parts[1] == "doctors" && publicUUID.MatchString(parts[2]) || len(parts) == 6 && parts[1] == "doctors" && publicUUID.MatchString(parts[2]) && parts[3] == "clinics" && publicUUID.MatchString(parts[4]) && parts[5] == "availability"
 	}
-	return method == "POST" && (len(parts) == 2 && (parts[1] == "challenge" || parts[1] == "confirmation") || len(parts) == 4 && parts[1] == "doctors" && publicUUID.MatchString(parts[2]) && parts[3] == "bookings")
+	if method != http.MethodPost {
+		return false
+	}
+	switch strings.Join(parts[1:], "/") {
+	case "challenge", "access/request", "access/verify", "my-bookings", "my-bookings/change", "my-bookings/logout":
+		return true
+	}
+	return len(parts) == 4 && parts[1] == "doctors" && publicUUID.MatchString(parts[2]) && parts[3] == "bookings"
 }
 
 // StaffRoute is a transport allowlist, not authentication. DoctorChart checks
@@ -245,7 +252,7 @@ func StaffRoute(method, p string) bool {
 		return true
 	}
 	if method == "GET" && len(parts) == 5 && parts[2] == "clinics" && decimal(parts[3]) {
-		return parts[4] == "bookings" || parts[4] == "availability"
+		return parts[4] == "bookings" || parts[4] == "availability" || parts[4] == "booking-form"
 	}
 	if method == "POST" && len(parts) == 3 && parts[2] == "bookings" {
 		return true

@@ -39,11 +39,12 @@ func TestStaffInvitationLinkInspectionAndOptionalPhone(t *testing.T) {
 		var info struct {
 			Email, Name     string
 			ExistingAccount bool
+			Agendas         []string
 		}
 		if err := json.Unmarshal(w.Body.Bytes(), &info); err != nil {
 			t.Fatal(err)
 		}
-		if info.Email != "assistant@example.invalid" || info.Name != "Ana" || info.ExistingAccount {
+		if info.Email != "assistant@example.invalid" || info.Name != "Ana" || info.ExistingAccount || len(info.Agendas) != 1 || info.Agendas[0] != c.Name {
 			t.Fatalf("invalid link information: %s", w.Body)
 		}
 		if w.Header().Get("Cache-Control") != "no-store, private" || w.Header().Get("Referrer-Policy") != "no-referrer" {

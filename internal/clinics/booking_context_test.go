@@ -46,7 +46,7 @@ func TestBookingContextScopedAvailabilityHidesUnassignedClinic(t *testing.T) {
 	}
 }
 
-func TestBookingContextSnapshotsAndPatientLink(t *testing.T) {
+func TestBookingContextSnapshots(t *testing.T) {
 	f, c, start := bookingFixture(t)
 	key := newBookingKey()
 	body := createBookingBody(c.ID, start)
@@ -67,57 +67,22 @@ func TestBookingContextSnapshotsAndPatientLink(t *testing.T) {
 		t.Fatal("mutable data rewrote booking")
 	}
 	assertCode(t, bookingRequestFixture(f, "POST", "/bookings", owner, key, body), 201, "")
-	for _, user := range []string{owner, other} {
-		if _, err := f.pool.Exec(t.Context(), `INSERT INTO patients(user_id,workspace_id,specialty_context_id,full_name,birth_date,form_definition_snapshot,form_values,formula_context,formula_results,updated_at,version,workspace_version)
- SELECT $1::varchar(100),w.id,c.id,'Explicit link fixture','1990-01-01','{}','{}','{}','{}',now(),0,0 FROM doctor_workspaces w JOIN doctor_specialty_contexts c ON c.workspace_id=w.id WHERE w.user_id=$1::varchar(100)`, user); err != nil {
-			t.Fatal(err)
-		}
-	}
-	var patient, foreign string
-	if err := f.pool.QueryRow(t.Context(), "SELECT id::text FROM patients WHERE user_id=$1", owner).Scan(&patient); err != nil {
-		t.Fatal(err)
-	}
-	if err := f.pool.QueryRow(t.Context(), "SELECT id::text FROM patients WHERE user_id=$1", other).Scan(&foreign); err != nil {
-		t.Fatal(err)
-	}
-	link := func(version, id string) string {
-		return fmt.Sprintf(`{"expectedVersion":%q,"patientId":%q}`, version, id)
-	}
-	assertCode(t, bookingRequestFixture(f, "PUT", "/bookings/"+b.ID+"/patient", other, newBookingKey(), link("1", foreign)), 404, "BOOKING_NOT_FOUND")
-	assertCode(t, bookingRequestFixture(f, "PUT", "/bookings/"+b.ID+"/patient", owner, newBookingKey(), link("1", foreign)), 404, "PATIENT_NOT_FOUND")
-	linkKey := newBookingKey()
-	reply = bookingRequestFixture(f, "PUT", "/bookings/"+b.ID+"/patient", owner, linkKey, link("1", patient))
-	assertCode(t, reply, 200, "")
-	linked := booked(t, reply)
-	if linked.PatientID == nil || *linked.PatientID != patient || linked.Version != "2" || linked.Provenance != b.Provenance || linked.Specialty != b.Specialty {
-		t.Fatal("bad explicit link", linked)
-	}
-	assertCode(t, bookingRequestFixture(f, "PUT", "/bookings/"+b.ID+"/patient", owner, linkKey, link("1", patient)), 200, "")
-	assertCode(t, bookingRequestFixture(f, "PUT", "/bookings/"+b.ID+"/patient", owner, newBookingKey(), link("2", patient)), 409, "BOOKING_PATIENT_ALREADY_LINKED")
-	var events int
-	if err := f.pool.QueryRow(t.Context(), "SELECT count(*) FROM booking_events WHERE booking_id=$1 AND kind='PATIENT_LINKED'", b.ID).Scan(&events); err != nil || events != 1 {
-		t.Fatal("link audit", events, err)
-	}
 	// Destination snapshots update explicitly while the specialty snapshot stays historical.
-	reply = bookingRequestFixture(f, "POST", "/bookings/"+b.ID+"/reschedule", owner, newBookingKey(), fmt.Sprintf(`{"expectedVersion":"2","clinicId":%q,"start":%q}`, c.ID, start.Add(time.Hour).Format(time.RFC3339)))
+	reply = bookingRequestFixture(f, "POST", "/bookings/"+b.ID+"/reschedule", owner, newBookingKey(), fmt.Sprintf(`{"expectedVersion":"1","clinicId":%q,"start":%q}`, c.ID, start.Add(time.Hour).Format(time.RFC3339)))
 	assertCode(t, reply, 200, "")
 	moved := booked(t, reply)
 	if moved.Specialty != b.Specialty || moved.ContextID != b.ContextID || moved.ClinicSnapshot.Name != "Renamed clinic" || moved.Provenance.BlockID != b.Provenance.BlockID {
 		t.Fatal("reschedule lost history", moved)
 	}
-	if _, err := f.pool.Exec(t.Context(), "UPDATE patients SET annulled_at=now() WHERE id=$1", patient); err != nil {
-		t.Fatal(err)
-	}
-	assertCode(t, bookingRequestFixture(f, "PATCH", "/bookings/"+b.ID+"/status", owner, newBookingKey(), `{"expectedVersion":"3","status":"CANCELLED"}`), 200, "")
+	assertCode(t, bookingRequestFixture(f, "PATCH", "/bookings/"+b.ID+"/status", owner, newBookingKey(), `{"expectedVersion":"2","status":"CANCELLED"}`), 200, "")
 	fresh := booked(t, bookingRequestFixture(f, "POST", "/bookings", owner, newBookingKey(), body))
-	assertCode(t, bookingRequestFixture(f, "PUT", "/bookings/"+fresh.ID+"/patient", owner, newBookingKey(), link("1", patient)), 404, "PATIENT_NOT_FOUND")
 	assertCode(t, bookingRequestFixture(f, "PATCH", "/bookings/"+fresh.ID+"/status", owner, newBookingKey(), `{"expectedVersion":"1","status":"CANCELLED"}`), 200, "")
 	agenda := agendaDTO(t, f, c)
 	agenda.Weekly = []ScheduleDay{}
 	agenda.Exceptions = []ScheduleException{}
 	putBlocks(t, f, c, agenda, 200, "")
 	retained := booked(t, f.request("GET", "/bookings/"+b.ID, owner, ""))
-	if retained.Provenance != moved.Provenance || retained.Specialty != b.Specialty || retained.PatientID == nil || *retained.PatientID != patient {
+	if retained.Provenance != moved.Provenance || retained.Specialty != b.Specialty {
 		t.Fatal("deleting retired block erased provenance", retained)
 	}
 }

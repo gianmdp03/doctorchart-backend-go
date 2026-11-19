@@ -28,10 +28,13 @@ func publicFixture(t *testing.T) (*fixture, Clinic, time.Time, Publication) {
 	return f, c, start, p
 }
 func jsonString(value any) string { b, _ := json.Marshal(value); return string(b) }
-func pubRequest(f *fixture, method, path, key string, body any) *httptest.ResponseRecorder {
+func pubRequest(f *fixture, method, path, key string, body any, cookies ...*http.Cookie) *httptest.ResponseRecorder {
 	r := httptest.NewRequest(method, "/api/doctorchart"+path, strings.NewReader(jsonString(body)))
 	r.Header.Set("X-Gateway-Secret", "gateway-fixture")
 	r.Header.Set("X-Public-Client", strings.Repeat("a", 64))
+	for _, cookie := range cookies {
+		r.AddCookie(cookie)
+	}
 	if key != "" {
 		r.Header.Set("Idempotency-Key", key)
 	}
@@ -58,13 +61,16 @@ func publicBody(t *testing.T, f *fixture, p Publication, start time.Time) Public
 			break
 		}
 	}
-	return PublicBookingRequest{ClinicID: doctor.Clinics[0].ID, Start: start.Format(time.RFC3339), FormVersion: p.Version, ContactName: "Solicitante", ContactPhone: "+54 223 1234567", AttendeeName: "Persona atendida", DocumentCountry: "AR", DocumentType: "DNI", Document: "12345678", Email: "synthetic@example.invalid", Answers: map[string]string{"insurance": "Cobertura sintética"}, Challenge: proof.Token, Solution: solution}
+	return PublicBookingRequest{ClinicID: doctor.Clinics[0].ID, Start: start.Format(time.RFC3339), FormVersion: p.Version, ContactName: "Solicitante", ContactPhone: "+54 223 4951234", AttendeeName: "Persona atendida", DocumentCountry: "AR", DocumentType: "DNI", Document: "12345678", Email: "synthetic@example.invalid", Answers: map[string]string{"insurance": "Cobertura sintética"}, Challenge: proof.Token, Solution: solution}
 }
 func TestPublicBookingNoLoginSharedEngineAndSnapshots(t *testing.T) {
 	f, c, start, p := publicFixture(t)
 	path := "/public/appointments/doctors/" + p.PublicID + "/bookings"
 	body := publicBody(t, f, p, start)
 	key := newOpaqueID()
+	invalid := body
+	invalid.ContactPhone = ""
+	assertCode(t, pubRequest(f, "POST", path, key, invalid), 400, "INVALID_REQUEST")
 	w := pubRequest(f, "POST", path, key, body)
 	assertCode(t, w, 201, "")
 	text := w.Body.String()
@@ -91,10 +97,13 @@ func TestPublicBookingNoLoginSharedEngineAndSnapshots(t *testing.T) {
 	assertCode(t, list, 200, "")
 	var page struct{ Items []Booking }
 	json.Unmarshal(list.Body.Bytes(), &page)
-	if len(page.Items) != 1 || page.Items[0].PatientID != nil {
+	if len(page.Items) != 1 {
 		t.Fatal(list.Body.String())
 	}
 	b := page.Items[0]
+	if b.ContactPhone != "+542234951234" {
+		t.Fatalf("stored public contact phone = %q", b.ContactPhone)
+	}
 	if b.ContextID == "" || b.Specialty.Name == "" || b.Provenance.Kind != "SCHEDULE_BLOCK" || response["specialtyName"] != b.Specialty.Name {
 		t.Fatal("public booking lost persisted specialty", b, response)
 	}

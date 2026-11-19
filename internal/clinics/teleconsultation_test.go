@@ -17,7 +17,71 @@ func virtualClinic(t *testing.T, f *fixture) Clinic {
 	if err := json.Unmarshal(w.Body.Bytes(), &clinic); err != nil || clinic.Modality != teleconsultation || clinic.Address != "" {
 		t.Fatal(w.Body.String(), err)
 	}
+	toggleTeleconsultation(t, f, contextID(t, f, owner), true)
 	return clinic
+}
+
+func toggleTeleconsultation(t *testing.T, f *fixture, context string, enabled bool) teleconsultationSetting {
+	t.Helper()
+	w := f.request("PUT", "/teleconsultations/"+context, owner, fmt.Sprintf(`{"enabled":%t}`, enabled))
+	assertCode(t, w, 200, "")
+	var setting teleconsultationSetting
+	if err := json.Unmarshal(w.Body.Bytes(), &setting); err != nil || setting.Enabled != enabled {
+		t.Fatal(w.Body.String(), err)
+	}
+	return setting
+}
+
+func TestFixedTeleconsultationPerSpecialty(t *testing.T) {
+	f, _, start := bookingFixture(t)
+	first := contextID(t, f, owner)
+	foreign := contextID(t, f, other)
+	list := f.request("GET", "/teleconsultations", owner, "")
+	assertCode(t, list, 200, "")
+	if strings.Contains(list.Body.String(), `"clinicId"`) || !strings.Contains(list.Body.String(), `"enabled":false`) {
+		t.Fatal(list.Body.String())
+	}
+	assertCode(t, f.request("PUT", "/teleconsultations/"+foreign, owner, `{"enabled":true}`), 404, "SPECIALTY_CONTEXT_NOT_FOUND")
+	setting := toggleTeleconsultation(t, f, first, true)
+	if setting.ClinicID == "" || toggleTeleconsultation(t, f, first, true).ClinicID != setting.ClinicID {
+		t.Fatal("activation must create one shared virtual clinic")
+	}
+	var second string
+	if err := f.pool.QueryRow(t.Context(), `INSERT INTO doctor_specialty_contexts(workspace_id,created_at,current_step_key,onboarding_completed,definition,updated_at,version,specialty_id)
+		SELECT workspace_id,now(),'COMPLETE',true,'{}',now(),0,(SELECT min(id) FROM specialties WHERE id<>c.specialty_id)
+		FROM doctor_specialty_contexts c WHERE id=$1 RETURNING id::text`, first).Scan(&second); err != nil {
+		t.Fatal(err)
+	}
+	if toggleTeleconsultation(t, f, second, true).ClinicID != setting.ClinicID {
+		t.Fatal("specialties must share the same virtual clinic")
+	}
+	weekday := (int(start.Weekday())+6)%7 + 1
+	path := "/clinics/" + setting.ClinicID + "/schedule"
+	schedule := func(version, secondStart string) string {
+		return fmt.Sprintf(`{"expectedVersion":%q,"minNoticeMinutes":0,"maxAdvanceDays":30,"weekly":[{"weekday":%d,"ranges":[{"start":"15:00","end":"17:00","specialtyContextId":%q,"slotMinutes":30},{"start":%q,"end":"19:00","specialtyContextId":%q,"slotMinutes":30}]}],"exceptions":[]}`, version, weekday, first, secondStart, second)
+	}
+	assertCode(t, f.request("POST", path+"/validate", owner, schedule("0", "16:30")), 400, "INVALID_REQUEST")
+	assertCode(t, f.request("PUT", path, owner, schedule("0", "16:30")), 400, "INVALID_REQUEST")
+	assertCode(t, f.request("PUT", path, owner, schedule("0", "17:00")), 200, "")
+	toggleTeleconsultation(t, f, first, false)
+	availability := "/clinics/" + setting.ClinicID + "/availability?days=1&from=" + start.Format(civilLayout)
+	w := f.request("GET", availability, owner, "")
+	assertCode(t, w, 200, "")
+	if strings.Contains(w.Body.String(), `"specialtyContextId":"`+first+`"`) || !strings.Contains(w.Body.String(), `"specialtyContextId":"`+second+`"`) {
+		t.Fatal(w.Body.String())
+	}
+	at := time.Date(start.Year(), start.Month(), start.Day(), 15, 0, 0, 0, time.UTC)
+	assertCode(t, bookingRequestFixture(f, "POST", "/bookings", owner, newBookingKey(),
+		createBookingBody(setting.ClinicID, at)), 409, "BOOKING_SLOT_UNAVAILABLE")
+	toggleTeleconsultation(t, f, first, true)
+	w = bookingRequestFixture(f, "POST", "/bookings", owner, newBookingKey(), createBookingBody(setting.ClinicID, at))
+	assertCode(t, w, 201, "")
+	booking := booked(t, w)
+	toggleTeleconsultation(t, f, first, false)
+	var status string
+	if err := f.pool.QueryRow(t.Context(), "SELECT status FROM bookings WHERE id=$1", booking.ID).Scan(&status); err != nil || status != "CONFIRMED" {
+		t.Fatalf("existing booking status: %q, error: %v", status, err)
+	}
 }
 
 func TestTeleconsultationUnifiedScheduleAndBookingHistory(t *testing.T) {
@@ -43,6 +107,7 @@ func TestTeleconsultationUnifiedScheduleAndBookingHistory(t *testing.T) {
 		FROM doctor_specialty_contexts c WHERE id=$1 RETURNING id::text`, general).Scan(&second); err != nil {
 		t.Fatal(err)
 	}
+	toggleTeleconsultation(t, f, second, true)
 	weekday := (int(start.Weekday())+6)%7 + 1
 	path := func(c Clinic) string { return "/clinics/" + c.ID + "/schedule" }
 	put := func(c Clinic, version, from, to, context string) *httptest.ResponseRecorder {
@@ -72,6 +137,32 @@ func TestTeleconsultationUnifiedScheduleAndBookingHistory(t *testing.T) {
 		t.Fatal(w.Body.String())
 	}
 	assertCode(t, f.request("GET", path(virtual)+"/occupied?from="+start.Format(civilLayout), other, ""), 404, "CLINIC_NOT_FOUND")
+
+	week := "/occupied?from=" + start.Format(civilLayout)
+	w = f.request("GET", path(virtual)+week+"&specialtyContextId="+general, owner, "")
+	assertCode(t, w, 200, "")
+	var occupied struct{ Items []agendaWindow }
+	if err := json.Unmarshal(w.Body.Bytes(), &occupied); err != nil {
+		t.Fatal(err)
+	}
+	var foundOtherVirtual bool
+	for _, window := range occupied.Items {
+		if window.ClinicID == virtual.ID {
+			if window.ContextID != second {
+				t.Fatalf("unexpected teleconsultation context: %+v", window)
+			}
+			foundOtherVirtual = true
+		}
+	}
+	if !foundOtherVirtual {
+		t.Fatal("other specialty missing from the shared teleconsultation agenda")
+	}
+	w = f.request("GET", path(virtual)+week+"&specialtyContextId="+second, owner, "")
+	assertCode(t, w, 200, "")
+	if strings.Contains(w.Body.String(), `"modality":"TELECONSULTATION"`) {
+		t.Fatal(w.Body.String())
+	}
+	assertCode(t, f.request("GET", path(virtual)+week+"&specialtyContextId="+contextID(t, f, other), owner, ""), 404, "SPECIALTY_CONTEXT_NOT_FOUND")
 
 	w = bookingRequestFixture(f, "POST", "/bookings", owner, newBookingKey(), createBookingBody(physical.ID, start))
 	assertCode(t, w, 201, "")
@@ -155,6 +246,12 @@ func TestTeleconsultationOnlyPublicDirectoryAndPrivateStaffProjection(t *testing
 		t.Fatal(w.Body.String())
 	}
 	assertCode(t, pubRequest(f, "POST", path, key, body), 201, "")
+	toggleTeleconsultation(t, f, contextID(t, f, owner), false)
+	w = pubRequest(f, "GET", directory+"&modality=TELECONSULTATION", "", nil)
+	assertCode(t, w, 200, "")
+	if !strings.Contains(w.Body.String(), `"items":[]`) {
+		t.Fatal(w.Body.String())
+	}
 
 	data, err := staffBookingDocument([]byte(`{"id":"1","patientId":"2","meetingUrl":"private","answers":{"insurance":"synthetic-sensitive-answer"},"clinicalNote":"synthetic-sensitive-note","clinicSnapshot":{"name":"Virtual","modality":"TELECONSULTATION","meetingUrl":"private"},"specialty":{"name":"General","private":"private"}}`))
 	if err != nil || strings.Contains(jsonString(data), "private") || strings.Contains(jsonString(data), "synthetic-sensitive") || !strings.Contains(jsonString(data), "TELECONSULTATION") {

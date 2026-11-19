@@ -1,8 +1,6 @@
 package clinics
 
 import (
-	"encoding/base64"
-	"fmt"
 	"strings"
 	"testing"
 )
@@ -17,69 +15,62 @@ func bookingLinkPatientFixture(t *testing.T, f *fixture) string {
 	}
 	return id
 }
-func TestBookingContextLinkKeepsPendingMessagesAndHistoricalConfirmation(t *testing.T) {
-	f, c, start, p, n, sender := notificationFixture(t)
+func TestBookingLegacyLinkKeepsHistoricalConfirmation(t *testing.T) {
+	f, c, start, p, notices, sender := notificationFixture(t)
 	receipt, b := notificationBooking(t, f, p, start)
 	patient := bookingLinkPatientFixture(t, f)
-	assertCode(t, bookingRequestFixture(f, "PUT", "/bookings/"+b.ID+"/patient", owner, newBookingKey(), fmt.Sprintf(`{"expectedVersion":"1","patientId":%q}`, patient)), 200, "")
+	seedLegacyBookingLink(t, f, b.ID, patient)
 	var count int
-	if err := f.pool.QueryRow(t.Context(), "SELECT count(*) FROM notification_outbox WHERE booking_id=$1", b.ID).Scan(&count); err != nil || count != 2 {
-		t.Fatal("link duplicated/replaced notices", count, err)
+	if err := f.pool.QueryRow(t.Context(), "SELECT count(*) FROM notification_outbox WHERE portal_code_id IS NOT NULL").Scan(&count); err != nil || count != 1 {
+		t.Fatal("link changed the verification queue", count, err)
 	}
 	if _, err := f.pool.Exec(t.Context(), `WITH renamed AS (UPDATE specialties SET display_name='New catalog name' WHERE id=$1), changed_address AS (UPDATE clinic_publications SET address='New public address' WHERE clinic_id=$2) UPDATE clinics SET name='New clinic name',version=version+1 WHERE id=$2`, b.Specialty.ID, c.ID); err != nil {
 		t.Fatal(err)
 	}
-	w := pubRequest(f, "POST", "/public/appointments/confirmation", "", map[string]string{"accessCode": receipt.AccessCode})
+	access := portalVerify(t, f, receipt, portalCodeFromMail(t, notices, sender))
+	w := pubRequest(f, "POST", "/public/appointments/my-bookings", "", struct{}{}, access)
 	assertCode(t, w, 200, "")
 	if !strings.Contains(w.Body.String(), b.Specialty.Name) || !strings.Contains(w.Body.String(), b.ClinicSnapshot.Name) || strings.Contains(w.Body.String(), "New catalog name") || strings.Contains(w.Body.String(), "New clinic name") || strings.Contains(w.Body.String(), "New public address") || strings.Contains(w.Body.String(), "Nombre clínico reservado") {
 		t.Fatal("confirmation depends on mutable or clinical data", w.Body.String())
 	}
-	processMail(t, n)
-	if sender.count() != 1 {
-		t.Fatal("patient link invalidated pending confirmation")
-	}
-	if _, err := f.pool.Exec(t.Context(), "UPDATE notification_outbox SET due_at=clock_timestamp()-interval '1 second' WHERE booking_id=$1 AND kind='BOOKING_REMINDER'", b.ID); err != nil {
+
+}
+
+// Existing installations may still have historical links and old idempotency documents.
+func seedLegacyBookingLink(t *testing.T, f *fixture, booking, patient string) {
+	t.Helper()
+	if _, err := f.pool.Exec(t.Context(), `WITH updated AS (
+		UPDATE bookings SET patient_id=$2,version=version+1,updated_at=clock_timestamp() WHERE id=$1 RETURNING id,version,patient_id
+	) INSERT INTO booking_events(booking_id,version,kind,actor_id,before_document,after_document)
+	SELECT u.id,u.version,'PATIENT_LINKED',$3,e.after_document,e.after_document || jsonb_build_object('patientId',u.patient_id::text)
+	FROM updated u JOIN booking_events e ON e.booking_id=u.id AND e.version=u.version-1`, booking, patient, owner); err != nil {
 		t.Fatal(err)
-	}
-	processMail(t, n)
-	if sender.count() != 2 {
-		t.Fatal("patient link invalidated pending reminder")
-	}
-	sender.mu.Lock()
-	defer sender.mu.Unlock()
-	for _, message := range sender.messages {
-		parts := strings.SplitN(string(message), "\r\n\r\n", 2)
-		if len(parts) != 2 {
-			t.Fatal("invalid MIME fixture")
-		}
-		decoded, err := base64.StdEncoding.DecodeString(strings.TrimSpace(parts[1]))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !strings.Contains(string(decoded), "Especialidad: "+b.Specialty.Name) || strings.Contains(string(decoded), "New catalog name") || strings.Contains(string(decoded), "Nombre clínico reservado") {
-			t.Fatal("notice lost snapshot/privacy")
-		}
 	}
 }
 
-func TestBookingContextPatientLinkRollsBackAndRetries(t *testing.T) {
+func TestBookingLegacyClinicalIDIsExcludedFromReadsAndRetries(t *testing.T) {
 	f, c, start := bookingFixture(t)
-	w := bookingRequestFixture(f, "POST", "/bookings", owner, newBookingKey(), createBookingBody(c.ID, start))
+	key := newBookingKey()
+	body := createBookingBody(c.ID, start)
+	w := bookingRequestFixture(f, "POST", "/bookings", owner, key, body)
 	assertCode(t, w, 201, "")
 	b := booked(t, w)
 	patient := bookingLinkPatientFixture(t, f)
-	key := newBookingKey()
-	body := fmt.Sprintf(`{"expectedVersion":"1","patientId":%q}`, patient)
-	if _, err := f.pool.Exec(t.Context(), `CREATE FUNCTION fixture_fail_link() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN IF NEW.kind='PATIENT_LINKED' THEN RAISE EXCEPTION 'fixture link failure'; END IF;RETURN NEW;END$$;CREATE TRIGGER fixture_fail_link BEFORE INSERT ON booking_events FOR EACH ROW EXECUTE FUNCTION fixture_fail_link()`); err != nil {
+	seedLegacyBookingLink(t, f, b.ID, patient)
+	if _, err := f.pool.Exec(t.Context(), "UPDATE booking_idempotency SET response_document=response_document || jsonb_build_object('patientId',$2::text) WHERE booking_id=$1", b.ID, patient); err != nil {
 		t.Fatal(err)
 	}
-	assertCode(t, bookingRequestFixture(f, "PUT", "/bookings/"+b.ID+"/patient", owner, key, body), 500, "")
-	current := booked(t, f.request("GET", "/bookings/"+b.ID, owner, ""))
-	if current.PatientID != nil || current.Version != "1" {
-		t.Fatal("failed link committed partial state")
+	for _, path := range []string{"/bookings/" + b.ID, "/bookings/" + b.ID + "/events"} {
+		w = f.request("GET", path, owner, "")
+		assertCode(t, w, 200, "")
+		if strings.Contains(w.Body.String(), `"patientId"`) {
+			t.Fatal("clinical identifier in agenda response", w.Body.String())
+		}
 	}
-	if _, err := f.pool.Exec(t.Context(), "DROP TRIGGER fixture_fail_link ON booking_events;DROP FUNCTION fixture_fail_link()"); err != nil {
-		t.Fatal(err)
+	w = bookingRequestFixture(f, "POST", "/bookings", owner, key, body)
+	assertCode(t, w, 201, "")
+	if strings.Contains(w.Body.String(), `"patientId"`) {
+		t.Fatal("clinical identifier in historical replay", w.Body.String())
 	}
-	assertCode(t, bookingRequestFixture(f, "PUT", "/bookings/"+b.ID+"/patient", owner, key, body), 200, "")
+	assertCode(t, bookingRequestFixture(f, "PATCH", "/bookings/"+b.ID+"/status", owner, newBookingKey(), `{"expectedVersion":"2","status":"CANCELLED"}`), 200, "")
 }

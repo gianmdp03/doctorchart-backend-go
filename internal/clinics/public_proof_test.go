@@ -62,7 +62,7 @@ func TestPublicProofClaimIsAtomicAcrossConcurrentTransactions(t *testing.T) {
 	}
 }
 func TestPublicDocumentFormatAndCountry(t *testing.T) {
-	base := PublicBookingRequest{ClinicID: newOpaqueID(), Start: time.Now().UTC().Add(time.Hour).Format(time.RFC3339), FormVersion: "1", ContactName: "Solicitante", AttendeeName: "Persona", ContactPhone: "+54 223 1234567", DocumentCountry: "AR", DocumentType: "DNI", Email: "synthetic@example.invalid"}
+	base := PublicBookingRequest{ClinicID: newOpaqueID(), Start: time.Now().UTC().Add(time.Hour).Format(time.RFC3339), FormVersion: "1", ContactName: "Solicitante", AttendeeName: "Persona", ContactPhone: "+54 223 4951234", DocumentCountry: "AR", DocumentType: "DNI", Email: "synthetic@example.invalid"}
 	for _, doc := range []string{"12345", "123456", "1234567", "12345678"} {
 		p := base
 		p.Document = doc

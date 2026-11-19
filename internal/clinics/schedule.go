@@ -182,6 +182,9 @@ func (s *Service) updateSchedule(w http.ResponseWriter, r *http.Request, user st
 	if previous.Version != expected {
 		return api.Failure(409, "VERSION_CONFLICT", "La agenda cambió. Tus datos no se guardaron; recargá la versión vigente.")
 	}
+	if err := validateClinicScheduleContexts(current, request.ScheduleConfig); err != nil {
+		return err
+	}
 	if validateOnly {
 		draft := agendaRecord{current.ID, current.Timezone, current.Name, current.Modality, request.ScheduleConfig}
 		if err = validateDraftAgendas(ctx, tx, workspace, draft, time.Now().UTC()); err != nil {
@@ -268,17 +271,20 @@ func (s *Service) availabilityFor(w http.ResponseWriter, r *http.Request, user s
 		return err
 	}
 	readyContexts := map[string]bool{}
-	contextRows, e := tx.Query(ctx, "SELECT id::text FROM doctor_specialty_contexts WHERE workspace_id=$1 AND onboarding_completed AND definition IS NOT NULL", workspace)
+	virtualContexts := map[string]bool{}
+	contextRows, e := tx.Query(ctx, "SELECT id::text, teleconsultation_enabled FROM doctor_specialty_contexts WHERE workspace_id=$1 AND onboarding_completed AND definition IS NOT NULL", workspace)
 	if e != nil {
 		return e
 	}
 	for contextRows.Next() {
 		var id string
-		if e = contextRows.Scan(&id); e != nil {
+		var virtualEnabled bool
+		if e = contextRows.Scan(&id, &virtualEnabled); e != nil {
 			contextRows.Close()
 			return e
 		}
 		readyContexts[id] = true
+		virtualContexts[id] = virtualEnabled
 	}
 	e = contextRows.Err()
 	contextRows.Close()
@@ -297,6 +303,9 @@ func (s *Service) availabilityFor(w http.ResponseWriter, r *http.Request, user s
 	clinic, err = scan(tx.QueryRow(ctx, "SELECT "+columns+" FROM clinics WHERE id=$1 AND workspace_id=$2", clinic.ID, workspace))
 	if err != nil {
 		return err
+	}
+	if clinic.Modality == teleconsultation {
+		readyContexts = virtualContexts
 	}
 	if public != nil {
 		current, e := s.readPublicDoctor(ctx, tx, public.doctorID)

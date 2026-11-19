@@ -93,3 +93,29 @@ func TestPersonalInputFormats(t *testing.T) {
 		})
 	}
 }
+
+func TestPhoneUpdatePreservesLegacyValuesAndNormalizesEdits(t *testing.T) {
+	validator, err := NewValidator()
+	if err != nil {
+		t.Fatal(err)
+	}
+	form := minimalPatientForm()
+	values := map[string]any{"sys_firstName": "Ana", "sys_lastName": "Pérez", "sys_dni": "12345678", "sys_dob": "2000-01-01", "sys_sex": "FEMALE", "sys_phone": "interno 123"}
+	context := map[string]any{"referenceDate": "2026-10-09"}
+	previous := map[string]any{"sys_phone": "interno 123"}
+	evaluation, err := validator.EvaluateUpdate(form, values, context, previous)
+	if err != nil || evaluation.Values["sys_phone"] != "interno 123" || evaluation.Projections["patient.phone"] != "interno 123" {
+		t.Fatalf("legacy phone changed: %#v, %v", evaluation, err)
+	}
+	values["sys_phone"] = "0351 15-234-5678"
+	evaluation, err = validator.EvaluateUpdate(form, values, context, previous)
+	if err != nil || evaluation.Values["sys_phone"] != "+5493512345678" || evaluation.Projections["patient.phone"] != "+5493512345678" {
+		t.Fatalf("edited phone was not normalized: %#v, %v", evaluation, err)
+	}
+	values["sys_phone"] = "123"
+	_, err = validator.EvaluateUpdate(form, values, context, previous)
+	var invalid *api.Error
+	if !errors.As(err, &invalid) || len(invalid.Errors) != 1 || invalid.Errors[0].Code != "INVALID_PHONE" {
+		t.Fatalf("expected INVALID_PHONE on changed number, got %v", err)
+	}
+}

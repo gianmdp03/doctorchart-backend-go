@@ -12,6 +12,7 @@ import (
 	"encoding/base64"
 	"github.com/joho/godotenv"
 	"github.com/syntah/doctorchart-backend-go/internal/api"
+	"github.com/syntah/doctorchart-backend-go/internal/mailclient"
 	"github.com/syntah/doctorchart-backend-go/internal/notifications"
 	"github.com/syntah/doctorchart-backend-go/internal/storage"
 )
@@ -110,15 +111,13 @@ func Load() (Config, error) {
 		return c, errors.New("NOTIFICATIONS_ENABLED debe ser true o false")
 	}
 	if notifyFlag == "true" {
-		port, e := strconv.Atoi(get("notifications.smtp.port", "NOTIFICATIONS_SMTP_PORT", "587"))
-		if e != nil {
-			return c, errors.New("Puerto SMTP inválido")
+		c.Notifications = notifications.Config{
+			Enabled:           true,
+			Key:               get("notifications.key", "NOTIFICATIONS_KEY", ""),
+			PublicOrigin:      get("notifications.public-origin", "NOTIFICATIONS_PUBLIC_ORIGIN", ""),
+			MailServiceURL:    get("notifications.mail-service.url", "NOTIFICATIONS_MAIL_SERVICE_URL", ""),
+			MailServiceAPIKey: get("notifications.mail-service.api-key", "NOTIFICATIONS_MAIL_SERVICE_API_KEY", ""),
 		}
-		lead, e := strconv.Atoi(get("notifications.reminder-minutes", "NOTIFICATIONS_REMINDER_MINUTES", "1440"))
-		if e != nil || lead < 1 || lead > 10080 {
-			return c, errors.New("Recordatorio inválido")
-		}
-		c.Notifications = notifications.Config{PublicOrigin: get("notifications.public-origin", "NOTIFICATIONS_PUBLIC_ORIGIN", ""), Enabled: true, Key: get("notifications.key", "NOTIFICATIONS_KEY", ""), Host: get("notifications.smtp.host", "NOTIFICATIONS_SMTP_HOST", ""), Port: port, From: get("notifications.smtp.from", "NOTIFICATIONS_SMTP_FROM", ""), Username: get("notifications.smtp.username", "NOTIFICATIONS_SMTP_USERNAME", ""), Password: get("notifications.smtp.password", "NOTIFICATIONS_SMTP_PASSWORD", ""), TLSMode: get("notifications.smtp.tls", "NOTIFICATIONS_SMTP_TLS", "starttls"), ReminderMinutes: lead}
 		raw, e := base64.StdEncoding.DecodeString(c.Notifications.Key)
 		if !c.BookingsEnabled || e != nil || len(raw) != 32 {
 			return c, errors.New("NOTIFICATIONS_ENABLED requiere BOOKINGS_ENABLED y NOTIFICATIONS_KEY de32bytes base64")
@@ -127,7 +126,7 @@ func Load() (Config, error) {
 		if e != nil || origin.Scheme != "https" || origin.Host == "" || origin.User != nil || origin.Path != "" || origin.RawQuery != "" || origin.ForceQuery || origin.Fragment != "" {
 			return c, errors.New("NOTIFICATIONS_PUBLIC_ORIGIN debe ser un origen HTTPS exacto")
 		}
-		if _, e = notifications.NewSMTP(c.Notifications); e != nil {
+		if _, e = mailclient.New(c.Notifications.MailServiceURL, c.Notifications.MailServiceAPIKey, nil); e != nil {
 			return c, e
 		}
 	}

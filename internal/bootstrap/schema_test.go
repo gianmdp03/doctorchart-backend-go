@@ -86,7 +86,7 @@ func assertFixtureReady(t *testing.T, pool *pgxpool.Pool) {
 	if err := pool.QueryRow(context.Background(), "SELECT count(*) FROM vaccination_calendars").Scan(&calendars); err != nil {
 		t.Fatal(err)
 	}
-	if tables != 55 || constraints != 70 || specialties == 0 || calendars != 1 {
+	if tables != 57 || constraints != 74 || specialties == 0 || calendars != 1 {
 		t.Fatalf("startup produced %d tables, %d foreign keys, %d specialties and %d calendars", tables, constraints, specialties, calendars)
 	}
 	var expected map[string][]json.RawMessage
@@ -98,8 +98,12 @@ func assertFixtureReady(t *testing.T, pool *pgxpool.Pool) {
 		if err := pool.QueryRow(context.Background(), "SELECT count(*) FROM "+pgx.Identifier{name}.Sanitize()).Scan(&count); err != nil {
 			t.Fatal(err)
 		}
-		if count != len(expected[name]) {
-			t.Fatalf("catalog %s has %d rows, expected %d", name, count, len(expected[name]))
+		want := len(expected[name])
+		if name == "specialties" || name == "wizard_defaults" {
+			want += len(expected["provisional_specialties"])
+		}
+		if count != want {
+			t.Fatalf("catalog %s has %d rows, expected %d", name, count, want)
 		}
 	}
 }

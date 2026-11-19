@@ -129,10 +129,12 @@ export async function seedManual(root, backend, settings, verifyOnly = false) {
   if (existsSync(started)) throw Error('La preparación anterior quedó incompleta. Revisá los logs y usá reset con confirmación explícita.');
   assert.equal((await owner('GET', '/workspace/contexts')).length, 0, 'La preparación requiere un espacio sintético vacío');
   writeJSON(started, {format: 1, task: settings.task});
+  const initialCatalog = await admin('GET', '/admin/specialties');
   for (const file of readdirSync(join(backend, 'templates')).filter(file => file.endsWith('.provisional.json')).sort()) {
     const template = JSON.parse(readFileSync(join(backend, 'templates', file)));
     assert.equal(template.status, 'PROVISIONAL_TEST_ONLY');
-    const created = await admin('POST', '/admin/specialties', template.createSpecialty, null, 201);
+    const created = initialCatalog.find(item => item.code === template.createSpecialty.code) ??
+      await admin('POST', '/admin/specialties', template.createSpecialty, null, 201);
     const path = '/admin/specialties/' + created.id;
     let experience = await admin('GET', path + '/experience');
     for (const [key, suffix] of Object.entries({
@@ -257,13 +259,14 @@ async function seedClinicalAndAgenda({root, call, owner, doctorToken, contexts, 
   console.log('Documentos, adjunto convertido, vacunación, revisiones, auditoría y exportación preparados.');
 
   const timezone = 'America/Argentina/Buenos_Aires';
-  const clinic = name => owner('POST', '/clinics', {
+  const clinic = (name, specialtyIds) => owner('POST', '/clinics', {
     name, timezone, country: 'Argentina', province: 'Buenos Aires', city: 'Mar del Plata', address: 'Dirección ficticia para pruebas',
+    specialtyContextIds: specialtyIds.map(String),
   }, null, 201);
-  const [centro, norte, virtual] = [
-    await clinic('Consultorio Centro Ficticio'), await clinic('Consultorio Norte Ficticio'),
-    await owner('POST', '/clinics', {name: 'Teleconsulta Ficticia', timezone, modality: 'TELECONSULTATION'}, null, 201),
-  ];
+  const centro = await clinic('Consultorio Centro Ficticio', Object.values(contexts).map(item => item.context));
+  const norte = await clinic('Consultorio Norte Ficticio', [dermatology.context]);
+  const virtualSetting = await owner('PUT', '/teleconsultations/' + general.context, {enabled: true});
+  const virtual = await owner('GET', '/clinics/' + virtualSetting.clinicId);
   const rest = Object.values(contexts).filter(item => item !== pediatric).map(item => item.context);
   const weekly = ranges => Array.from({length: 7}, (_, index) => ({weekday: index + 1, ranges: ranges(index)}));
   async function schedule(clinicId, ranges) {

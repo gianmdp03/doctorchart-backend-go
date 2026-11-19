@@ -7,8 +7,9 @@ Informes de validación: [SP-03B](../docs/specialties-sp03b.md),
 Las dieciséis propuestas ambulatorias tienen estado `PROVISIONAL_TEST_ONLY`, fuera
 de `createSpecialty.definition` para respetar el contrato estricto v1. Su uso está
 limitado a ensayos con datos ficticios hasta que un profesional médico apruebe
-campos, etiquetas, unidades, opciones y alcance clínico. Se cargan explícitamente
-en el catálogo: no pertenecen al seed ni se publican en instancias existentes.
+campos, etiquetas, unidades, opciones y alcance clínico. El seed las incorpora
+al catálogo como borradores inactivos. Las publicaciones administradas
+conservan su estado y las plantillas nuevas requieren su aprobación normal.
 
 | Archivo / código estable | Ficha específica | Consulta específica |
 | --- | --- | --- |

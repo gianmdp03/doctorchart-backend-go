@@ -4,4 +4,6 @@
 !cmd/**
 !internal/**
 !db/**
+!templates/*.go
+!templates/*.provisional.json
 !Dockerfile

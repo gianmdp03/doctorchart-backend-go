@@ -1,24 +1,24 @@
-# M8-NOTIFICATIONS-v1
-
-31/10/2026. Rama codex/m8-notifications desde M7 aprobado. NOTIFICATIONS_ENABLED=false por defecto en backend y Angular. Sin cambios comerciales/Billing, main, producción ni M9. M4 sigue siendo único motor.
+# Mis turnos y correo de secretaría
 
 ## Reserva y consulta pública
 
-Con M8 habilitado, la confirmación M6 incorpora `accessCode` (256 bits, base64url43) y `accessExpiresAt`. Campos M6 restantes intactos. Un replay autorizado devuelve el mismo código mientras esté vigente. No depende de SMTP; la reserva y la constancia inmediata sobreviven a una caída del proveedor.
+La reserva pública requiere documento y correo. Con `NOTIFICATIONS_ENABLED=true` se encola un código de seis dígitos y la constancia devuelve su `verificationRequestId` mientras esté vigente. La reserva se confirma en pantalla al guardar. Un fallo posterior del SMTP no revierte la reserva. Cada correo contiene el código y su vigencia sin enlaces, datos del turno ni datos clínicos.
 
-POST `/api/doctorchart/public/appointments/confirmation` `{accessCode:string}` →200 `{reference,status,start,end,doctorName,clinicName,address,timezone,accessExpiresAt}`. Read-only, sin cuenta, Billing, DNI, email, teléfono, IDs internos ni respuestas del formulario. Código solo en body, nunca query/path/localStorage/analytics. Ruta Angular `/appointments/confirmation` anterior a `:publicId`, noindex/no-store/no-referrer. Email enlaza esa ruta sin secretos; el usuario pega el código. Código atado a una sola reserva; hash SHA-256 para búsqueda, copia AES-GCM con AAD por reserva para entrega/replay. Caduca siete días después del final del turno; reprogramación ajusta vencimiento. Cancelar permite consultar estado cancelado. Ninguna cancelación pública en M8.
+- `POST /api/doctorchart/public/appointments/my-bookings` con `document`, `challenge`, `solution` y `offset` opcional devuelve hasta 50 coincidencias de DNI argentino. Cada entrada incluye una referencia interna, la fecha civil en la zona del turno, disponibilidad de acciones y si la cookie ya autoriza esa reserva. La hora, el profesional, el consultorio y el correo requieren verificación.
+- `POST /api/doctorchart/public/appointments/access/request` recibe `document`, la `reference` devuelta por la búsqueda, `challenge` y `solution`. Busca el correo registrado para ese DNI y esa reserva. Si se encoló el correo, devuelve 202 con `requestId` y `maskedEmail`.
+- `POST /api/doctorchart/public/appointments/access/verify` recibe `document`, `reference`, `requestId` y `code`. Un código se puede usar una vez, vence en 10 minutos y admite hasta cinco intentos. Al validarlo responde 204 y establece una cookie cifrada, HttpOnly, Secure y SameSite=Strict con una vigencia de 48 horas para los turnos del mismo DNI y correo.
+- `my-bookings` con la cookie y sin `document` devuelve hasta 50 reservas completas del par verificado. Admite `offset` y `focusReference` para priorizar el turno seleccionado.
+- `POST /api/doctorchart/public/appointments/my-bookings/change` recibe la cookie, `reference`, `expectedVersion`, `action` y, para reprogramar, `start`. Requiere `Idempotency-Key`. Usa el motor de agenda para cancelar una reserva futura confirmada o moverla a un horario disponible del mismo consultorio publicado y especialidad.
 
-DELETE médico `/api/doctorchart/bookings/{id}/confirmation-access` →204 revoca el código de esa reserva propia, sin borrar reserva/historia ni generar nuevo código. Datos fuera de propiedad404. Rate limit persistente recuperación30/min por red HMAC Gateway, body16KiB, código inválido/vencido/revocado/ajeno devuelve404 `CONFIRMATION_NOT_FOUND`, sin diferencias que faciliten enumeración;429 Retry-After60. Sin buscador por PII ni endpoint de reenvío público.
+El servidor valida el Origin configurado. La sesión se recupera al volver al mismo navegador y `POST /api/doctorchart/public/appointments/my-bookings/logout` la revoca y borra la cookie. El código se verifica con HMAC, la sesión se guarda como hash y el correo en cola se cifra. La solicitud usa la protección pública existente y un límite por correo de cinco por hora con un intervalo mínimo de 45 segundos. La página `/appointments/confirmation` mantiene `noindex` y `no-referrer`.
 
-## Correos y outbox
+## Constancia y correo de secretaría
 
-Solo destinatario administrativo explícito de la reserva pública M6; no inferir email desde paciente clínico ni inventarlo para turnos manuales sin email. Plantillas de texto en español: confirmación, cancelación, reprogramación y recordatorio. Solo profesional, sede/dirección pública, fecha/hora IANA y referencia/código de consulta; sin diagnósticos, nombres del paciente/solicitante, DNI/teléfono ni respuestas. Invitación staff incluye código privado de un uso M7; nunca contraseña/código maestro personal.
+El worker marca los avisos de turnos pendientes de versiones anteriores como `OBSOLETE` con el código `BOOKING_EMAIL_DISABLED`. Los códigos de verificación siguen la cola SMTP y dejan de enviarse si vencieron o ya se usaron. Las reservas online también envían confirmación, reprogramación, cancelación y un recordatorio 24 horas antes. El worker verifica la versión del turno antes de enviar y cada correo explica cómo entrar a Mis turnos.
 
-Evento y outbox se insertan atómicamente con M4; nunca SMTP dentro de esa transacción. UNIQUE por reserva/versión/tipo e invitación/hash. Workers con SKIP LOCKED, lease2min, timeout SMTP10s, reintento exponencial1s..5min, máximo10 intentos, estados PENDING/PROCESSING/SENT/OBSOLETE/DEAD, errores constantes sin cuerpos/secretos. Jobs PROCESSING recuperables tras lease vencida/reinicio. Payloads cifrados AES-GCM con AAD de dedup-key; clave estable separada NOTIFICATIONS_KEY de32bytes base64, necesaria al habilitar M8. Message-ID estable por job. No plataforma genérica ni nuevas cuotas.
+La cola SMTP conserva las invitaciones y la recuperación de secretaría. La invitación incluye un enlace privado de un solo uso. Los workers usan SKIP LOCKED, lease de 2 minutos, timeout SMTP de 10 segundos y hasta 10 intentos con espera exponencial. Una invitación consumida, renovada o revocada se marca como `OBSOLETE`. Los payloads se cifran con AES-GCM usando la clave estable NOTIFICATIONS_KEY de 32 bytes en base64. Cada reintento conserva el Message-ID.
 
-Recordatorio: NOTIFICATIONS_REMINDER_MINUTES=1440 por defecto, minutos reales antes del instante UTC, presentación en zona IANA; si ese momento ya pasó no se programa aviso inmediato duplicado. Cada versión obtiene su job; justo antes de enviar se verifica versión, estado CONFIRMED y turno futuro. Cancelado/reprogramado/atendido/ausente o invitación consumida/renovada/revocada se marca OBSOLETE. No se retienen locks de reservas durante SMTP. Una modificación posterior a la comprobación final o a la aceptación SMTP no puede retirar correo ya entregado; tampoco se garantiza exactly-once físico cuando se pierde un ACK. Se garantiza unicidad lógica y se usa mismo Message-ID en reintentos.
-
-SMTP configurable por host/puerto/from/usuario/password; STARTTLS obligatorio por defecto o TLS implícito, certificados verificados, sin fallback plaintext. Ensayo con Mailpit descartable y TLS. Cero envíos a proveedores/usuarios reales. Fallo SMTP no revierte reservas; fallo PostgreSQL al persistir outbox sí impide commit incompleto, como otros eventos M4. Clave de cifrado debe conservarse para reinicios/restauraciones; rotación automática fuera de alcance.
+SMTP se configura con host, puerto, remitente, usuario y contraseña. Usa STARTTLS por defecto o TLS implícito con certificados verificados. La clave de cifrado se conserva para reinicios y restauraciones.
 
 ## Secretarias
 
@@ -29,4 +29,4 @@ POST `/api/doctorchart/staff/recover-email` `{email,emailCode,password}` →200 
 
 ## Prueba y recuperación
 
-Migración incremental0010, baseline/0002..0009 inmutables. Fresh/upgrade9→10, fallos SQL/drift/seed y rollback/reintento/preservación sobre PG descartable. Binarios anteriores rechazan10, sin DOWN destructivo ni bajar marcador. Probar Mailpit TLS real, caída/reintento/reinicio/dos workers, obsolescencia, idempotencia, consulta/códigos inválidos/expirados/revocados/aislamiento, cuenta médica real y staff local. No contar omitidos PASS. Editor comercial onlineBooking/secretaryManagement va a M9, no implementado aquí.
+El baseline de preproducción se define en `db/schema.sql`. Para probar localmente se puede usar Mailpit. Para enviar por Brevo se configura el SMTP existente con un remitente autenticado y sus credenciales de relay.

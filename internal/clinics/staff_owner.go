@@ -4,16 +4,14 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/syntah/doctorchart-backend-go/internal/api"
 	"github.com/syntah/doctorchart-backend-go/internal/billing"
+	"github.com/syntah/doctorchart-backend-go/internal/telephone"
 )
-
-var staffPhone = regexp.MustCompile(`^\+[1-9][0-9]{7,14}$`)
 
 type staffAccess struct {
 	ID          string   `json:"id"`
@@ -137,9 +135,6 @@ func (s *Service) staffOwnerWrite(w http.ResponseWriter, r *http.Request, user, 
 				return err
 			}
 			req.Phone = strings.TrimSpace(req.Phone)
-			if req.Phone != "" && !staffPhone.MatchString(req.Phone) {
-				return api.Invalid("Usá un teléfono con código de país, por ejemplo +5491123456789.")
-			}
 			req.Name = strings.TrimSpace(req.Name)
 			if len([]rune(req.Name)) < 1 || len([]rune(req.Name)) > 160 {
 				return api.Invalid("Revisá el nombre.")
@@ -167,22 +162,31 @@ func (s *Service) staffOwnerWrite(w http.ResponseWriter, r *http.Request, user, 
 	if op == "invite" {
 		id = newOpaqueID()
 
-		var existing string
+		var existing, savedPhone string
 		var activated bool
-		err = tx.QueryRow(r.Context(), "SELECT id::text,account_id IS NOT NULL FROM staff_access WHERE workspace_id=$1 AND email=$2", workspace, req.Email).Scan(&existing, &activated)
-		if err == nil {
-			if activated {
-				return api.Failure(409, "STAFF_ACCESS_EXISTS", "La relación ya está activada. Editala desde la lista.")
+		err = tx.QueryRow(r.Context(), "SELECT id::text,account_id IS NOT NULL,phone FROM staff_access WHERE workspace_id=$1 AND email=$2", workspace, req.Email).Scan(&existing, &activated, &savedPhone)
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+		if activated {
+			return api.Failure(409, "STAFF_ACCESS_EXISTS", "La relación ya está activada. Editala desde la lista.")
+		}
+		if req.Phone != savedPhone {
+			phone, valid := telephone.Normalize(req.Phone)
+			// staff_access requires at least eight digits in its stored E.164 values.
+			if !valid || (phone != "" && (phone != req.Phone || len(phone) < 9)) {
+				return field("phone", "INVALID_PHONE")
 			}
+			req.Phone = phone
+		}
+		if err == nil {
 			id = existing
 			if _, err = tx.Exec(r.Context(), "UPDATE staff_invitations SET consumed_at=COALESCE(consumed_at,clock_timestamp()) WHERE access_id=$1", id); err != nil {
 				return err
 			}
 			_, err = tx.Exec(r.Context(), "UPDATE staff_access SET name=$1,permissions=$2,active=true,version=version+1,phone=$4 WHERE id=$3", req.Name, req.Permissions, id, req.Phone)
-		} else if errors.Is(err, pgx.ErrNoRows) {
-			_, err = tx.Exec(r.Context(), "INSERT INTO staff_access(id,workspace_id,email,name,permissions,phone) VALUES($1,$2,$3,$4,$5,$6)", id, workspace, req.Email, req.Name, req.Permissions, req.Phone)
 		} else {
-			return err
+			_, err = tx.Exec(r.Context(), "INSERT INTO staff_access(id,workspace_id,email,name,permissions,phone) VALUES($1,$2,$3,$4,$5,$6)", id, workspace, req.Email, req.Name, req.Permissions, req.Phone)
 		}
 
 	} else {

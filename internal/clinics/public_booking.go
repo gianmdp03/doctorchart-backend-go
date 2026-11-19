@@ -39,11 +39,11 @@ type publicAdmission struct {
 	doctor                      PublicDoctor
 	clinic                      PublicClinic
 	challengeHash               string
+	management                  string
 }
 
 var dniPattern = regexp.MustCompile(`^[0-9]{5,8}$`)
 var passportPattern = regexp.MustCompile(`^[A-Z0-9]{3,24}$`)
-var phonePattern = regexp.MustCompile(`^\+?[0-9 ()-]{7,30}$`)
 var countryPattern = regexp.MustCompile(`^[A-Z]{2}$`)
 
 func validatePublicRequest(p *PublicBookingRequest) error {
@@ -71,40 +71,42 @@ func validatePublicRequest(p *PublicBookingRequest) error {
 			return api.Invalid("Ingresá nombre y apellido del solicitante y de quien será atendido.")
 		}
 	}
-	address, err := mail.ParseAddress(p.Email)
-	if err != nil || address.Address != p.Email || len(p.Email) > 254 || !strings.Contains(address.Address, ".") {
-		return field("email", "INVALID_EMAIL")
+	if err := validatePublicIdentity(p.DocumentCountry, p.DocumentType, p.Document, p.Email); err != nil {
+		return err
 	}
-	region, regionErr := language.ParseRegion(p.DocumentCountry)
-	if regionErr != nil || !region.IsCountry() {
-		return field("documentCountry", "INVALID_COUNTRY")
-	}
-	if !countryPattern.MatchString(p.DocumentCountry) || p.DocumentType == "DNI" && (p.DocumentCountry != "AR" || !dniPattern.MatchString(p.Document)) || p.DocumentType == "PASSPORT" && !passportPattern.MatchString(p.Document) || p.DocumentType != "DNI" && p.DocumentType != "PASSPORT" {
-		return field("document", "INVALID_DOCUMENT")
-	}
-	if !phonePattern.MatchString(p.ContactPhone) {
-		return field("contactPhone", "INVALID_PHONE")
-	}
-	digits := 0
-	for _, v := range p.ContactPhone {
-		if v >= '0' && v <= '9' {
-			digits++
-		}
-	}
-	if digits < 7 || digits > 20 {
-		return field("contactPhone", "INVALID_PHONE")
-	}
-	if len(p.Answers) > 8 {
+	return validatePublicAnswers(p.Answers)
+}
+
+func validatePublicAnswers(answers map[string]string) error {
+	if len(answers) > 8 {
 		return api.Invalid("Demasiadas respuestas.")
 	}
-	for k, v := range p.Answers {
+	for k, v := range answers {
 		if !questionKey.MatchString(k) || len([]rune(v)) > 240 || strings.ContainsRune(v, 0) {
 			return api.Invalid("Respuesta administrativa inválida.")
 		}
 	}
 	return nil
 }
+
+func validatePublicIdentity(country, kind, document, email string) error {
+	address, err := mail.ParseAddress(email)
+	if err != nil || address.Address != email || len(email) > 254 || !strings.Contains(address.Address, ".") || strings.ContainsAny(email, "\r\n") {
+		return field("email", "INVALID_EMAIL")
+	}
+	region, regionErr := language.ParseRegion(country)
+	if regionErr != nil || !region.IsCountry() {
+		return field("documentCountry", "INVALID_COUNTRY")
+	}
+	if !countryPattern.MatchString(country) || kind == "DNI" && (country != "AR" || !dniPattern.MatchString(document)) || kind == "PASSPORT" && !passportPattern.MatchString(document) || kind != "DNI" && kind != "PASSPORT" {
+		return field("document", "INVALID_DOCUMENT")
+	}
+	return nil
+}
 func (a *publicAdmission) check(ctx context.Context, tx pgx.Tx, s *Service, workspace int64, snap billing.Snapshot) error {
+	if a.management == "status" {
+		return nil
+	}
 	if snap.OnlineBooking == nil || !*snap.OnlineBooking || !snap.ClinicManagement {
 		return publicDenied()
 	}
@@ -114,6 +116,12 @@ func (a *publicAdmission) check(ctx context.Context, tx pgx.Tx, s *Service, work
 	}
 	if current.workspace != workspace || !current.published {
 		return publicMissing()
+	}
+	if a.management == "reschedule" {
+		if !publicContextClinic(current, a.contextID, a.clinicID) {
+			return publicMissing()
+		}
+		return nil
 	}
 	a.contextID, err = choosePublicContext(current, a.request.ContextID)
 	if err != nil {
@@ -133,23 +141,30 @@ func (a *publicAdmission) check(ctx context.Context, tx pgx.Tx, s *Service, work
 	if !found {
 		return publicMissing()
 	}
-	if current.Form.Version != a.request.FormVersion {
+	if err := checkPublicForm(current.Form, a.request.FormVersion, a.request.Answers); err != nil {
+		return err
+	}
+	a.challengeHash, err = s.verifyProof(a.request.Challenge, a.request.Solution, a.network)
+	return err
+}
+
+func checkPublicForm(form PublicForm, version string, answers map[string]string) error {
+	if form.Version != version {
 		return api.Failure(409, "FORM_VERSION_CONFLICT", "El formulario cambió. Revisá las preguntas actualizadas; tus datos se conservaron.")
 	}
 	allowed := map[string]bool{}
-	for _, q := range current.Form.Questions {
+	for _, q := range form.Questions {
 		allowed[q.Key] = true
-		if q.Required && strings.TrimSpace(a.request.Answers[q.Key]) == "" {
+		if q.Required && strings.TrimSpace(answers[q.Key]) == "" {
 			return field(q.Key, "REQUIRED")
 		}
 	}
-	for k := range a.request.Answers {
+	for k := range answers {
 		if !allowed[k] {
 			return api.Invalid("El formulario contiene preguntas que ya no están vigentes.")
 		}
 	}
-	a.challengeHash, err = s.verifyProof(a.request.Challenge, a.request.Solution, a.network)
-	return err
+	return nil
 }
 func (a *publicAdmission) record(ctx context.Context, tx pgx.Tx, b Booking) error {
 	form, _ := json.Marshal(a.doctor.Form)
@@ -180,12 +195,15 @@ func (s *Service) writeBookingResult(w http.ResponseWriter, r *http.Request, a *
 			api.WriteJSON(w, status, doc)
 			return nil
 		}
-		api.WriteJSON(w, status, response)
-		return nil
 	}
+	// Project historical idempotency responses through the administrative shape.
 	var b Booking
 	if err := json.Unmarshal(response, &b); err != nil {
 		return err
+	}
+	if a == nil {
+		api.WriteJSON(w, status, b)
+		return nil
 	}
 	var reference, name, clinic, address, timezone string
 	if err := s.pool.QueryRow(r.Context(), "SELECT reference::text,doctor_name,clinic_name,address,timezone FROM booking_public_details WHERE booking_id=$1", b.ID).Scan(&reference, &name, &clinic, &address, &timezone); err != nil {
@@ -198,14 +216,18 @@ func (s *Service) writeBookingResult(w http.ResponseWriter, r *http.Request, a *
 	if b.Specialty.Name != "" {
 		document["specialtyName"] = b.Specialty.Name
 	}
-	if s.notices != nil {
-		code, expires, err := s.notices.Code(r.Context(), b.ID)
-		if err != nil {
+	if a.management != "" {
+		delete(document, "contactName")
+		delete(document, "attendeeName")
+	} else if s.notices != nil {
+		var id string
+		err := s.pool.QueryRow(r.Context(), "SELECT id::text FROM booking_portal_codes WHERE booking_id=$1 AND expires_at>clock_timestamp() AND session_hash IS NULL", b.ID).Scan(&id)
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			return err
 		}
-		if code != "" {
-			document["accessCode"] = code
-			document["accessExpiresAt"] = expires
+		if id != "" {
+			document["verificationRequestId"] = id
+			document["maskedEmail"] = maskedPortalEmail(a.request.Email)
 		}
 	}
 	api.WriteJSON(w, status, document)
@@ -215,6 +237,9 @@ func (s *Service) publicCreate(w http.ResponseWriter, r *http.Request) error {
 	var p PublicBookingRequest
 	if err := decodePublic(w, r, &p); err != nil {
 		return err
+	}
+	if p.DocumentType != "DNI" || p.DocumentCountry != "AR" {
+		return field("document", "INVALID_DOCUMENT")
 	}
 	if err := validatePublicRequest(&p); err != nil {
 		return err

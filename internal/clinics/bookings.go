@@ -17,12 +17,13 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/syntah/doctorchart-backend-go/db"
 	"github.com/syntah/doctorchart-backend-go/internal/api"
+	"github.com/syntah/doctorchart-backend-go/internal/telephone"
 )
 
 type Booking struct {
-	ID             string            `json:"id"`
-	ClinicID       string            `json:"clinicId"`
-	PatientID      *string           `json:"patientId"`
+	ID       string `json:"id"`
+	ClinicID string `json:"clinicId"`
+
 	Start          time.Time         `json:"start"`
 	End            time.Time         `json:"end"`
 	Status         string            `json:"status"`
@@ -38,12 +39,12 @@ type Booking struct {
 	Provenance     BookingProvenance `json:"provenance"`
 }
 
-const bookingColumns = "b.id::text,b.clinic_id::text,b.patient_id::text,b.start_at,b.end_at,b.status,b.version::text,COALESCE(b.attendee_name,b.contact_name),b.contact_name,b.contact_phone,b.created_at,b.updated_at,b.specialty_context_id::text,b.specialty_snapshot,b.clinic_snapshot,b.provenance"
+const bookingColumns = "b.id::text,b.clinic_id::text,b.start_at,b.end_at,b.status,b.version::text,COALESCE(b.attendee_name,b.contact_name),b.contact_name,b.contact_phone,b.created_at,b.updated_at,b.specialty_context_id::text,b.specialty_snapshot,b.clinic_snapshot,b.provenance"
 
 func scanBooking(row scanner) (Booking, error) {
 	var b Booking
 	var specialty, clinic, provenance []byte
-	err := row.Scan(&b.ID, &b.ClinicID, &b.PatientID, &b.Start, &b.End, &b.Status, &b.Version, &b.AttendeeName, &b.ContactName, &b.ContactPhone, &b.CreatedAt, &b.UpdatedAt, &b.ContextID, &specialty, &clinic, &provenance)
+	err := row.Scan(&b.ID, &b.ClinicID, &b.Start, &b.End, &b.Status, &b.Version, &b.AttendeeName, &b.ContactName, &b.ContactPhone, &b.CreatedAt, &b.UpdatedAt, &b.ContextID, &specialty, &clinic, &provenance)
 	if err == nil {
 		err = json.Unmarshal(specialty, &b.Specialty)
 	}
@@ -93,6 +94,7 @@ func (s *Service) bookingRoutes(mux *http.ServeMux, wrap func(func(http.Response
 		return s.mutateBooking(w, r, u, "reschedule")
 	}))
 	mux.HandleFunc("GET /api/doctorchart/bookings", wrap(s.listBookings))
+	mux.HandleFunc("GET /api/doctorchart/bookings/form", wrap(s.getBookingForm))
 	mux.HandleFunc("GET /api/doctorchart/bookings/{id}", wrap(func(w http.ResponseWriter, r *http.Request, u string) error {
 		b, err := ownedBooking(r.Context(), s.pool, u, r.PathValue("id"))
 		if err != nil {
@@ -102,14 +104,13 @@ func (s *Service) bookingRoutes(mux *http.ServeMux, wrap func(func(http.Response
 		return nil
 	}))
 	mux.HandleFunc("GET /api/doctorchart/bookings/{id}/events", wrap(s.bookingEvents))
-	mux.HandleFunc("PUT /api/doctorchart/bookings/{id}/patient", wrap(func(w http.ResponseWriter, r *http.Request, u string) error { return s.mutateBooking(w, r, u, "link") }))
 }
 func (s *Service) bookingEvents(w http.ResponseWriter, r *http.Request, user string) error {
 	b, err := ownedBooking(r.Context(), s.pool, user, r.PathValue("id"))
 	if err != nil {
 		return err
 	}
-	rows, err := s.pool.Query(r.Context(), "SELECT version::text,kind,actor_id,occurred_at,before_document,after_document FROM booking_events WHERE booking_id=$1 ORDER BY version", b.ID)
+	rows, err := s.pool.Query(r.Context(), "SELECT version::text,kind,actor_id,occurred_at,before_document - 'patientId',after_document - 'patientId' FROM booking_events WHERE booking_id=$1 ORDER BY version", b.ID)
 	if err != nil {
 		return err
 	}
@@ -207,15 +208,16 @@ func (s *Service) listBookings(w http.ResponseWriter, r *http.Request, user stri
 }
 
 type bookingRequest struct {
-	ExpectedVersion string  `json:"expectedVersion"`
-	ClinicID        string  `json:"clinicId"`
-	Start           string  `json:"start"`
-	PatientID       *string `json:"patientId"`
-	AttendeeName    *string `json:"attendeeName"`
-	ContactName     string  `json:"contactName"`
-	ContactPhone    string  `json:"contactPhone"`
-	Status          string  `json:"status"`
-	ContextID       string  `json:"specialtyContextId,omitempty"`
+	ExpectedVersion string               `json:"expectedVersion"`
+	ClinicID        string               `json:"clinicId"`
+	Start           string               `json:"start"`
+	PatientID       *string              `json:"patientId"`
+	AttendeeName    *string              `json:"attendeeName"`
+	ContactName     string               `json:"contactName"`
+	ContactPhone    string               `json:"contactPhone"`
+	Status          string               `json:"status"`
+	ContextID       string               `json:"specialtyContextId,omitempty"`
+	Portal          *bookingPortalIntake `json:"portal,omitempty"`
 }
 
 var idempotencyPattern = regexp.MustCompile(`^[A-Za-z0-9._:-]{16,128}$`)
@@ -233,17 +235,13 @@ func decodeBooking(w http.ResponseWriter, r *http.Request, op string) (bookingRe
 	allowed := []string{"expectedVersion", "status"}
 	required := []string{"expectedVersion", "status"}
 	if op == "create" {
-		allowed = []string{"clinicId", "start", "patientId", "contactName", "contactPhone", "attendeeName", "specialtyContextId"}
+		allowed = []string{"clinicId", "start", "patientId", "contactName", "contactPhone", "attendeeName", "specialtyContextId", "portal"}
 		required = []string{"clinicId", "start", "contactName"}
 	}
 	if op == "reschedule" {
 		allowed = []string{"expectedVersion", "clinicId", "start"}
 		required = allowed
 		allowed = append(allowed, "specialtyContextId")
-	}
-	if op == "link" {
-		allowed = []string{"expectedVersion", "patientId"}
-		required = allowed
 	}
 	if err = api.Only(body, allowed...); err != nil {
 		return bookingRequest{}, "", "", err
@@ -287,15 +285,12 @@ func decodeBooking(w http.ResponseWriter, r *http.Request, op string) (bookingRe
 			return request, "", "", field("specialtyContextId", "INVALID_ID")
 		}
 	}
-	if op == "link" {
-		if request.PatientID == nil {
-			return request, "", "", field("patientId", "REQUIRED")
-		}
-		if _, err = decimal(*request.PatientID, true); err != nil {
-			return request, "", "", field("patientId", "INVALID_ID")
-		}
-	}
 	if op == "create" {
+		if request.Portal != nil {
+			if err = request.Portal.validate(); err != nil {
+				return request, "", "", err
+			}
+		}
 		if request.AttendeeName != nil {
 			value := strings.TrimSpace(*request.AttendeeName)
 			if len([]rune(value)) < 1 || len([]rune(value)) > 160 {
@@ -340,13 +335,6 @@ func bookingTransition(old, target string) bool {
 	return old == target || (old == "CONFIRMED" && (target == "CHECKED_IN" || target == "NO_SHOW" || target == "CANCELLED")) || (old == "CHECKED_IN" && (target == "COMPLETED" || target == "CANCELLED"))
 }
 
-func bindBookingPatientScope(ctx context.Context, tx pgx.Tx, owner, contextID string) error {
-	id, err := strconv.ParseInt(contextID, 10, 64)
-	if err != nil || id <= 0 {
-		return bookingContextConflict()
-	}
-	return db.BindClinicalScope(ctx, tx, owner, id)
-}
 func (s *Service) mutateBooking(w http.ResponseWriter, r *http.Request, user, op string) error {
 	var previous Booking
 	if op != "create" {
@@ -374,8 +362,8 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 		return err
 	}
 	staff := staffFrom(r.Context())
-	if request.PatientID != nil && (staff != nil || public != nil) {
-		return api.Failure(403, "PATIENT_LINK_FORBIDDEN", "Sólo el médico puede vincular la ficha clínica.")
+	if request.PatientID != nil {
+		return api.Failure(403, "PATIENT_LINK_FORBIDDEN", "Los turnos se gestionan independientemente de las fichas clínicas.")
 	}
 	var status int
 	var response json.RawMessage
@@ -442,6 +430,13 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 	if status != 0 {
 		return s.writeBookingResult(w, r, public, status, response)
 	}
+	if op == "create" {
+		phone, valid := telephone.Normalize(request.ContactPhone)
+		if !valid || ((public != nil || request.Portal != nil) && phone == "") {
+			return field("contactPhone", "INVALID_PHONE")
+		}
+		request.ContactPhone = phone
+	}
 	if err = rights.Fence(ctx, tx, snapshot); err != nil {
 		return unavailable()
 	}
@@ -469,32 +464,14 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 		if previous.Version != request.ExpectedVersion {
 			return api.Failure(409, "VERSION_CONFLICT", "La reserva cambió. Recargá su versión antes de modificarla.")
 		}
-	}
-	if op == "link" && (staff != nil || public != nil) {
-		return api.Failure(403, "PATIENT_LINK_FORBIDDEN", "Sólo el médico puede vincular la ficha clínica.")
-	}
-	if request.PatientID != nil && op == "link" {
-		if err = bindBookingPatientScope(ctx, tx, user, previous.ContextID); err != nil {
-			return err
-		}
-		var valid bool
-		if err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM patients WHERE id=$1 AND user_id=$2 AND specialty_context_id=$3 AND workspace_id=$4 AND annulled_at IS NULL FOR SHARE)", *request.PatientID, user, previous.ContextID, workspace).Scan(&valid); err != nil {
-			return err
-		}
-		if !valid {
-			return api.Failure(404, "PATIENT_NOT_FOUND", "No se encontró el paciente.")
+		if public != nil && public.management != "" && (previous.Status != "CONFIRMED" || !previous.Start.After(time.Now())) {
+			return bookingState()
 		}
 	}
 	var result Booking
 	kind := "CREATED"
 	status = 200
-	if op == "link" {
-		if previous.PatientID != nil {
-			return api.Failure(409, "BOOKING_PATIENT_ALREADY_LINKED", "El turno ya tiene una ficha clínica vinculada. No se reemplazó el vínculo.")
-		}
-		result, err = scanBooking(tx.QueryRow(ctx, "UPDATE bookings b SET patient_id=$1,version=version+1,updated_at=clock_timestamp() WHERE id=$2 RETURNING "+bookingColumns, request.PatientID, previous.ID))
-		kind = "PATIENT_LINKED"
-	} else if op == "status" {
+	if op == "status" {
 		if !bookingTransition(previous.Status, request.Status) {
 			return bookingState()
 		}
@@ -552,18 +529,6 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 		if (request.ContextID != "" && request.ContextID != slot.contextID) || (op == "reschedule" && previous.ContextID != slot.contextID) {
 			return bookingContextConflict()
 		}
-		if request.PatientID != nil {
-			if err = bindBookingPatientScope(ctx, tx, user, slot.contextID); err != nil {
-				return err
-			}
-			var valid bool
-			if err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM patients WHERE id=$1 AND workspace_id=$2 AND specialty_context_id=$3 AND annulled_at IS NULL FOR SHARE)", *request.PatientID, workspace, slot.contextID).Scan(&valid); err != nil {
-				return err
-			}
-			if !valid {
-				return api.Failure(404, "PATIENT_NOT_FOUND", "No se encontró una ficha clínica de esta especialidad.")
-			}
-		}
 		var specialty, clinicSnapshot, provenance []byte
 		if err = tx.QueryRow(ctx, `SELECT jsonb_build_object('id',s.id::text,'code',s.code,'name',s.display_name),public.booking_clinic_snapshot($2),public.booking_block_snapshot($3) FROM doctor_specialty_contexts c JOIN specialties s ON s.id=c.specialty_id WHERE c.id=$1 AND c.workspace_id=$4`, slot.contextID, clinic.ID, slot.blockID, workspace).Scan(&specialty, &clinicSnapshot, &provenance); err != nil {
 			return err
@@ -581,7 +546,7 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 		}
 		if op == "create" {
 			status = 201
-			result, err = scanBooking(tx.QueryRow(ctx, "INSERT INTO bookings AS b(workspace_id,clinic_id,patient_id,start_at,end_at,contact_name,contact_phone,attendee_name,specialty_context_id,specialty_snapshot,clinic_snapshot,provenance) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING "+bookingColumns, workspace, clinic.ID, request.PatientID, start, end, request.ContactName, request.ContactPhone, request.AttendeeName, slot.contextID, json.RawMessage(specialty), json.RawMessage(clinicSnapshot), json.RawMessage(provenance)))
+			result, err = scanBooking(tx.QueryRow(ctx, "INSERT INTO bookings AS b(workspace_id,clinic_id,start_at,end_at,contact_name,contact_phone,attendee_name,specialty_context_id,specialty_snapshot,clinic_snapshot,provenance) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING "+bookingColumns, workspace, clinic.ID, start, end, request.ContactName, request.ContactPhone, request.AttendeeName, slot.contextID, json.RawMessage(specialty), json.RawMessage(clinicSnapshot), json.RawMessage(provenance)))
 		} else {
 			kind = "RESCHEDULED"
 			result, err = scanBooking(tx.QueryRow(ctx, "UPDATE bookings b SET clinic_id=$1,start_at=$2,end_at=$3,clinic_snapshot=$5,provenance=$6,version=version+1,updated_at=clock_timestamp() WHERE id=$4 RETURNING "+bookingColumns, clinic.ID, start, end, previous.ID, json.RawMessage(clinicSnapshot), json.RawMessage(provenance)))
@@ -590,8 +555,19 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 	if err != nil {
 		return bookingDBError(err)
 	}
-	if public != nil {
+	if public != nil && op == "create" {
 		if err = public.record(ctx, tx, result); err != nil {
+			return err
+		}
+		if s.notices != nil {
+			p := public.request
+			if _, err = s.issuePortalCode(ctx, tx, portalIdentity{p.DocumentCountry, p.DocumentType, p.Document, p.Email}, &result.ID, nil); err != nil {
+				return err
+			}
+		}
+	}
+	if request.Portal != nil && op == "create" {
+		if err = recordManualBooking(ctx, tx, workspace, result, request.Portal); err != nil {
 			return err
 		}
 	}
@@ -600,12 +576,20 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 		return err
 	}
 	if op == "create" || result.Version != previous.Version {
+		if s.notices != nil {
+			if err = s.notices.BookingChanged(ctx, tx, result.ID, result.Version, kind, result.Status); err != nil {
+				return err
+			}
+		}
 		actor := user
 		if staff != nil {
 			actor = "STAFF:" + staff.session.ID
 		}
 		if public != nil {
 			actor = "PUBLIC_BOOKING"
+			if public.management != "" {
+				actor = "PUBLIC_PATIENT"
+			}
 		}
 		var before any
 		if op != "create" {
@@ -614,11 +598,6 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 				return e
 			}
 			before = json.RawMessage(raw)
-		}
-		if s.notices != nil && op != "link" {
-			if err = s.notices.BookingChanged(ctx, tx, result.ID, result.Version, kind); err != nil {
-				return err
-			}
 		}
 		if _, err = tx.Exec(ctx, "INSERT INTO booking_events(booking_id,version,kind,actor_id,before_document,after_document) VALUES($1,$2,$3,$4,$5,$6)", result.ID, result.Version, kind, actor, before, response); err != nil {
 			return err

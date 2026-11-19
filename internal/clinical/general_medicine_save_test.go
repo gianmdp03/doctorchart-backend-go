@@ -3,6 +3,7 @@ package clinical
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"testing"
 
 	"github.com/syntah/doctorchart-backend-go/internal/api"
@@ -77,8 +78,19 @@ func TestGeneralMedicineCompletePatientAndEncounterWithBrowserTimeZone(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
+	if loaded.Phone == nil || *loaded.Phone != "+541155554444" {
+		t.Fatalf("expected a canonical patient contact phone, got %v", loaded.Phone)
+	}
 	if loaded.ID != patient.ID || loaded.Email == nil || *loaded.Email != "prueba@example.test" || loaded.Measurements == nil || loaded.Measurements.Weight == nil || *loaded.Measurements.Weight != 70 {
 		t.Fatal("full patient or post-encounter reload lost saved data")
+	}
+	page, err := s.ListPatients(ctx, owner, url.Values{"search": {"011 5555-4444"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows := page.(map[string]any)["content"].([]PatientList)
+	if len(rows) != 1 || rows[0].ID != patient.ID {
+		t.Fatal("directory did not find canonical phone by national input")
 	}
 	if encounter.PatientID != patient.ID {
 		t.Fatal("encounter belongs to another patient")

@@ -1,4 +1,22 @@
 {
+  "provisional_specialties": [
+    {"code":"allergy_immunology"},
+    {"code":"cardiology"},
+    {"code":"endocrinology"},
+    {"code":"gastroenterology"},
+    {"code":"geriatrics"},
+    {"code":"gynecology"},
+    {"code":"internal_medicine"},
+    {"code":"neurology"},
+    {"code":"obstetrics"},
+    {"code":"ophthalmology"},
+    {"code":"otolaryngology"},
+    {"code":"psychiatry"},
+    {"code":"pulmonology"},
+    {"code":"rheumatology"},
+    {"code":"traumatology_orthopedics"},
+    {"code":"urology"}
+  ],
   "specialties": [
     {
       "id": 1,

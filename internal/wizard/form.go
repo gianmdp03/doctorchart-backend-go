@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/syntah/doctorchart-backend-go/internal/api"
+	"github.com/syntah/doctorchart-backend-go/internal/telephone"
 )
 
 type Evaluation struct {
@@ -24,7 +25,14 @@ type formField struct {
 
 var emailInput = regexp.MustCompile(`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
 var dniInput = regexp.MustCompile(`^[0-9]{6,8}$`)
-var phoneInput = regexp.MustCompile(`^[+0-9\s().-]+$`)
+
+func telephoneField(key string) bool {
+	switch key {
+	case "sys_phone", "phone", "patient.phone", "primaryContactPhone", "patient.guardianInfo.primaryContactPhone":
+		return true
+	}
+	return false
+}
 
 func personalTextError(key, value string) string {
 	value = strings.TrimSpace(value)
@@ -39,16 +47,6 @@ func personalTextError(key, value string) string {
 	case "sys_dni", "nationalId", "patient.nationalId":
 		if !dniInput.MatchString(value) {
 			return "INVALID_DNI"
-		}
-	case "sys_phone", "phone", "patient.phone", "primaryContactPhone", "patient.guardianInfo.primaryContactPhone":
-		digits := 0
-		for _, char := range value {
-			if char >= '0' && char <= '9' {
-				digits++
-			}
-		}
-		if !phoneInput.MatchString(value) || digits < 6 || digits > 15 {
-			return "INVALID_PHONE"
 		}
 	}
 	return ""
@@ -225,7 +223,18 @@ func (v *Validator) evaluate(form, values, context, previous map[string]any) (Ev
 			}
 		}
 		if value, ok := value.(string); ok && (kind == "TEXT" || kind == "TEXTAREA") {
-			if code := personalTextError(key, value); code != "" {
+			if telephoneField(key) {
+				// Full-form edits echo stored fields. Validate only new phone values.
+				if saved, exists := previous[key].(string); exists && saved == value {
+					continue
+				}
+				normalized, valid := telephone.Normalize(value)
+				if !valid {
+					issue(key, "INVALID_PHONE")
+				} else {
+					result.Values[key] = normalized
+				}
+			} else if code := personalTextError(key, value); code != "" {
 				issue(key, code)
 			}
 		}

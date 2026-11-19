@@ -186,6 +186,41 @@ func (f *fixture) request(method, path, user, body string) *httptest.ResponseRec
 
 const createBody = `{"name":"Centro","country":"Argentina","province":"Buenos Aires","city":"Mar del Plata","address":"Synthetic 123","timezone":"America/Argentina/Buenos_Aires"}`
 
+func TestClinicSpecialtiesConstrainSchedulingAndKeepExistingBlocks(t *testing.T) {
+	f := scheduleFixture(t)
+	first := contextID(t, f, owner)
+	foreign := contextID(t, f, other)
+	var second string
+	if err := f.pool.QueryRow(t.Context(), `INSERT INTO doctor_specialty_contexts(workspace_id,created_at,current_step_key,onboarding_completed,definition,updated_at,version,specialty_id)
+	 SELECT workspace_id,now(),'COMPLETE',true,'{}',now(),0,(SELECT min(id) FROM specialties WHERE id<>c.specialty_id)
+	 FROM doctor_specialty_contexts c WHERE id=$1 RETURNING id::text`, first).Scan(&second); err != nil {
+		t.Fatal(err)
+	}
+	body := func(ids string) string {
+		return strings.TrimSuffix(createBody, "}") + `,"specialtyContextIds":[` + ids + "]}"
+	}
+	assertCode(t, f.request("POST", "/clinics", owner, body(jsonString(foreign))), 400, "INVALID_REQUEST")
+	w := f.request("POST", "/clinics", owner, body(jsonString(first)))
+	assertCode(t, w, 201, "")
+	c := clinic(t, w)
+	if len(c.SpecialtyContextIDs) != 1 || c.SpecialtyContextIDs[0] != first {
+		t.Fatal(w.Body.String())
+	}
+	path := "/clinics/" + c.ID
+	a := clinicSchedule{Version: "0", ScheduleConfig: ScheduleConfig{MinNoticeMinutes: 0, MaxAdvanceDays: 30, Weekly: []ScheduleDay{{Weekday: 1, Ranges: []ScheduleRange{{Start: "09:00", End: "11:00", SlotMinutes: 30, ContextID: second}}}}, Exceptions: []ScheduleException{}}}
+	putBlocks(t, f, c, a, 400, "CLINIC_SPECIALTY_NOT_ASSIGNED")
+	update := func(version string, ids ...string) string {
+		return jsonString(map[string]any{"expectedVersion": version, "specialtyContextIds": ids})
+	}
+	assertCode(t, f.request("PATCH", path, owner, update("0", first, second)), 200, "")
+	putBlocks(t, f, c, a, 200, "")
+	assertCode(t, f.request("PATCH", path, owner, update("1", first)), 409, "CLINIC_SPECIALTY_HAS_HOURS")
+	saved := clinic(t, f.request("GET", path, owner, ""))
+	if saved.Version != "1" || len(saved.SpecialtyContextIDs) != 2 {
+		t.Fatal(saved)
+	}
+}
+
 func assertCode(t *testing.T, w *httptest.ResponseRecorder, status int, code string) {
 	t.Helper()
 	if w.Code != status {

@@ -27,6 +27,24 @@ func TestDefaultSpecialtyDefinitions(t *testing.T) {
 	if len(seeds["specialties"]) != 3 || len(seeds["wizard_defaults"]) != 3 {
 		t.Fatal("expected three complete defaults")
 	}
+	provisional := seeds["provisional_specialties"]
+	if len(provisional) != 16 {
+		t.Fatalf("expected sixteen provisional specialties, got %d", len(provisional))
+	}
+	seen := make(map[string]bool, len(seeds["specialties"])+len(provisional))
+	for _, row := range seeds["specialties"] {
+		seen[row["code"].(string)] = true
+	}
+	for _, row := range provisional {
+		code, ok := row["code"].(string)
+		if !ok || seen[code] {
+			t.Fatalf("invalid or duplicate specialty reference: %v", row)
+		}
+		seen[code] = true
+		if _, err := provisionalDefinition(code, validator); err != nil {
+			t.Fatalf("invalid provisional specialty %s: %v", code, err)
+		}
+	}
 	for _, row := range seeds["wizard_defaults"] {
 		for _, key := range []string{"draft_definition", "published_definition"} {
 			raw, err := json.Marshal(row[key])
@@ -106,6 +124,14 @@ UPDATE wizard_defaults SET version=9,published_version=4,draft_definition=jsonb_
 		}
 	}
 	assertFixtureReady(t, pool)
+	var drafts int
+	if err := pool.QueryRow(ctx, `
+		SELECT count(*) FROM specialties s JOIN wizard_defaults w ON w.specialty_id=s.id
+		WHERE NOT s.active AND w.published_version=0 AND w.published_definition IS NULL
+		  AND w.published_approval_id IS NULL
+	`).Scan(&drafts); err != nil || drafts != 16 {
+		t.Fatalf("expected sixteen unpublished drafts, got %d: %v", drafts, err)
+	}
 	if snapshot() != before {
 		t.Fatal("Pediatrics configuration was replaced")
 	}

@@ -25,19 +25,20 @@ const (
 )
 
 type Clinic struct {
-	Modality       string    `json:"modality"`
-	FutureBookings int       `json:"futureBookings,omitempty"`
-	ID             string    `json:"id"`
-	Name           string    `json:"name"`
-	Country        string    `json:"country"`
-	Province       string    `json:"province"`
-	City           string    `json:"city"`
-	Address        string    `json:"address"`
-	Timezone       string    `json:"timezone"`
-	Status         string    `json:"status"`
-	Version        string    `json:"version"`
-	CreatedAt      time.Time `json:"createdAt"`
-	UpdatedAt      time.Time `json:"updatedAt"`
+	Modality            string    `json:"modality"`
+	SpecialtyContextIDs []string  `json:"specialtyContextIds,omitempty"`
+	FutureBookings      int       `json:"futureBookings,omitempty"`
+	ID                  string    `json:"id"`
+	Name                string    `json:"name"`
+	Country             string    `json:"country"`
+	Province            string    `json:"province"`
+	City                string    `json:"city"`
+	Address             string    `json:"address"`
+	Timezone            string    `json:"timezone"`
+	Status              string    `json:"status"`
+	Version             string    `json:"version"`
+	CreatedAt           time.Time `json:"createdAt"`
+	UpdatedAt           time.Time `json:"updatedAt"`
 }
 
 type Service struct {
@@ -77,13 +78,14 @@ func (s *Service) WithPublicBookings(enabled bool, secret string) *Service {
 	return s
 }
 
-const columns = "id::text,name,country,province,city,address,timezone,status,version::text,created_at,updated_at,modality"
+const columns = "id::text,name,country,province,city,address,timezone,status,version::text,created_at,updated_at,modality," +
+	"ARRAY(SELECT specialty_context_id::text FROM clinic_specialty_contexts WHERE clinic_id=clinics.id ORDER BY specialty_context_id)"
 
 type scanner interface{ Scan(...any) error }
 
 func scan(row scanner) (Clinic, error) {
 	var c Clinic
-	err := row.Scan(&c.ID, &c.Name, &c.Country, &c.Province, &c.City, &c.Address, &c.Timezone, &c.Status, &c.Version, &c.CreatedAt, &c.UpdatedAt, &c.Modality)
+	err := row.Scan(&c.ID, &c.Name, &c.Country, &c.Province, &c.City, &c.Address, &c.Timezone, &c.Status, &c.Version, &c.CreatedAt, &c.UpdatedAt, &c.Modality, &c.SpecialtyContextIDs)
 	c.CreatedAt, c.UpdatedAt = c.CreatedAt.UTC(), c.UpdatedAt.UTC()
 	return c, err
 }
@@ -140,8 +142,8 @@ func (s *Service) Routes(mux *http.ServeMux) {
 			}
 		}
 	}
-	if s.notices != nil {
-		s.notificationRoutes(mux, wrap)
+	if s.notices != nil && s.publicEnabled {
+		s.bookingPortalRoutes(mux)
 	}
 	if s.staffEnabled {
 		s.staffAuthRoutes(mux)
@@ -155,6 +157,8 @@ func (s *Service) Routes(mux *http.ServeMux) {
 	}
 	if s.schedulesEnabled {
 		s.scheduleRoutes(mux, wrap)
+		mux.HandleFunc("GET /api/doctorchart/teleconsultations", wrap(s.listTeleconsultations))
+		mux.HandleFunc("PUT /api/doctorchart/teleconsultations/{context}", wrap(s.setTeleconsultation))
 	}
 	mux.HandleFunc("GET /api/doctorchart/clinics", wrap(s.list))
 	mux.HandleFunc("GET /api/doctorchart/clinics/capabilities", wrap(s.capabilities))
@@ -278,6 +282,9 @@ func values(body map[string]any, op string) (map[string]string, int64, error) {
 	mode, _ := body["modality"].(string)
 	virtual := op == "create" && mode == teleconsultation
 	for key, value := range body {
+		if key == "specialtyContextIds" && op != "status" {
+			continue
+		}
 		if key == "modality" && op == "create" {
 			if mode != teleconsultation && mode != inPerson {
 				return nil, 0, field(key, "INVALID_MODALITY")
@@ -336,7 +343,7 @@ func values(body map[string]any, op string) (map[string]string, int64, error) {
 		if _, ok := body["expectedVersion"]; !ok {
 			return nil, 0, field("expectedVersion", "REQUIRED")
 		}
-		if len(fields) == 0 {
+		if _, assigned := body["specialtyContextIds"]; len(fields) == 0 && !assigned {
 			return nil, 0, api.Invalid("Indicá los campos a modificar.")
 		}
 	}
@@ -373,6 +380,10 @@ func (s *Service) mutate(w http.ResponseWriter, r *http.Request, user, op string
 		return err
 	}
 	fields, expected, err := values(body, op)
+	if err != nil {
+		return err
+	}
+	contextIDs, err := clinicContextIDs(body)
 	if err != nil {
 		return err
 	}
@@ -422,6 +433,9 @@ func (s *Service) mutate(w http.ResponseWriter, r *http.Request, user, op string
 	}
 	virtual := fields["modality"] == teleconsultation || current.Modality == teleconsultation
 	if virtual {
+		if contextIDs != nil {
+			return field("specialtyContextIds", "UNEXPECTED_FIELD")
+		}
 		if !s.schedulesEnabled {
 			return missing()
 		}
@@ -482,6 +496,15 @@ func (s *Service) mutate(w http.ResponseWriter, r *http.Request, user, op string
 			}
 		}
 		return err
+	}
+	if contextIDs != nil {
+		if err := setClinicContexts(ctx, tx, workspace, result.ID, contextIDs); err != nil {
+			return err
+		}
+		result.SpecialtyContextIDs = make([]string, len(contextIDs))
+		for i, contextID := range contextIDs {
+			result.SpecialtyContextIDs[i] = strconv.FormatInt(contextID, 10)
+		}
 	}
 	if op != "create" {
 		if err := s.validateSchedules(ctx, tx, workspace, result.ID, time.Now().UTC()); err != nil {

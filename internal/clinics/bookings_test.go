@@ -49,7 +49,7 @@ func bookingRequestFixture(f *fixture, method, path, user, key, body string) *ht
 }
 func newBookingKey() string { return fmt.Sprintf("booking-key-%020d", bookingKeyCounter.Add(1)) }
 func createBookingBody(clinic string, start time.Time) string {
-	return fmt.Sprintf(`{"clinicId":%q,"start":%q,"contactName":"Contacto sintético","contactPhone":"123"}`, clinic, start.Format(time.RFC3339Nano))
+	return fmt.Sprintf(`{"clinicId":%q,"start":%q,"contactName":"Contacto sintético","contactPhone":"0351 15-234-5678"}`, clinic, start.Format(time.RFC3339Nano))
 }
 func booked(t *testing.T, w *httptest.ResponseRecorder) Booking {
 	t.Helper()
@@ -71,10 +71,15 @@ func TestBookingsCreateCancelReleaseReplayAndEvents(t *testing.T) {
 	f, c, start := bookingFixture(t)
 	key := newBookingKey()
 	body := createBookingBody(c.ID, start)
+	invalid := strings.Replace(body, "0351 15-234-5678", "123", 1)
+	assertCode(t, bookingRequestFixture(f, "POST", "/bookings", owner, key, invalid), 400, "INVALID_REQUEST")
 	reply := bookingRequestFixture(f, "POST", "/bookings", owner, key, body)
 	assertCode(t, reply, 201, "")
 	b := booked(t, reply)
-	if b.Status != "CONFIRMED" || b.Version != "1" || !b.End.Equal(start.Add(30*time.Minute)) || b.PatientID != nil {
+	if b.ContactPhone != "+5493512345678" {
+		t.Fatalf("manual contact phone = %q", b.ContactPhone)
+	}
+	if b.Status != "CONFIRMED" || b.Version != "1" || !b.End.Equal(start.Add(30*time.Minute)) || strings.Contains(reply.Body.String(), `"patientId"`) {
 		t.Fatal(b)
 	}
 	again := bookingRequestFixture(f, "POST", "/bookings", owner, key, body)

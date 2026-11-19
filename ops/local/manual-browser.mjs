@@ -98,7 +98,8 @@ try {
     const response = await pending;
     assert.equal(response.status(),201);
     const result = await response.json();
-    await page.getByText(result.reference,{exact:true}).waitFor();
+    await page.getByRole('heading', {name:'Tu próxima consulta, organizada.'}).waitFor();
+    assert.ok(result.reference, 'La referencia sigue disponible en la respuesta de la reserva');
     assert.equal(response.request().postDataJSON().attendeeName,'Paciente distinto ficticio');
     report('Reserva pública real con solicitante distinto del paciente');
   });

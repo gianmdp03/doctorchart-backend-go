@@ -12,51 +12,41 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/mail"
 	"net/url"
 	"time"
 	_ "time/tzdata"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/syntah/doctorchart-backend-go/internal/mailclient"
 )
 
 type Config struct {
-	PublicOrigin                      string
 	Enabled                           bool
-	Key                               string
-	Host                              string
-	Port                              int
-	From, Username, Password, TLSMode string
-	ReminderMinutes                   int
+	Key, PublicOrigin                 string
+	MailServiceURL, MailServiceAPIKey string
 }
 type Sender interface {
-	Send(context.Context, string, []byte) error
+	Send(context.Context, mailclient.Message) (mailclient.Result, error)
 }
 type Service struct {
 	pool   *pgxpool.Pool
 	cipher cipher.AEAD
 	sender Sender
-	from   string
-	lead   time.Duration
 	origin string
 }
 type Message struct {
 	Date        time.Time `json:"date"`
 	To          string    `json:"to"`
-	Doctor      string    `json:"doctor,omitempty"`
-	Clinic      string    `json:"clinic,omitempty"`
-	Specialty   string    `json:"specialty,omitempty"`
-	Address     string    `json:"address,omitempty"`
-	Timezone    string    `json:"timezone,omitempty"`
-	Start       time.Time `json:"start,omitempty"`
-	Reference   string    `json:"reference,omitempty"`
 	Code        string    `json:"code,omitempty"`
 	Expires     time.Time `json:"expires,omitempty"`
 	StaffOrigin string    `json:"staffOrigin,omitempty"`
+	Start       time.Time `json:"start,omitempty"`
+	Timezone    string    `json:"timezone,omitempty"`
 }
 
 const staffInvitationKeyPrefix = "staff-invitation:"
+const bookingEmailKeyPrefix = "booking-email:"
 
 func Token() string {
 	var raw [32]byte
@@ -83,24 +73,20 @@ func New(pool *pgxpool.Pool, c Config) (*Service, error) {
 	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.Path != "" || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" {
 		return nil, errors.New("notifications require an exact HTTPS public origin")
 	}
-	sender, err := NewSMTP(c)
+	sender, err := mailclient.New(c.MailServiceURL, c.MailServiceAPIKey, nil)
 	if err != nil {
 		return nil, err
 	}
-	s, err := NewWithSender(pool, c.Key, c.From, c.ReminderMinutes, sender)
+	s, err := NewWithSender(pool, c.Key, sender)
 	if err == nil {
 		s.origin = c.PublicOrigin
 	}
 	return s, err
 }
-func NewWithSender(pool *pgxpool.Pool, key, from string, minutes int, sender Sender) (*Service, error) {
-	fromAddress, err := mail.ParseAddress(from)
-	if err != nil || fromAddress.Address != from {
-		return nil, errors.New("invalid notification sender")
-	}
+func NewWithSender(pool *pgxpool.Pool, key string, sender Sender) (*Service, error) {
 	raw, err := base64.StdEncoding.DecodeString(key)
-	if err != nil || len(raw) != 32 || minutes < 1 || minutes > 10080 || sender == nil {
-		return nil, errors.New("invalid notification encryption or reminder configuration")
+	if err != nil || len(raw) != 32 || sender == nil {
+		return nil, errors.New("invalid notification encryption or sender configuration")
 	}
 	block, err := aes.NewCipher(raw)
 	if err != nil {
@@ -110,7 +96,7 @@ func NewWithSender(pool *pgxpool.Pool, key, from string, minutes int, sender Sen
 	if err != nil {
 		return nil, err
 	}
-	return &Service{pool: pool, cipher: aead, sender: sender, from: from, lead: time.Duration(minutes) * time.Minute}, nil
+	return &Service{pool: pool, cipher: aead, sender: sender}, nil
 }
 func (s *Service) seal(value []byte, aad string) []byte {
 	nonce := make([]byte, s.cipher.NonceSize())
@@ -131,20 +117,25 @@ func (s *Service) open(value []byte, aad string) ([]byte, error) {
 	return plain, nil
 }
 
+func (s *Service) PublicOrigin() string { return s.origin }
+
+func (s *Service) SealPortalSession(value []byte) string {
+	return base64.RawURLEncoding.EncodeToString(s.seal(value, "booking-portal-cookie"))
+}
+
+func (s *Service) OpenPortalSession(value string) ([]byte, error) {
+	raw, err := base64.RawURLEncoding.DecodeString(value)
+	if err != nil {
+		return nil, err
+	}
+	return s.open(raw, "booking-portal-cookie")
+}
+
 // ValidateKey refuses to start with a key that cannot read existing delivery state.
 func (s *Service) ValidateKey(ctx context.Context) error {
 	var data []byte
 	var aad string
-	err := s.pool.QueryRow(ctx, "SELECT payload,dedup_key FROM notification_outbox ORDER BY id LIMIT 1").Scan(&data, &aad)
-	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return err
-	}
-	if err == nil {
-		if _, err = s.open(data, aad); err != nil {
-			return err
-		}
-	}
-	err = s.pool.QueryRow(ctx, "SELECT encrypted_code,'booking:'||booking_id::text FROM booking_confirmation_access LIMIT 1").Scan(&data, &aad)
+	err := s.pool.QueryRow(ctx, "SELECT payload,dedup_key FROM notification_outbox WHERE booking_id IS NULL ORDER BY id LIMIT 1").Scan(&data, &aad)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return err
 	}
@@ -154,7 +145,7 @@ func (s *Service) ValidateKey(ctx context.Context) error {
 	}
 	return nil
 }
-func (s *Service) enqueue(ctx context.Context, tx pgx.Tx, key, kind string, booking, version, access, recovery any, due time.Time, m Message) error {
+func (s *Service) enqueue(ctx context.Context, tx pgx.Tx, key, kind string, access, recovery any, m Message) error {
 	if m.Date.IsZero() {
 		m.Date = time.Now().UTC()
 	}
@@ -162,76 +153,66 @@ func (s *Service) enqueue(ctx context.Context, tx pgx.Tx, key, kind string, book
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, "INSERT INTO notification_outbox(dedup_key,kind,booking_id,booking_version,access_id,recovery_id,payload,due_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(dedup_key) DO NOTHING", key, kind, booking, version, access, recovery, s.seal(raw, key), due)
+	_, err = tx.Exec(ctx, "INSERT INTO notification_outbox(dedup_key,kind,access_id,recovery_id,payload,due_at) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(dedup_key) DO NOTHING", key, kind, access, recovery, s.seal(raw, key), m.Date)
 	return err
 }
-func (s *Service) BookingChanged(ctx context.Context, tx pgx.Tx, id, version, kind string) error {
+
+func (s *Service) BookingPortalCode(ctx context.Context, tx pgx.Tx, id, email, code string) error {
+	key := "booking-portal:" + id
+	m := Message{To: email, Code: code, Date: time.Now().UTC()}
+	raw, err := json.Marshal(m)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, "INSERT INTO notification_outbox(dedup_key,kind,portal_code_id,payload,due_at) VALUES($1,'BOOKING_PORTAL_CODE',$2,$3,$4)",
+		key, id, s.seal(raw, key), m.Date)
+	return err
+}
+
+// BookingChanged schedules email for the address explicitly provided with an online reservation.
+func (s *Service) BookingChanged(ctx context.Context, tx pgx.Tx, id, version, event, status string) error {
+	kind := ""
+	switch {
+	case event == "CREATED":
+		kind = "BOOKING_CONFIRMED"
+	case event == "RESCHEDULED":
+		kind = "BOOKING_RESCHEDULED"
+	case event == "STATUS_CHANGED" && status == "CANCELLED":
+		kind = "BOOKING_CANCELLED"
+	}
+	if kind == "" {
+		return nil
+	}
 	var m Message
-	var status string
-	var end time.Time
-	err := tx.QueryRow(ctx, `SELECT p.email,p.doctor_name,b.clinic_snapshot->>'name',b.clinic_snapshot->>'publicAddress',b.clinic_snapshot->>'timezone',b.start_at,b.end_at,p.reference::text,b.status,b.specialty_snapshot->>'name' FROM bookings b JOIN booking_public_details p ON p.booking_id=b.id WHERE b.id=$1`, id).Scan(&m.To, &m.Doctor, &m.Clinic, &m.Address, &m.Timezone, &m.Start, &end, &m.Reference, &status, &m.Specialty)
+	err := tx.QueryRow(ctx, "SELECT p.email,b.start_at,b.clinic_snapshot->>'timezone' FROM booking_public_details p JOIN bookings b ON b.id=p.booking_id WHERE b.id=$1", id).
+		Scan(&m.To, &m.Start, &m.Timezone)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
 	}
 	if err != nil {
 		return err
 	}
-	var data []byte
-	var revoked *time.Time
-	err = tx.QueryRow(ctx, "SELECT encrypted_code,revoked_at FROM booking_confirmation_access WHERE booking_id=$1", id).Scan(&data, &revoked)
-	if errors.Is(err, pgx.ErrNoRows) {
-		m.Code = Token()
-		m.Expires = end.AddDate(0, 0, 7)
-		_, err = tx.Exec(ctx, "INSERT INTO booking_confirmation_access(booking_id,token_hash,encrypted_code,expires_at) VALUES($1,$2,$3,$4)", id, Hash(m.Code), s.seal([]byte(m.Code), "booking:"+id), m.Expires)
-	} else if err == nil && revoked == nil {
-		var raw []byte
-		raw, err = s.open(data, "booking:"+id)
-		m.Code = string(raw)
-		m.Expires = end.AddDate(0, 0, 7)
-		if err == nil {
-			_, err = tx.Exec(ctx, "UPDATE booking_confirmation_access SET expires_at=$1 WHERE booking_id=$2", m.Expires, id)
-		}
-	}
+	m.Date = time.Now().UTC()
+	raw, err := json.Marshal(m)
 	if err != nil {
 		return err
 	}
-	event := ""
-	switch kind {
-	case "CREATED":
-		event = "BOOKING_CONFIRMED"
-	case "RESCHEDULED":
-		event = "BOOKING_RESCHEDULED"
-	case "STATUS_CHANGED":
-		if status == "CANCELLED" {
-			event = "BOOKING_CANCELLED"
-		}
+	enqueue := func(kind string, due time.Time) error {
+		key := bookingEmailKeyPrefix + id + ":" + version + ":" + kind
+		_, err := tx.Exec(ctx, "INSERT INTO notification_outbox(dedup_key,kind,booking_id,booking_version,payload,due_at) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(dedup_key) DO NOTHING",
+			key, kind, id, version, s.seal(raw, key), due)
+		return err
 	}
-	if event != "" {
-		if err = s.enqueue(ctx, tx, "booking:"+id+":"+version+":"+event, event, id, version, nil, nil, time.Now().UTC(), m); err != nil {
-			return err
-		}
+	if err = enqueue(kind, m.Date); err != nil {
+		return err
 	}
-	due := m.Start.Add(-s.lead)
-	if status == "CONFIRMED" && due.After(time.Now()) {
-		return s.enqueue(ctx, tx, "booking:"+id+":"+version+":reminder", "BOOKING_REMINDER", id, version, nil, nil, due, m)
+	if due := m.Start.Add(-24 * time.Hour); status == "CONFIRMED" && due.After(m.Date) {
+		return enqueue("BOOKING_REMINDER", due)
 	}
 	return nil
 }
-func (s *Service) Code(ctx context.Context, id string) (string, time.Time, error) {
-	var data []byte
-	var expires time.Time
-	err := s.pool.QueryRow(ctx, "SELECT encrypted_code,expires_at FROM booking_confirmation_access WHERE booking_id=$1 AND revoked_at IS NULL AND expires_at>clock_timestamp()", id).Scan(&data, &expires)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return "", expires, nil
-	}
-	if err != nil {
-		return "", expires, err
-	}
-	raw, err := s.open(data, "booking:"+id)
-	return string(raw), expires, err
-}
 func (s *Service) Invitation(ctx context.Context, tx pgx.Tx, access, email, code, origin string, expires time.Time) error {
-	return s.enqueue(ctx, tx, staffInvitationKeyPrefix+Hash(code), "STAFF_INVITATION", nil, nil, access, nil, time.Now().UTC(),
+	return s.enqueue(ctx, tx, staffInvitationKeyPrefix+Hash(code), "STAFF_INVITATION", access, nil,
 		Message{To: email, Code: code, StaffOrigin: origin, Expires: expires})
 }
 
@@ -241,5 +222,5 @@ func (s *Service) Recovery(ctx context.Context, tx pgx.Tx, account, email string
 	if _, err := tx.Exec(ctx, "INSERT INTO staff_email_recovery(id,account_id,token_hash,expires_at) VALUES($1,$2,$3,$4)", id, account, Hash(code), expires); err != nil {
 		return err
 	}
-	return s.enqueue(ctx, tx, "recovery:"+id, "STAFF_RECOVERY", nil, nil, nil, id, time.Now().UTC(), Message{To: email, Code: code, Expires: expires})
+	return s.enqueue(ctx, tx, "recovery:"+id, "STAFF_RECOVERY", nil, id, Message{To: email, Code: code, Expires: expires})
 }

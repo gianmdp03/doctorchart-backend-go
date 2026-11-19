@@ -12,60 +12,24 @@ import (
 )
 
 func (s *Service) WithNotifications(n *notifications.Service) *Service { s.notices = n; return s }
-func confirmationMissing() error {
-	return api.Failure(404, "CONFIRMATION_NOT_FOUND", "La constancia no está disponible. Revisá el código o su vencimiento.")
-}
-func (s *Service) notificationRoutes(mux *http.ServeMux, wrap func(func(http.ResponseWriter, *http.Request, string) error) http.HandlerFunc) {
-	if s.publicEnabled {
-		mux.HandleFunc("POST /api/doctorchart/public/appointments/confirmation", func(w http.ResponseWriter, r *http.Request) {
-			publicHeaders(w)
-			if err := s.confirmation(w, r); err != nil {
-				if failure, ok := err.(*api.Error); ok && failure.Status == 429 {
-					w.Header().Set("Retry-After", "60")
-				}
-				api.WriteError(w, err)
+func (s *Service) bookingPortalRoutes(mux *http.ServeMux) {
+	const prefix = "POST /api/doctorchart/public/appointments/"
+	register := func(path, kind string, limit int, fn func(http.ResponseWriter, *http.Request) error) {
+		mux.HandleFunc(prefix+path, s.publicWrap(kind, limit, func(w http.ResponseWriter, r *http.Request) error {
+			if r.URL.RawQuery != "" {
+				return api.Invalid("Ingresá los datos solamente en el formulario.")
 			}
-		})
+			if origin := s.notices.PublicOrigin(); origin != "" && r.Header.Get("Origin") != origin {
+				return api.Failure(403, "INVALID_PUBLIC_CONTEXT", "Abrí Mis turnos desde DoctorChart.")
+			}
+			return fn(w, r)
+		}))
 	}
-	mux.HandleFunc("DELETE /api/doctorchart/bookings/{id}/confirmation-access", wrap(func(w http.ResponseWriter, r *http.Request, owner string) error {
-		b, err := ownedBooking(r.Context(), s.pool, owner, r.PathValue("id"))
-		if err != nil {
-			return err
-		}
-		if _, err = s.pool.Exec(r.Context(), "UPDATE booking_confirmation_access SET revoked_at=COALESCE(revoked_at,clock_timestamp()) WHERE booking_id=$1", b.ID); err != nil {
-			return err
-		}
-		w.WriteHeader(204)
-		return nil
-	}))
-}
-func (s *Service) confirmation(w http.ResponseWriter, r *http.Request) error {
-	if err := s.publicLimit(r, "confirmation", 30); err != nil {
-		return err
-	}
-	if r.URL.RawQuery != "" {
-		return api.Invalid("El código se envía solamente en el formulario.")
-	}
-	var req struct {
-		Code string `json:"accessCode"`
-	}
-	if err := decodePublic(w, r, &req); err != nil {
-		return err
-	}
-	if len(req.Code) != 43 {
-		return confirmationMissing()
-	}
-	var reference, status, doctor, clinic, address, zone, specialty, modality string
-	var start, end, expires time.Time
-	err := s.pool.QueryRow(r.Context(), `SELECT p.reference::text,b.status,b.start_at,b.end_at,p.doctor_name,b.clinic_snapshot->>'name',b.clinic_snapshot->>'publicAddress',b.clinic_snapshot->>'timezone',a.expires_at,b.specialty_snapshot->>'name',COALESCE(b.clinic_snapshot->>'modality','IN_PERSON') FROM booking_confirmation_access a JOIN bookings b ON b.id=a.booking_id JOIN booking_public_details p ON p.booking_id=b.id WHERE a.token_hash=$1 AND a.revoked_at IS NULL AND a.expires_at>clock_timestamp()`, notifications.Hash(req.Code)).Scan(&reference, &status, &start, &end, &doctor, &clinic, &address, &zone, &expires, &specialty, &modality)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return confirmationMissing()
-	}
-	if err != nil {
-		return err
-	}
-	api.WriteJSON(w, 200, map[string]any{"reference": reference, "status": status, "start": start.UTC(), "end": end.UTC(), "doctorName": doctor, "clinicName": clinic, "modality": modality, "address": address, "timezone": zone, "accessExpiresAt": expires.UTC(), "specialtyName": specialty})
-	return nil
+	register("access/request", "portal-request", 6, s.requestPortalCode)
+	register("access/verify", "portal-verify", 12, s.verifyPortalCode)
+	register("my-bookings", "portal-list", 30, s.portalBookings)
+	register("my-bookings/change", "portal-change", 10, s.changePortalBooking)
+	register("my-bookings/logout", "portal-logout", 10, s.closePortal)
 }
 func (s *Service) staffRecoveryEmail(w http.ResponseWriter, r *http.Request) error {
 	if err := s.staffOriginCheck(r); err != nil {

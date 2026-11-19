@@ -97,7 +97,7 @@ func TestPediatricDirectoryFiltersAndSpecialtyIsolation(t *testing.T) {
 	ctx := context.Background()
 	// Keep growth enabled in the other workspace: capability must not opt it in.
 	var otherSpecialty int64
-	if err := pool.QueryRow(ctx, `INSERT INTO specialties(active,code,created_at,display_name,navigation,patient_record_actions,patient_record_tabs,updated_at,version) SELECT active,'cardiology',now(),'Pediatría (editable name)',navigation,patient_record_actions,patient_record_tabs,now(),version FROM specialties WHERE code='pediatrics' RETURNING id`).Scan(&otherSpecialty); err != nil {
+	if err := pool.QueryRow(ctx, `INSERT INTO specialties(active,code,created_at,display_name,navigation,patient_record_actions,patient_record_tabs,updated_at,version) SELECT active,'directory_other_fixture',now(),'Pediatría (editable name)',navigation,patient_record_actions,patient_record_tabs,now(),version FROM specialties WHERE code='pediatrics' RETURNING id`).Scan(&otherSpecialty); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := pool.Exec(ctx, `UPDATE doctor_specialty_contexts SET specialty_id=$1 WHERE workspace_id=(SELECT id FROM doctor_workspaces WHERE user_id='integrity-other')`, otherSpecialty); err != nil {

@@ -99,6 +99,9 @@ func seed(ctx context.Context, tx pgx.Tx, validator *wizard.Validator) error {
 				return err
 			}
 		}
+		if err := seedProvisional(ctx, tx, validator, seeds["provisional_specialties"]); err != nil {
+			return err
+		}
 		for _, row := range seeds["chart_definitions"] {
 			var exists bool
 			if err := tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM chart_definitions WHERE chart_code=$1)", row["chart_code"]).Scan(&exists); err != nil {

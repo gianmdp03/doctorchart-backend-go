@@ -15,12 +15,13 @@ import (
 const civilLayout = "2006-01-02"
 
 type agendaWindow struct {
-	ClinicID string    `json:"clinicId"`
-	Name     string    `json:"name"`
-	Timezone string    `json:"timezone"`
-	Modality string    `json:"modality"`
-	Start    time.Time `json:"start"`
-	End      time.Time `json:"end"`
+	ContextID string    `json:"specialtyContextId,omitempty"`
+	ClinicID  string    `json:"clinicId"`
+	Name      string    `json:"name"`
+	Timezone  string    `json:"timezone"`
+	Modality  string    `json:"modality"`
+	Start     time.Time `json:"start"`
+	End       time.Time `json:"end"`
 }
 
 func localDate(t time.Time) time.Time {
@@ -61,7 +62,10 @@ func agendaWindows(ctx context.Context, a agendaRecord, first time.Time, days in
 				start := maxTime(period, midnight.Add(time.Duration(startMinute)*time.Minute))
 				end := minTime(endPeriod, midnight.Add(time.Duration(endMinute)*time.Minute))
 				if start.Before(end) {
-					result = append(result, agendaWindow{a.id, a.name, a.zone, a.modality, start, end})
+					result = append(result, agendaWindow{
+						ClinicID: a.id, Name: a.name, Timezone: a.zone, Modality: a.modality,
+						ContextID: r.ContextID, Start: start, End: end,
+					})
 				}
 			}
 			period = endPeriod
@@ -290,7 +294,7 @@ func validateDraftAgendas(ctx context.Context, q scheduleReader, workspace int64
 
 func archivedReservationWindows(ctx context.Context, q scheduleReader, workspace int64, from, to time.Time) ([]agendaWindow, error) {
 	rows, err := q.Query(ctx, `SELECT c.id::text,COALESCE(b.clinic_snapshot->>'name',c.name),
-		COALESCE(b.clinic_snapshot->>'timezone',c.timezone),c.modality,b.start_at,b.end_at
+		COALESCE(b.clinic_snapshot->>'timezone',c.timezone),c.modality,b.specialty_context_id::text,b.start_at,b.end_at
 		FROM bookings b JOIN clinics c ON c.id=b.clinic_id AND c.workspace_id=b.workspace_id
 		WHERE b.workspace_id=$1 AND c.status='ARCHIVED' AND b.status<>'CANCELLED'
 		  AND b.end_at>$2 AND b.start_at<$3 ORDER BY b.start_at`, workspace, from, to)
@@ -301,7 +305,7 @@ func archivedReservationWindows(ctx context.Context, q scheduleReader, workspace
 	result := []agendaWindow{}
 	for rows.Next() {
 		var w agendaWindow
-		if err := rows.Scan(&w.ClinicID, &w.Name, &w.Timezone, &w.Modality, &w.Start, &w.End); err != nil {
+		if err := rows.Scan(&w.ClinicID, &w.Name, &w.Timezone, &w.Modality, &w.ContextID, &w.Start, &w.End); err != nil {
 			return nil, err
 		}
 		w.Start, w.End = w.Start.UTC(), w.End.UTC()
@@ -341,9 +345,23 @@ func (s *Service) occupiedSchedule(w http.ResponseWriter, r *http.Request, user 
 		return err
 	}
 	q := r.URL.Query()
-	if len(q) != 1 || len(q["from"]) != 1 {
+	var selectedContextID int64
+	if len(q["from"]) != 1 {
 		return api.Invalid("Indicá la fecha de inicio de la semana.")
 	}
+	for key, values := range q {
+		if key == "from" {
+			continue
+		}
+		if key != "specialtyContextId" || len(values) != 1 || clinic.Modality != teleconsultation {
+			return api.Invalid("Parámetros de horarios ocupados inválidos.")
+		}
+		selectedContextID, err = decimal(values[0], true)
+		if err != nil {
+			return err
+		}
+	}
+	selectedContext := q.Get("specialtyContextId")
 	date, err := civilDate(q.Get("from"))
 	if err != nil || date.Year() >= 9999 {
 		return field("from", "INVALID_DATE")
@@ -364,6 +382,15 @@ func (s *Service) occupiedSchedule(w http.ResponseWriter, r *http.Request, user 
 		return err
 	}
 	defer tx.Rollback(context.WithoutCancel(ctx))
+	if selectedContext != "" {
+		var owned bool
+		if err := tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM doctor_specialty_contexts WHERE workspace_id=$1 AND id=$2)", workspace, selectedContextID).Scan(&owned); err != nil {
+			return err
+		}
+		if !owned {
+			return api.Failure(404, "SPECIALTY_CONTEXT_NOT_FOUND", "La especialidad no está disponible para atención.")
+		}
+	}
 	agendas, err := readAgendas(ctx, tx, workspace)
 	if err != nil {
 		return err
@@ -373,7 +400,7 @@ func (s *Service) occupiedSchedule(w http.ResponseWriter, r *http.Request, user 
 		return err
 	}
 	for _, a := range agendas {
-		if a.id == clinic.ID {
+		if a.id == clinic.ID && selectedContext == "" {
 			continue
 		}
 		part, err := agendaWindows(ctx, a, date.AddDate(0, 0, -2), 11)
@@ -381,6 +408,9 @@ func (s *Service) occupiedSchedule(w http.ResponseWriter, r *http.Request, user 
 			return err
 		}
 		for _, interval := range part {
+			if a.id == clinic.ID && interval.ContextID == selectedContext {
+				continue
+			}
 			if interval.Start.Before(to) && from.Before(interval.End) {
 				interval.Start = maxTime(interval.Start, from).UTC()
 				interval.End = minTime(interval.End, to).UTC()

@@ -14,7 +14,7 @@ type PublicContext struct {
 	Clinics []PublicClinic `json:"clinics"`
 }
 
-const publicOfferExists = `EXISTS(SELECT 1 FROM schedule_blocks b LEFT JOIN schedule_exceptions ex ON ex.id=b.exception_id WHERE b.specialty_context_id=cctx.id AND b.clinic_id=c.id AND (b.weekday IS NOT NULL OR ex.through_date>=CURRENT_DATE))`
+const publicOfferExists = `(c.modality='IN_PERSON' OR cctx.teleconsultation_enabled) AND EXISTS(SELECT 1 FROM schedule_blocks b LEFT JOIN schedule_exceptions ex ON ex.id=b.exception_id WHERE b.specialty_context_id=cctx.id AND b.clinic_id=c.id AND (b.weekday IS NOT NULL OR ex.through_date>=CURRENT_DATE))`
 
 func publicContextClinic(d PublicDoctor, context, clinic string) bool {
 	for _, s := range d.Specialties {

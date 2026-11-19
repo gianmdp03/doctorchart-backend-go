@@ -181,6 +181,14 @@ CREATE TABLE public.clinic_schedules (
     CONSTRAINT clinic_schedules_version_check CHECK ((version > 0))
 );
 
+CREATE TABLE public.clinic_specialty_contexts (
+    clinic_id bigint NOT NULL,
+    workspace_id bigint NOT NULL,
+    specialty_context_id bigint NOT NULL,
+    modality varchar(16) DEFAULT 'IN_PERSON' NOT NULL CHECK (modality = 'IN_PERSON'),
+    PRIMARY KEY (clinic_id, specialty_context_id)
+);
+
 COMMENT ON TABLE public.clinic_schedules IS 'Local civil agenda configuration; availability is calculated, never materialized.';
 
 CREATE TABLE public.clinical_calculation_definitions (
@@ -339,6 +347,7 @@ CREATE TABLE public.doctor_specialty_contexts (
     onboarding_completed boolean NOT NULL,
     created_at timestamp(6) with time zone NOT NULL,
     updated_at timestamp(6) with time zone NOT NULL,
+    teleconsultation_enabled boolean DEFAULT false NOT NULL,
     CONSTRAINT doctor_specialty_contexts_draft_source_wizard_version_check CHECK ((draft_source_wizard_version > 0)),
     CONSTRAINT doctor_specialty_contexts_source_wizard_version_check CHECK ((source_wizard_version > 0)),
     CONSTRAINT doctor_specialty_contexts_version_check CHECK ((version >= 0))
@@ -386,6 +395,24 @@ CREATE TABLE public.media_events (
     document jsonb NOT NULL
 );
 
+CREATE TABLE public.booking_portal_codes (
+    id uuid PRIMARY KEY,
+    booking_id bigint UNIQUE,
+    subject_hash character(64) NOT NULL,
+    email_hash character(64) NOT NULL,
+    proof_hash character(64) UNIQUE,
+    code_hash character(64) NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    expires_at timestamptz NOT NULL,
+    attempts integer NOT NULL DEFAULT 0 CHECK (attempts BETWEEN 0 AND 5),
+    session_hash character(64),
+    session_expires_at timestamptz,
+    CHECK ((session_hash IS NULL) = (session_expires_at IS NULL))
+);
+
+CREATE INDEX booking_portal_codes_email_idx ON public.booking_portal_codes (email_hash, created_at);
+CREATE INDEX booking_public_details_portal_idx ON public.booking_public_details (document_country, document_type, document, email);
+
 CREATE TABLE public.notification_outbox (
     id bigint NOT NULL,
     dedup_key character varying(160) NOT NULL,
@@ -404,8 +431,15 @@ CREATE TABLE public.notification_outbox (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     sent_at timestamp with time zone,
     CONSTRAINT notification_outbox_attempts_check CHECK ((attempts >= 0)),
-    CONSTRAINT notification_outbox_check CHECK ((((booking_id IS NOT NULL) AND (booking_version IS NOT NULL) AND (access_id IS NULL) AND (recovery_id IS NULL)) OR ((booking_id IS NULL) AND (booking_version IS NULL) AND (((access_id IS NOT NULL) AND (recovery_id IS NULL)) OR ((access_id IS NULL) AND (recovery_id IS NOT NULL)))))),
-    CONSTRAINT notification_outbox_kind_check CHECK ((kind IN ('BOOKING_CONFIRMED', 'BOOKING_CANCELLED', 'BOOKING_RESCHEDULED', 'BOOKING_REMINDER', 'STAFF_INVITATION', 'STAFF_RECOVERY'))),
+    portal_code_id uuid REFERENCES public.booking_portal_codes(id),
+    CONSTRAINT notification_outbox_check CHECK (
+        (kind IN ('BOOKING_CONFIRMED','BOOKING_CANCELLED','BOOKING_RESCHEDULED','BOOKING_REMINDER') AND booking_id IS NOT NULL AND booking_version IS NOT NULL AND access_id IS NULL AND recovery_id IS NULL AND portal_code_id IS NULL)
+        OR (booking_id IS NULL AND booking_version IS NULL AND (
+            (kind='STAFF_INVITATION' AND access_id IS NOT NULL AND recovery_id IS NULL AND portal_code_id IS NULL)
+            OR (kind='STAFF_RECOVERY' AND access_id IS NULL AND recovery_id IS NOT NULL AND portal_code_id IS NULL)
+            OR (kind='BOOKING_PORTAL_CODE' AND access_id IS NULL AND recovery_id IS NULL AND portal_code_id IS NOT NULL)
+        ))
+    ),
     CONSTRAINT notification_outbox_state_check CHECK ((state IN ('PENDING', 'PROCESSING', 'SENT', 'OBSOLETE', 'DEAD')))
 );
 
@@ -1356,6 +1390,9 @@ ALTER TABLE ONLY public.booking_idempotency
 ALTER TABLE ONLY public.booking_public_details
     ADD CONSTRAINT booking_public_details_booking_id_fkey FOREIGN KEY (booking_id) REFERENCES public.bookings(id) ON DELETE RESTRICT;
 
+ALTER TABLE ONLY public.booking_portal_codes
+    ADD CONSTRAINT booking_portal_codes_booking_id_fkey FOREIGN KEY (booking_id) REFERENCES public.bookings(id);
+
 ALTER TABLE ONLY public.booking_publications
     ADD CONSTRAINT booking_publications_workspace_id_fkey FOREIGN KEY (workspace_id) REFERENCES public.doctor_workspaces(id) ON DELETE RESTRICT;
 
@@ -1394,6 +1431,10 @@ ALTER TABLE ONLY public.clinic_schedules
 
 ALTER TABLE ONLY public.clinics
     ADD CONSTRAINT clinics_workspace_id_fkey FOREIGN KEY (workspace_id) REFERENCES public.doctor_workspaces(id);
+
+ALTER TABLE ONLY public.clinic_specialty_contexts
+    ADD CONSTRAINT clinic_specialty_contexts_clinic_fk FOREIGN KEY (clinic_id, workspace_id, modality) REFERENCES public.clinics(id, workspace_id, modality),
+    ADD CONSTRAINT clinic_specialty_contexts_context_fk FOREIGN KEY (specialty_context_id, workspace_id) REFERENCES public.doctor_specialty_contexts(id, workspace_id);
 
 ALTER TABLE ONLY public.doctor_specialty_contexts
     ADD CONSTRAINT doctor_specialty_contexts_specialty_id_fkey FOREIGN KEY (specialty_id) REFERENCES public.specialties(id) ON DELETE RESTRICT;
@@ -1812,7 +1853,7 @@ GRANT USAGE ON SCHEMA public TO doctorchart_app, doctorchart_media;
 GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO doctorchart_app;
 GRANT SELECT ON public.app_schema_state, public.chart_definitions, public.clinical_calculation_definitions,
     public.specialty_calculator_defaults, public.vaccination_calendars, public.vaccination_doses TO doctorchart_app;
-GRANT SELECT, INSERT, UPDATE ON public.booking_confirmation_access, public.booking_publications, public.bookings,
+GRANT SELECT, INSERT, UPDATE ON public.booking_confirmation_access, public.booking_portal_codes, public.booking_publications, public.bookings,
     public.clinic_publications, public.clinic_schedules, public.clinics, public.doctor_calculator_preferences,
     public.doctor_chart_configs, public.doctor_specialty_contexts, public.doctor_workspaces,
     public.notification_outbox, public.specialties, public.specialty_context_preferences,
@@ -1824,7 +1865,7 @@ GRANT SELECT, INSERT ON public.booking_events, public.booking_idempotency, publi
 GRANT SELECT, INSERT ON public.prescription_diagnostic_orders, public.prescription_medications TO doctorchart_app;
 GRANT SELECT ON public.clinical_revisions TO doctorchart_app;
 GRANT SELECT, INSERT, DELETE ON public.doctor_calculator_selections,
-    public.publication_specialty_contexts, public.staff_access_clinics TO doctorchart_app;
+    public.clinic_specialty_contexts, public.publication_specialty_contexts, public.staff_access_clinics TO doctorchart_app;
 GRANT SELECT, INSERT, UPDATE ON public.clinical_encounters, public.patient_vaccinations, public.patients TO doctorchart_app;
 GRANT SELECT, INSERT ON public.patient_medical_studies, public.patient_prescription_records TO doctorchart_app;
 GRANT UPDATE (annulled_at,version) ON public.patient_medical_studies, public.patient_prescription_records TO doctorchart_app;

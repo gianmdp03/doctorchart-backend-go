@@ -6,29 +6,31 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/syntah/doctorchart-backend-go/internal/api"
+	"github.com/syntah/doctorchart-backend-go/internal/mailclient"
 	"github.com/syntah/doctorchart-backend-go/internal/notifications"
 )
 
 type testMail struct {
 	mu       sync.Mutex
-	messages [][]byte
+	messages []mailclient.Message
 	fail     bool
 }
 
-func (m *testMail) Send(_ context.Context, _ string, body []byte) error {
+func (m *testMail) Send(_ context.Context, message mailclient.Message) (mailclient.Result, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.fail {
-		return errors.New("synthetic SMTP failure with secret that must not be persisted")
+		return mailclient.Result{}, errors.New("synthetic mail service failure with secret that must not be persisted")
 	}
-	m.messages = append(m.messages, append([]byte(nil), body...))
-	return nil
+	m.messages = append(m.messages, message)
+	return mailclient.Result{ID: message.ID, Status: "accepted_by_provider"}, nil
 }
 func (m *testMail) count() int { m.mu.Lock(); defer m.mu.Unlock(); return len(m.messages) }
 func notificationFixture(t *testing.T) (*fixture, Clinic, time.Time, Publication, *notifications.Service, *testMail) {
@@ -36,7 +38,7 @@ func notificationFixture(t *testing.T) (*fixture, Clinic, time.Time, Publication
 	f, c, start, p := publicFixture(t)
 	f.staff.Store(true)
 	sender := &testMail{}
-	n, err := notifications.NewWithSender(f.pool, base64.StdEncoding.EncodeToString([]byte(strings.Repeat("k", 32))), "notices@example.invalid", 1440, sender)
+	n, err := notifications.NewWithSender(f.pool, base64.StdEncoding.EncodeToString([]byte(strings.Repeat("k", 32))), sender)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,9 +49,8 @@ func notificationFixture(t *testing.T) (*fixture, Clinic, time.Time, Publication
 }
 
 type notificationReceipt struct {
-	AccessCode      string
-	AccessExpiresAt time.Time
-	Reference       string
+	VerificationRequestID string
+	Reference             string
 }
 
 func notificationBooking(t *testing.T, f *fixture, p Publication, start time.Time) (notificationReceipt, Booking) {
@@ -60,7 +61,7 @@ func notificationBooking(t *testing.T, f *fixture, p Publication, start time.Tim
 	if err := json.Unmarshal(w.Body.Bytes(), &receipt); err != nil {
 		t.Fatal(err)
 	}
-	if len(receipt.AccessCode) != 43 {
+	if !opaqueID.MatchString(receipt.VerificationRequestID) {
 		t.Fatal("missing immediate recovery code")
 	}
 	var id string
@@ -80,68 +81,160 @@ func processMail(t *testing.T, n *notifications.Service) {
 		t.Fatal("expected durable job", processed, err)
 	}
 }
-func TestNotificationAtomicOutboxImmediateRecoveryAndPrivacy(t *testing.T) {
-	f, _, start, p, n, sender := notificationFixture(t)
-	receipt, b := notificationBooking(t, f, p, start)
-	var count int
-	if err := f.pool.QueryRow(t.Context(), "SELECT count(*) FROM notification_outbox").Scan(&count); err != nil || count != 2 {
-		t.Fatal("confirmation and scheduled reminder missing", count, err)
-	}
-	var payload []byte
-	var hash string
-	if err := f.pool.QueryRow(t.Context(), "SELECT o.payload,a.token_hash FROM notification_outbox o JOIN booking_confirmation_access a ON a.booking_id=o.booking_id LIMIT 1").Scan(&payload, &hash); err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(string(payload), receipt.AccessCode) || strings.Contains(string(payload), "synthetic@example.invalid") || hash == receipt.AccessCode {
-		t.Fatal("sensitive delivery state is plaintext")
-	}
-	processMail(t, n)
-	if sender.count() != 1 {
-		t.Fatal("confirmation not delivered")
-	}
-	const publicAnswer = "Cobertura sintética"
-	var supplied string
-	if err := f.pool.QueryRow(t.Context(), "SELECT answers->>'insurance' FROM booking_public_details WHERE booking_id=$1", b.ID).Scan(&supplied); err != nil || supplied != publicAnswer {
-		t.Fatal("fixture did not persist the free-text answer", err)
-	}
-	_, transfer, ok := strings.Cut(string(sender.messages[0]), "\r\n\r\n")
-	decoded, err := base64.StdEncoding.DecodeString(transfer)
-	if !ok || err != nil || strings.Contains(string(decoded), publicAnswer) ||
-		strings.Contains(string(decoded), "Persona atendida") || strings.Contains(string(decoded), "12345678") {
-		t.Fatal("notification exposed an answer or attendee data")
-	}
-	// Query existing administrative information without depending on live Billing.
-	f.mode.Store(1)
-	w := pubRequest(f, "POST", "/public/appointments/confirmation", "", map[string]string{"accessCode": receipt.AccessCode})
-	assertCode(t, w, 200, "")
-	for _, secret := range []string{"patientId", "bookingId", "clinicId", "email", "document", "answers", "attendeeName", "contactName", owner, publicAnswer} {
-		if strings.Contains(w.Body.String(), secret) {
-			t.Fatal("recovery leaked private field", secret)
+
+var testPortalIdentity = portalIdentity{"AR", "DNI", "12345678", "synthetic@example.invalid"}
+
+func portalCodeFromMail(t *testing.T, n *notifications.Service, sender *testMail) string {
+	t.Helper()
+	for range 5 {
+		before := sender.count()
+		processMail(t, n)
+		if sender.count() == before {
+			continue
+		}
+		for _, line := range strings.Split(sender.messages[len(sender.messages)-1].Text, "\n") {
+			if portalCodePattern.MatchString(line) {
+				return line
+			}
 		}
 	}
-	assertCode(t, f.request("DELETE", "/bookings/"+b.ID+"/confirmation-access", other, ""), 404, "BOOKING_NOT_FOUND")
-	assertCode(t, f.request("DELETE", "/bookings/"+b.ID+"/confirmation-access", owner, ""), 204, "")
-	assertCode(t, pubRequest(f, "POST", "/public/appointments/confirmation", "", map[string]string{"accessCode": receipt.AccessCode}), 404, "CONFIRMATION_NOT_FOUND")
+	t.Fatal("verification email did not contain a six-digit code")
+	return ""
 }
-func TestNotificationSMTPFailureRetryRestartAndLeaseRecovery(t *testing.T) {
-	f, _, start, p, n, sender := notificationFixture(t)
-	_, b := notificationBooking(t, f, p, start)
+
+func portalVerify(t *testing.T, f *fixture, receipt notificationReceipt, code string) *http.Cookie {
+	t.Helper()
+	draft := portalAccess{portalIdentity: testPortalIdentity, RequestID: receipt.VerificationRequestID}
+	w := pubRequest(f, "POST", "/public/appointments/access/verify", "", map[string]string{
+		"documentCountry": draft.DocumentCountry, "documentType": draft.DocumentType, "document": draft.Document,
+		"email": draft.Email, "requestId": draft.RequestID, "code": code,
+	})
+	assertCode(t, w, 204, "")
+	cookies := w.Result().Cookies()
+	if len(cookies) != 1 || cookies[0].Name != portalCookie || !cookies[0].HttpOnly || !cookies[0].Secure || cookies[0].SameSite != http.SameSiteStrictMode || cookies[0].MaxAge != 172800 || w.Body.Len() != 0 {
+		t.Fatal("expected a secure 48-hour session")
+	}
+	return cookies[0]
+}
+
+func TestManualBookingUsesTheSamePatientPortal(t *testing.T) {
+	f, clinic, start, publication, notices, sender := notificationFixture(t)
+	form := f.request("GET", "/bookings/form", owner, "")
+	assertCode(t, form, 200, "")
+	if !strings.Contains(form.Body.String(), "insurance") {
+		t.Fatal("missing current administrative question")
+	}
+	details := bookingPortalIntake{
+		Email: testPortalIdentity.Email, Document: testPortalIdentity.Document,
+		FormVersion: publication.Version,
+	}
+	request := bookingRequest{
+		ClinicID: clinic.ID, Start: start.Format(time.RFC3339),
+		ContactName: "Solicitante manual", ContactPhone: "+54 223 4951234", Portal: &details,
+	}
+	send := func(key string) *httptest.ResponseRecorder {
+		return bookingRequestFixture(f, "POST", "/bookings", owner, key, jsonString(map[string]any{
+			"clinicId": request.ClinicID, "start": request.Start, "contactName": request.ContactName,
+			"contactPhone": request.ContactPhone, "portal": details,
+		}))
+	}
+	assertCode(t, send(newBookingKey()), 400, "INVALID_REQUEST")
+	details.Answers = map[string]string{"insurance": "Cobertura sintética"}
+	w := send(newBookingKey())
+	assertCode(t, w, 201, "")
+	booking := booked(t, w)
+	var reference string
+	if err := f.pool.QueryRow(t.Context(), "SELECT reference::text FROM booking_public_details WHERE booking_id=$1", booking.ID).Scan(&reference); err != nil {
+		t.Fatal(err)
+	}
+	proof := publicBody(t, f, publication, start)
+	w = pubRequest(f, "POST", "/public/appointments/access/request", "", map[string]string{
+		"document": details.Document, "reference": reference, "challenge": proof.Challenge, "solution": proof.Solution,
+	})
+	assertCode(t, w, 202, "")
+	var issued struct{ RequestID string }
+	if err := json.Unmarshal(w.Body.Bytes(), &issued); err != nil {
+		t.Fatal(err)
+	}
+	code := portalCodeFromMail(t, notices, sender)
+	access := portalVerify(t, f, notificationReceipt{VerificationRequestID: issued.RequestID}, code)
+	w = pubRequest(f, "POST", "/public/appointments/my-bookings", "", struct{}{}, access)
+	assertCode(t, w, 200, "")
+	if !strings.Contains(w.Body.String(), reference) || strings.Contains(w.Body.String(), details.Email) {
+		t.Fatal("manual booking is missing from the private portal or exposed its email")
+	}
+}
+
+func TestBookingPortalCodeAndListKeepPatientDataPrivate(t *testing.T) {
+	f, _, start, publication, notices, sender := notificationFixture(t)
+	receipt, booking := notificationBooking(t, f, publication, start)
+	assertCode(t, pubRequest(f, "POST", "/public/appointments/my-bookings", "", struct{}{}), 403, "BOOKING_ACCESS_DENIED")
+	code := portalCodeFromMail(t, notices, sender)
+	emailBody := sender.messages[0].Text
+	if strings.Contains(emailBody, "https:") || strings.Contains(emailBody, "12345678") || strings.Contains(emailBody, "Persona atendida") {
+		t.Fatal("verification email contains a link or patient data")
+	}
+	diff := map[string]string{"documentCountry": "AR", "documentType": "DNI", "document": "12345677", "email": testPortalIdentity.Email,
+		"requestId": receipt.VerificationRequestID, "code": code}
+	assertCode(t, pubRequest(f, "POST", "/public/appointments/access/verify", "", diff), 403, "BOOKING_ACCESS_DENIED")
+	access := portalVerify(t, f, receipt, code)
+	diff["document"] = testPortalIdentity.Document
+	assertCode(t, pubRequest(f, "POST", "/public/appointments/access/verify", "", diff), 403, "BOOKING_ACCESS_DENIED")
+	f.mode.Store(1)
+	w := pubRequest(f, "POST", "/public/appointments/my-bookings", "", struct{}{}, access)
+	assertCode(t, w, 200, "")
+	if !strings.Contains(w.Body.String(), receipt.Reference) || !strings.Contains(w.Body.String(), booking.Specialty.Name) {
+		t.Fatal("missing booking in verified portal")
+	}
+	for _, secret := range []string{"patientId", "bookingId", "email", "document", "answers", "attendeeName", "contactName", owner, "Cobertura sintética"} {
+		if strings.Contains(w.Body.String(), secret) {
+			t.Fatal("portal exposed private fields", secret)
+		}
+	}
+	var hours float64
+	if err := f.pool.QueryRow(t.Context(), "SELECT extract(epoch FROM session_expires_at-clock_timestamp())/3600 FROM booking_portal_codes").Scan(&hours); err != nil || hours < 47.9 || hours > 48 {
+		t.Fatal("wrong server session lifetime", hours, err)
+	}
+	assertCode(t, pubRequest(f, "POST", "/public/appointments/my-bookings/logout", "", struct{}{}, access), 204, "")
+	assertCode(t, pubRequest(f, "POST", "/public/appointments/my-bookings", "", struct{}{}, access), 403, "BOOKING_ACCESS_DENIED")
+}
+
+func TestBookingConfirmationAndReminderExplainHowToManageTheBooking(t *testing.T) {
+	f, _, start, publication, notices, sender := notificationFixture(t)
+	_, booking := notificationBooking(t, f, publication, start)
+	portalCodeFromMail(t, notices, sender)
+	processMail(t, notices)
+	if _, err := f.pool.Exec(t.Context(), "UPDATE notification_outbox SET due_at=now()-interval '1 second' WHERE booking_id=$1 AND kind='BOOKING_REMINDER'", booking.ID); err != nil {
+		t.Fatal(err)
+	}
+	processMail(t, notices)
+	if sender.count() != 3 {
+		t.Fatal("expected verification code, confirmation and reminder")
+	}
+	for _, message := range sender.messages {
+		body := message.Text
+		if !strings.Contains(body, "Mis turnos") || !strings.Contains(body, "DNI") || !strings.Contains(body, "48 horas") ||
+			strings.Contains(body, "12345678") || strings.Contains(body, "Persona atendida") {
+			t.Fatal("incorrect booking instructions or private information in email")
+		}
+	}
+}
+func TestNotificationMailServiceFailureRetryRestartAndLeaseRecovery(t *testing.T) {
+	f, c, _, _, n, sender := notificationFixture(t)
+	staffInvite(t, f, owner, c, []string{"view"})
 	sender.fail = true
 	processMail(t, n)
-	current, err := ownedBooking(t.Context(), f.pool, owner, b.ID)
-	if err != nil || current.Status != "CONFIRMED" {
-		t.Fatal("SMTP changed booking", err)
-	}
+	var err error
 	var state, last string
 	var attempts int
-	if err = f.pool.QueryRow(t.Context(), "SELECT state,last_code,attempts FROM notification_outbox WHERE kind='BOOKING_CONFIRMED'").Scan(&state, &last, &attempts); err != nil || state != "PENDING" || last != "SMTP_UNAVAILABLE" || attempts != 1 {
+	if err = f.pool.QueryRow(t.Context(), "SELECT state,last_code,attempts FROM notification_outbox WHERE kind='STAFF_INVITATION'").Scan(&state, &last, &attempts); err != nil || state != "PENDING" || last != "MAIL_SERVICE_UNAVAILABLE" || attempts != 1 {
 		t.Fatal(state, last, attempts, err)
 	}
-	if _, err = f.pool.Exec(t.Context(), "UPDATE notification_outbox SET state='PROCESSING',lease_id=$1,lease_until=now()-interval '1 second' WHERE kind='BOOKING_CONFIRMED'", newOpaqueID()); err != nil {
+	if _, err = f.pool.Exec(t.Context(), "UPDATE notification_outbox SET state='PROCESSING',lease_id=$1,lease_until=now()-interval '1 second' WHERE kind='STAFF_INVITATION'", newOpaqueID()); err != nil {
 		t.Fatal(err)
 	}
 	sender.fail = false
-	restarted, err := notifications.NewWithSender(f.pool, base64.StdEncoding.EncodeToString([]byte(strings.Repeat("k", 32))), "notices@example.invalid", 1440, sender)
+	restarted, err := notifications.NewWithSender(f.pool, base64.StdEncoding.EncodeToString([]byte(strings.Repeat("k", 32))), sender)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +245,7 @@ func TestNotificationSMTPFailureRetryRestartAndLeaseRecovery(t *testing.T) {
 	if sender.count() != 1 {
 		t.Fatal("restart did not deliver exactly one logical job")
 	}
-	wrong, err := notifications.NewWithSender(f.pool, base64.StdEncoding.EncodeToString([]byte(strings.Repeat("x", 32))), "notices@example.invalid", 1440, sender)
+	wrong, err := notifications.NewWithSender(f.pool, base64.StdEncoding.EncodeToString([]byte(strings.Repeat("x", 32))), sender)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,40 +253,41 @@ func TestNotificationSMTPFailureRetryRestartAndLeaseRecovery(t *testing.T) {
 		t.Fatal("changed encryption key silently accepted")
 	}
 }
-func TestNotificationVersionedReminderRescheduleCancellationAndExpiry(t *testing.T) {
-	f, c, start, p, n, sender := notificationFixture(t)
-	receipt, b := notificationBooking(t, f, p, start)
-	w := bookingRequestFixture(f, "POST", "/bookings/"+b.ID+"/reschedule", owner, newBookingKey(), jsonString(map[string]string{"expectedVersion": b.Version, "clinicId": c.ID, "start": start.Add(time.Hour).Format(time.RFC3339)}))
-	assertCode(t, w, 200, "")
-	b = booked(t, w)
-	// Old confirmation and reminder cannot deliver obsolete details.
-	if _, err := f.pool.Exec(t.Context(), "UPDATE notification_outbox SET due_at=now()"); err != nil {
-		t.Fatal(err)
+func TestVerifiedPortalReschedulesAndCancelsThroughBookingEngine(t *testing.T) {
+	f, _, start, publication, notices, sender := notificationFixture(t)
+	receipt, booking := notificationBooking(t, f, publication, start)
+	access := portalVerify(t, f, receipt, portalCodeFromMail(t, notices, sender))
+	const path = "/public/appointments/my-bookings/change"
+	req := struct {
+		Reference       string `json:"reference"`
+		ExpectedVersion string `json:"expectedVersion"`
+		Action          string `json:"action"`
+		Start           string `json:"start,omitempty"`
+	}{receipt.Reference, booking.Version, "reschedule", start.Add(time.Hour).Format(time.RFC3339)}
+	forged := req
+	forged.Reference = newOpaqueID()
+	assertCode(t, pubRequest(f, "POST", path, newOpaqueID(), forged, access), 404, "BOOKING_NOT_FOUND")
+	key := newOpaqueID()
+	assertCode(t, pubRequest(f, "POST", path, key, req, access), 200, "")
+	assertCode(t, pubRequest(f, "POST", path, key, req, access), 200, "")
+	current, err := ownedBooking(t.Context(), f.pool, owner, booking.ID)
+	if err != nil || !current.Start.Equal(start.Add(time.Hour)) || current.Version == booking.Version {
+		t.Fatal("reschedule did not persist", current, err)
 	}
-	for range 4 {
-		processMail(t, n)
+	req.Action, req.Start, req.ExpectedVersion = "cancel", "", current.Version
+	assertCode(t, pubRequest(f, "POST", path, newOpaqueID(), req, access), 200, "")
+	var jobs, events int
+	if err = f.pool.QueryRow(t.Context(), "SELECT (SELECT count(*) FROM notification_outbox WHERE kind IN ('BOOKING_CONFIRMED','BOOKING_RESCHEDULED','BOOKING_CANCELLED')),(SELECT count(*) FROM booking_events WHERE booking_id=$1 AND actor_id='PUBLIC_PATIENT')", booking.ID).Scan(&jobs, &events); err != nil || jobs != 3 || events != 2 {
+		t.Fatal("expected three event emails and two audited changes", jobs, events, err)
 	}
-	if sender.count() != 2 {
-		t.Fatal("expected only current reschedule and reminder", sender.count())
-	}
-	w = bookingRequestFixture(f, "PATCH", "/bookings/"+b.ID+"/status", owner, newBookingKey(), jsonString(map[string]string{"expectedVersion": b.Version, "status": "CANCELLED"}))
-	assertCode(t, w, 200, "")
-	processMail(t, n)
-	if sender.count() != 3 {
-		t.Fatal("cancellation not sent")
-	}
-	w = pubRequest(f, "POST", "/public/appointments/confirmation", "", map[string]string{"accessCode": receipt.AccessCode})
+	w := pubRequest(f, "POST", "/public/appointments/my-bookings", "", struct{}{}, access)
 	assertCode(t, w, 200, "")
 	if !strings.Contains(w.Body.String(), "CANCELLED") {
-		t.Fatal("recovery did not reflect live administrative state")
+		t.Fatal("portal shows an obsolete status", w.Body.String())
 	}
-	if _, err := f.pool.Exec(t.Context(), "UPDATE booking_confirmation_access SET expires_at=now()-interval '1 second'"); err != nil {
-		t.Fatal(err)
-	}
-	assertCode(t, pubRequest(f, "POST", "/public/appointments/confirmation", "", map[string]string{"accessCode": receipt.AccessCode}), 404, "CONFIRMATION_NOT_FOUND")
 }
-func TestNotificationTwoWorkersAndPublicIdempotency(t *testing.T) {
-	f, _, start, p, n, sender := notificationFixture(t)
+func TestPublicConfirmationReplayKeepsSameCode(t *testing.T) {
+	f, _, start, p, _, _ := notificationFixture(t)
 	body := publicBody(t, f, p, start)
 	key := newOpaqueID()
 	path := "/public/appointments/doctors/" + p.PublicID + "/bookings"
@@ -204,36 +298,20 @@ func TestNotificationTwoWorkersAndPublicIdempotency(t *testing.T) {
 	if first.Body.String() != second.Body.String() {
 		t.Fatal("retry lost immediate access code")
 	}
-	var wg sync.WaitGroup
-	errs := make(chan error, 2)
-	for range 2 {
-		wg.Go(func() { _, err := n.ProcessOne(t.Context()); errs <- err })
-	}
-	wg.Wait()
-	close(errs)
-	for err := range errs {
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	if sender.count() != 1 {
-		t.Fatal("workers duplicated confirmation", sender.count())
-	}
-	var jobs int
-	f.pool.QueryRow(t.Context(), "SELECT count(*) FROM notification_outbox").Scan(&jobs)
-	if jobs != 2 {
-		t.Fatal("logical duplicates", jobs)
+	var codes int
+	if err := f.pool.QueryRow(t.Context(), "SELECT count(*) FROM booking_portal_codes").Scan(&codes); err != nil || codes != 1 {
+		t.Fatal("replay duplicated confirmation codes", codes, err)
 	}
 }
-func TestNotificationOutboxFailureRollsBackWithM4(t *testing.T) {
+func TestPublicConfirmationPersistenceFailureRollsBackBooking(t *testing.T) {
 	f, _, start, p, _, _ := notificationFixture(t)
-	if _, err := f.pool.Exec(t.Context(), "ALTER TABLE notification_outbox ADD CONSTRAINT synthetic_failure CHECK(false) NOT VALID"); err != nil {
+	if _, err := f.pool.Exec(t.Context(), "ALTER TABLE booking_portal_codes ADD CONSTRAINT synthetic_failure CHECK(false) NOT VALID"); err != nil {
 		t.Fatal(err)
 	}
 	w := pubRequest(f, "POST", "/public/appointments/doctors/"+p.PublicID+"/bookings", newOpaqueID(), publicBody(t, f, p, start))
 	assertCode(t, w, 500, "")
 	var rows int
-	f.pool.QueryRow(t.Context(), "SELECT (SELECT count(*) FROM bookings)+(SELECT count(*) FROM booking_events)+(SELECT count(*) FROM booking_confirmation_access)").Scan(&rows)
+	f.pool.QueryRow(t.Context(), "SELECT (SELECT count(*) FROM bookings)+(SELECT count(*) FROM booking_events)+(SELECT count(*) FROM booking_portal_codes)").Scan(&rows)
 	if rows != 0 {
 		t.Fatal("partial confirmation committed despite database event failure")
 	}
@@ -247,7 +325,7 @@ func TestNotificationStaffInvitationAndEmailRecovery(t *testing.T) {
 	if sender.count() != 1 {
 		t.Fatal("only the most recent invitation should be delivered")
 	}
-	invitation := decodeTestMail(t, sender.messages[0])
+	invitation := sender.messages[0].Text
 	if !strings.Contains(invitation, staffTestOrigin+"/staff/activate#invite="+code) ||
 		strings.Contains(invitation, firstCode) {
 		t.Fatal("email did not contain the current private activation link")
@@ -257,7 +335,7 @@ func TestNotificationStaffInvitationAndEmailRecovery(t *testing.T) {
 	processMail(t, n)
 	// Only decrypt the captured test mailbox's MIME body, never query a plaintext token.
 	var emailCode string
-	for _, line := range strings.Split(decodeTestMail(t, sender.messages[1]), "\r\n") {
+	for _, line := range strings.Split(sender.messages[1].Text, "\n") {
 		if len(line) == 43 {
 			emailCode = line
 			break
@@ -277,48 +355,73 @@ func TestNotificationStaffInvitationAndEmailRecovery(t *testing.T) {
 	assertCode(t, staffReq(f, staffTestClient{}, "POST", "/recovery-email", map[string]string{"email": "unknown@example.invalid"}), 429, "STAFF_RATE_LIMITED")
 }
 
-func decodeTestMail(t *testing.T, message []byte) string {
-	t.Helper()
-	_, body, ok := strings.Cut(string(message), "\r\n\r\n")
-	if !ok {
-		t.Fatal("missing MIME body")
+func TestPortalCodeExpiresAndLocksAfterFiveGuesses(t *testing.T) {
+	f, _, start, publication, notices, sender := notificationFixture(t)
+	receipt, _ := notificationBooking(t, f, publication, start)
+	code := portalCodeFromMail(t, notices, sender)
+	wrong := "000000"
+	if wrong == code {
+		wrong = "111111"
 	}
-	raw, err := base64.StdEncoding.DecodeString(strings.ReplaceAll(body, "\r\n", ""))
-	if err != nil {
+	body := map[string]string{"documentCountry": "AR", "documentType": "DNI", "document": testPortalIdentity.Document,
+		"email": testPortalIdentity.Email, "requestId": receipt.VerificationRequestID, "code": wrong}
+	for range 5 {
+		assertCode(t, pubRequest(f, "POST", "/public/appointments/access/verify", "", body), 403, "BOOKING_ACCESS_DENIED")
+	}
+	body["code"] = code
+	assertCode(t, pubRequest(f, "POST", "/public/appointments/access/verify", "", body), 403, "BOOKING_ACCESS_DENIED")
+	if _, err := f.pool.Exec(t.Context(), "UPDATE booking_portal_codes SET attempts=0, expires_at=now()-interval '1 second'"); err != nil {
 		t.Fatal(err)
 	}
-	return string(raw)
+	assertCode(t, pubRequest(f, "POST", "/public/appointments/access/verify", "", body), 403, "BOOKING_ACCESS_DENIED")
 }
 
-func TestNotificationPublicRecoveryRateAndNoReferenceOverride(t *testing.T) {
-	f, _, start, p, _, _ := notificationFixture(t)
-	receipt, _ := notificationBooking(t, f, p, start)
-	assertCode(t, pubRequest(f, "POST", "/public/appointments/confirmation", "", map[string]string{"accessCode": receipt.AccessCode, "reference": newOpaqueID()}), 400, "INVALID_REQUEST")
-	for range 29 {
-		assertCode(t, pubRequest(f, "POST", "/public/appointments/confirmation", "", map[string]string{"accessCode": strings.Repeat("x", 43)}), 404, "CONFIRMATION_NOT_FOUND")
+func TestPortalRequestByDocumentAndEmailUsesGenericResponseAndInboxCooldown(t *testing.T) {
+	f, _, start, publication, notices, sender := notificationFixture(t)
+	notificationBooking(t, f, publication, start)
+	portalCodeFromMail(t, notices, sender)
+	if _, err := f.pool.Exec(t.Context(), "UPDATE booking_portal_codes SET created_at=now()-interval '2 minutes'"); err != nil {
+		t.Fatal(err)
 	}
-	w := pubRequest(f, "POST", "/public/appointments/confirmation", "", map[string]string{"accessCode": receipt.AccessCode})
-	assertCode(t, w, 429, "PUBLIC_RATE_LIMITED")
-	if w.Header().Get("Retry-After") != "60" {
-		t.Fatal("missing recovery rate guidance")
+	makeRequest := func(email string) notificationReceipt {
+		t.Helper()
+		proof := publicBody(t, f, publication, start)
+		w := pubRequest(f, "POST", "/public/appointments/access/request", "", map[string]string{
+			"documentCountry": "AR", "documentType": "DNI", "document": testPortalIdentity.Document,
+			"email": email, "challenge": proof.Challenge, "solution": proof.Solution,
+		})
+		assertCode(t, w, 202, "")
+		var response struct{ RequestID string }
+		if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil || !opaqueID.MatchString(response.RequestID) {
+			t.Fatal("missing generic request ID", err)
+		}
+		return notificationReceipt{VerificationRequestID: response.RequestID}
 	}
+	makeRequest("different@example.invalid")
+	draft := makeRequest(testPortalIdentity.Email)
+	makeRequest(testPortalIdentity.Email)
+	var jobs int
+	if err := f.pool.QueryRow(t.Context(), "SELECT count(*) FROM notification_outbox WHERE kind='BOOKING_PORTAL_CODE'").Scan(&jobs); err != nil || jobs != 2 {
+		t.Fatal("unknown email or repeated request enqueued mail", jobs, err)
+	}
+	portalVerify(t, f, draft, portalCodeFromMail(t, notices, sender))
 }
 
-func TestNotificationAttendedReservationsAndLegacyInvitationsNeverSend(t *testing.T) {
+func TestNotificationLegacyBookingEmailsAndInvitationsNeverSend(t *testing.T) {
 	f, c, start, p, n, sender := notificationFixture(t)
 	_, b := notificationBooking(t, f, p, start)
-	for _, status := range []string{"CHECKED_IN", "COMPLETED"} {
-		w := bookingRequestFixture(f, "PATCH", "/bookings/"+b.ID+"/status", owner, newBookingKey(), jsonString(map[string]string{"expectedVersion": b.Version, "status": status}))
-		assertCode(t, w, 200, "")
-		b = booked(t, w)
-	}
-	if _, err := f.pool.Exec(t.Context(), "UPDATE notification_outbox SET due_at=now()"); err != nil {
+	if _, err := f.pool.Exec(t.Context(), "UPDATE booking_portal_codes SET expires_at=now()-interval '1 second'; UPDATE notification_outbox SET state='OBSOLETE' WHERE booking_id IS NOT NULL"); err != nil {
 		t.Fatal(err)
 	}
 	processMail(t, n)
+	// Simulate an old reminder whose original delivery time is still in the future.
+	if _, err := f.pool.Exec(t.Context(), "INSERT INTO notification_outbox(dedup_key,kind,booking_id,booking_version,payload,due_at) VALUES('legacy-booking','BOOKING_REMINDER',$1,$2,$3,now()+interval '1 day')", b.ID, b.Version, []byte("legacy payload")); err != nil {
+		t.Fatal(err)
+	}
 	processMail(t, n)
-	if sender.count() != 0 {
-		t.Fatal("attended booking sent obsolete confirmation/reminder")
+	var state, code string
+	if err := f.pool.QueryRow(t.Context(), "SELECT state,last_code FROM notification_outbox WHERE dedup_key='legacy-booking'").Scan(&state, &code); err != nil || state != "OBSOLETE" || code != "BOOKING_EMAIL_DISABLED" || sender.count() != 0 {
+		t.Fatal("legacy booking email was not retired", state, code, err)
 	}
 	access, _ := staffInvite(t, f, owner, c, []string{"view"})
 	assertCode(t, f.request("DELETE", "/secretaries/"+access, owner, ""), 204, "")
@@ -327,7 +430,6 @@ func TestNotificationAttendedReservationsAndLegacyInvitationsNeverSend(t *testin
 	}
 	processMail(t, n)
 	processMail(t, n)
-	var state string
 	if err := f.pool.QueryRow(t.Context(), "SELECT state FROM notification_outbox WHERE dedup_key='legacy-invitation'").Scan(&state); err != nil || state != "OBSOLETE" || sender.count() != 0 {
 		t.Fatal("legacy invitation was not retired", state, err)
 	}
@@ -340,13 +442,8 @@ func TestNotificationConcurrentEmailRecoveryTokensAreSingleUse(t *testing.T) {
 	processMail(t, n)
 	assertCode(t, staffReq(f, staffTestClient{}, "POST", "/recovery-email", map[string]string{"email": "assistant@example.invalid"}), 202, "")
 	processMail(t, n)
-	parts := strings.SplitN(string(sender.messages[0]), "\r\n\r\n", 2)
-	plain, err := base64.StdEncoding.DecodeString(strings.ReplaceAll(parts[1], "\r\n", ""))
-	if err != nil {
-		t.Fatal(err)
-	}
 	emailCode := ""
-	for _, line := range strings.Split(string(plain), "\r\n") {
+	for _, line := range strings.Split(sender.messages[0].Text, "\n") {
 		if len(line) == 43 {
 			emailCode = line
 			break
@@ -373,7 +470,7 @@ func TestNotificationConcurrentEmailRecoveryTokensAreSingleUse(t *testing.T) {
 		t.Fatal("two successful uses of one recovery code", sum)
 	}
 	assertCode(t, staffReq(f, staffTestClient{}, "POST", "/recovery-email", map[string]string{"email": "assistant@example.invalid"}), 202, "")
-	if _, err = f.pool.Exec(t.Context(), "UPDATE staff_email_recovery SET expires_at=now()-interval '1 second'"); err != nil {
+	if _, err := f.pool.Exec(t.Context(), "UPDATE staff_email_recovery SET expires_at=now()-interval '1 second'"); err != nil {
 		t.Fatal(err)
 	}
 	processMail(t, n)

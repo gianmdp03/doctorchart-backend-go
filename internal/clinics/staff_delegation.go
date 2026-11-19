@@ -143,6 +143,7 @@ func (s *Service) staffDelegatedRoutes(mux *http.ServeMux, wrap func(func(http.R
 	mux.HandleFunc("GET "+staffBase+"/assignments", wrap(s.staffAssignments))
 	base := staffBase + "/owners/{ownerId}"
 	mux.HandleFunc("GET "+base+"/clinics/{clinicId}/bookings", wrap(s.staffBookings))
+	mux.HandleFunc("GET "+base+"/clinics/{clinicId}/booking-form", wrap(s.getStaffBookingForm))
 	mux.HandleFunc("GET "+base+"/clinics/{clinicId}/availability", wrap(func(w http.ResponseWriter, r *http.Request) error {
 		a, err := s.staffAdmission(r, "view")
 		if err != nil {
@@ -198,8 +199,6 @@ func (s *Service) staffMutate(w http.ResponseWriter, r *http.Request, op string)
 	if request.PatientID != nil {
 		return staffForbidden()
 	}
-	// Do not expose a clinical ID carried by an existing administrative booking.
-	// Engine checks/records it internally but response projection removes it.
 	key = "staff:" + staffHash(a.session.ID+":"+a.access+":"+key)
 	r = r.WithContext(context.WithValue(r.Context(), staffKey{}, a))
 	return s.applyBooking(w, r, a.owner, op, previous, request, key, hash, nil)

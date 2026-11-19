@@ -14,7 +14,7 @@ func TestBookingAttendeeAdministrativeIdentity(t *testing.T) {
 	w := bookingRequestFixture(f, "POST", "/bookings", owner, key, body)
 	assertCode(t, w, 201, "")
 	b := booked(t, w)
-	if b.AttendeeName != "Persona atendida" || b.ContactName == b.AttendeeName || b.PatientID != nil {
+	if b.AttendeeName != "Persona atendida" || b.ContactName == b.AttendeeName {
 		t.Fatal(b)
 	}
 	assertCode(t, bookingRequestFixture(f, "POST", "/bookings", owner, key, body), 201, "")

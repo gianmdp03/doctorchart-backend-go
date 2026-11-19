@@ -131,10 +131,13 @@ func TestStaffDelegationUsesM4AndNeverExposesPatientIDs(t *testing.T) {
 	access, code := staffInvite(t, f, owner, c, []string{"view", "create", "cancel", "reschedule", "status"})
 	client := staffActivateTest(t, f, code)
 	base := "/owners/" + owner
-	body := map[string]any{"clinicId": c.ID, "start": start.Format(time.RFC3339), "contactName": "Solicitante", "attendeeName": "Atendido"}
+	body := map[string]any{"clinicId": c.ID, "start": start.Format(time.RFC3339), "contactName": "Solicitante", "attendeeName": "Atendido", "contactPhone": "+44 20 7946 0018"}
 	w := staffReq(f, client, "POST", base+"/bookings", body)
 	assertCode(t, w, 201, "")
 	b := booked(t, w)
+	if b.ContactPhone != "+442079460018" {
+		t.Fatalf("delegated contact phone = %q", b.ContactPhone)
+	}
 	if b.ContextID == "" || b.Specialty.Name == "" || b.ClinicSnapshot.Name == "" {
 		t.Fatal("staff booking lacks persisted context", b)
 	}

@@ -14,7 +14,7 @@ import (
 	"github.com/syntah/doctorchart-backend-go/internal/api"
 )
 
-func TestBookingsPatientOwnershipAndClinicalPreservation(t *testing.T) {
+func TestBookingsRejectClinicalIDsAndPreserveClinicalHistory(t *testing.T) {
 	f, c, start := bookingFixture(t)
 	for i, user := range []string{owner, other} {
 		_, err := f.pool.Exec(t.Context(), "INSERT INTO patients(id,user_id,full_name,birth_date,form_definition_snapshot,form_values,formula_context,formula_results,updated_at,version,workspace_version,personal_history,workspace_id,specialty_context_id) VALUES($1,$2,'Historia sintética','1990-01-01','{}','{}','{}','{}',clock_timestamp(),7,0,'{\"preservar\":true}',(SELECT id FROM doctor_workspaces WHERE user_id=$2::varchar(100)),(SELECT c.id FROM doctor_specialty_contexts c JOIN doctor_workspaces w ON w.id=c.workspace_id WHERE w.user_id=$2::varchar(100)))", i+1, user)
@@ -35,14 +35,16 @@ func TestBookingsPatientOwnershipAndClinicalPreservation(t *testing.T) {
 	before := snapshot()
 	base := createBookingBody(c.ID, start)
 	cross := strings.TrimSuffix(base, "}") + `,"patientId":"2"}`
-	assertCode(t, bookingRequestFixture(f, "POST", "/bookings", owner, newBookingKey(), cross), 404, "PATIENT_NOT_FOUND")
+	assertCode(t, bookingRequestFixture(f, "POST", "/bookings", owner, newBookingKey(), cross), 403, "PATIENT_LINK_FORBIDDEN")
 	linked := strings.TrimSuffix(base, "}") + `,"patientId":"1"}`
-	reply := bookingRequestFixture(f, "POST", "/bookings", owner, newBookingKey(), linked)
+	assertCode(t, bookingRequestFixture(f, "POST", "/bookings", owner, newBookingKey(), linked), 403, "PATIENT_LINK_FORBIDDEN")
+	reply := bookingRequestFixture(f, "POST", "/bookings", owner, newBookingKey(), base)
 	assertCode(t, reply, 201, "")
 	b := booked(t, reply)
-	if b.PatientID == nil || *b.PatientID != "1" {
-		t.Fatal(b)
+	if strings.Contains(reply.Body.String(), `"patientId"`) {
+		t.Fatal(reply.Body.String())
 	}
+	assertCode(t, bookingRequestFixture(f, "PUT", "/bookings/"+b.ID+"/patient", owner, newBookingKey(), `{"expectedVersion":"1","patientId":"1"}`), 404, "")
 	for _, path := range []string{"/bookings/" + b.ID, "/bookings/" + b.ID + "/events"} {
 		assertCode(t, f.request("GET", path, other, ""), 404, "BOOKING_NOT_FOUND")
 	}

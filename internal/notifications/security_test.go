@@ -4,17 +4,24 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"strings"
+
+	"github.com/syntah/doctorchart-backend-go/internal/mailclient"
 	"testing"
 	"time"
 )
 
 type discardMail struct{}
 
-func (discardMail) Send(context.Context, string, []byte) error { return nil }
+func (discardMail) Send(context.Context, mailclient.Message) (mailclient.Result, error) {
+	return mailclient.Result{}, nil
+}
 func TestNotificationEncryptionBindsCiphertextToItsPurpose(t *testing.T) {
 	key := base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{23}, 32))
-	s, err := NewWithSender(nil, key, "notices@example.invalid", 1440, discardMail{})
+	s, err := NewWithSender(nil, key, discardMail{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,53 +45,63 @@ func TestNotificationEncryptionBindsCiphertextToItsPurpose(t *testing.T) {
 		t.Fatal("tampered ciphertext accepted")
 	}
 }
-func TestNotificationSMTPRequiresVerifiedTLSAndValidHeaders(t *testing.T) {
-	for _, c := range []Config{{Host: "localhost", Port: 1025, From: "notices@example.invalid", TLSMode: "none"}, {Host: "localhost", Port: 1025, From: "victim@example.invalid\r\nBcc: another@example.invalid", TLSMode: "starttls"}, {Host: "http://localhost", Port: 1025, From: "notices@example.invalid", TLSMode: "starttls"}} {
-		if _, err := NewSMTP(c); err == nil {
-			t.Fatal("unsafe SMTP configuration accepted")
+func TestNotificationUsesMailService(t *testing.T) {
+	key := strings.Repeat("k", 32)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/v1/emails" || r.Header.Get("Authorization") != "Bearer "+key {
+			t.Error("wrong mail service request")
+			w.WriteHeader(http.StatusForbidden)
+			return
 		}
-	}
-	if _, err := NewSMTP(Config{Host: "localhost", Port: 1025, From: "notices@example.invalid", TLSMode: "starttls"}); err != nil {
+		var message mailclient.Message
+		if err := json.NewDecoder(r.Body).Decode(&message); err != nil || message.To != "recipient@example.invalid" {
+			t.Error("invalid mail service message", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(mailclient.Result{ID: message.ID, Status: "accepted_by_provider"})
+	}))
+	defer server.Close()
+	c := Config{Enabled: true, Key: base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{1}, 32)),
+		PublicOrigin: "https://doctorchart.example", MailServiceURL: server.URL, MailServiceAPIKey: key}
+	s, err := New(nil, c)
+	if err != nil {
 		t.Fatal(err)
+	}
+	message, err := s.render("BOOKING_PORTAL_CODE", "stable-job", Message{Date: time.Now(), To: "recipient@example.invalid", Code: "123456"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.sender.Send(t.Context(), message); err != nil {
+		t.Fatal(err)
+	}
+	c.MailServiceURL = ""
+	if _, err := New(nil, c); err == nil {
+		t.Fatal("missing mail service accepted")
 	}
 }
 func TestNotificationSpanishAdministrativeTemplatesAndStableMessageID(t *testing.T) {
-	s, err := NewWithSender(nil, base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{1}, 32)), "notices@example.invalid", 1440, discardMail{})
+	s, err := NewWithSender(nil, base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{1}, 32)), discardMail{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	s.origin = "https://doctorchart.example"
-	// DST uses the clinic's zone at the reservation instant, not the process zone.
-	m := Message{Date: time.Date(2030, 3, 10, 7, 0, 0, 0, time.UTC), To: "recipient@example.invalid", Doctor: "Profesional", Clinic: "Consultorio", Timezone: "America/New_York", Start: time.Date(2030, 3, 10, 7, 30, 0, 0, time.UTC), Reference: "opaque-reference", Code: Token()}
-	for _, kind := range []string{"BOOKING_CONFIRMED", "BOOKING_CANCELLED", "BOOKING_RESCHEDULED", "BOOKING_REMINDER", "STAFF_RECOVERY"} {
+	m := Message{Date: time.Date(2030, 3, 10, 7, 0, 0, 0, time.UTC), To: "recipient@example.invalid", Code: Token()}
+	for _, kind := range []string{"STAFF_RECOVERY"} {
 		t.Run(kind, func(t *testing.T) {
 			a, err := s.render(kind, "stable-job", m)
 			if err != nil {
 				t.Fatal(err)
 			}
 			b, err := s.render(kind, "stable-job", m)
-			if err != nil || !bytes.Equal(a, b) {
+			if err != nil || a != b {
 				t.Fatal("retry changed identity")
 			}
-			parts := strings.SplitN(string(a), "\r\n\r\n", 2)
-			plain, err := base64.StdEncoding.DecodeString(strings.ReplaceAll(parts[1], "\r\n", ""))
-			if err != nil {
-				t.Fatal(err)
+			if !strings.Contains(a.Text, m.Code) {
+				t.Fatal("missing recovery code")
 			}
-			if strings.HasPrefix(kind, "BOOKING_") {
-				if !strings.Contains(string(plain), "03:30 (hora local del consultorio)") ||
-					strings.Contains(string(plain), m.Timezone) ||
-					!strings.Contains(string(plain), "https://doctorchart.example/appointments/confirmation") {
-					t.Fatal("incorrect DST or secret-free link")
-				}
-			}
-			if strings.Contains(parts[0], m.Code) {
-				t.Fatal("secret in mail headers")
-			}
-			for _, line := range strings.Split(parts[1], "\r\n") {
-				if len(line) > 76 {
-					t.Fatal("invalid SMTP MIME line")
-				}
+			if strings.Contains(a.Subject+a.ID+a.To, m.Code) {
+				t.Fatal("secret in mail metadata")
 			}
 		})
 	}

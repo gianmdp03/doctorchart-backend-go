@@ -2,7 +2,6 @@ package notifications
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -13,16 +12,6 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func base64Text(raw []byte) string {
-	value := base64.StdEncoding.EncodeToString(raw)
-	out := ""
-	for len(value) > 76 {
-		out += value[:76] + "\r\n"
-		value = value[76:]
-	}
-	return out + value + "\r\n"
-}
-
 type job struct {
 	id               int64
 	key, kind, lease string
@@ -32,11 +21,12 @@ type job struct {
 	version          *int64
 	access           *string
 	recovery         *string
+	portal           *string
 }
 
 func (s *Service) claim(ctx context.Context) (job, error) {
 	j := job{lease: uuid()}
-	err := s.pool.QueryRow(ctx, `WITH next AS (SELECT id FROM notification_outbox WHERE (state='PENDING' AND due_at<=clock_timestamp()) OR (state='PROCESSING' AND lease_until<clock_timestamp()) ORDER BY due_at,id FOR UPDATE SKIP LOCKED LIMIT 1) UPDATE notification_outbox o SET state='PROCESSING',attempts=attempts+1,lease_id=$1,lease_until=clock_timestamp()+interval '2 minutes',last_code=NULL FROM next WHERE o.id=next.id RETURNING o.id,o.dedup_key,o.kind,o.payload,o.attempts,o.booking_id,o.booking_version,o.access_id::text,o.recovery_id::text`, j.lease).Scan(&j.id, &j.key, &j.kind, &j.payload, &j.attempts, &j.booking, &j.version, &j.access, &j.recovery)
+	err := s.pool.QueryRow(ctx, `WITH next AS (SELECT id FROM notification_outbox WHERE (state='PENDING' AND (due_at<=clock_timestamp() OR (booking_id IS NOT NULL AND dedup_key NOT LIKE 'booking-email:%'))) OR (state='PROCESSING' AND lease_until<clock_timestamp()) ORDER BY due_at,id FOR UPDATE SKIP LOCKED LIMIT 1) UPDATE notification_outbox o SET state='PROCESSING',attempts=attempts+1,lease_id=$1,lease_until=clock_timestamp()+interval '2 minutes',last_code=NULL FROM next WHERE o.id=next.id RETURNING o.id,o.dedup_key,o.kind,o.payload,o.attempts,o.booking_id,o.booking_version,o.access_id::text,o.recovery_id::text,o.portal_code_id::text`, j.lease).Scan(&j.id, &j.key, &j.kind, &j.payload, &j.attempts, &j.booking, &j.version, &j.access, &j.recovery, &j.portal)
 	return j, err
 }
 func (s *Service) current(ctx context.Context, j job, m Message) (bool, error) {
@@ -46,14 +36,13 @@ func (s *Service) current(ctx context.Context, j job, m Message) (bool, error) {
 		return false, err
 	}
 	if j.booking != nil {
-		required := "CONFIRMED"
-		switch j.kind {
-		case "BOOKING_CANCELLED":
-			required = "CANCELLED"
+		status := "CONFIRMED"
+		if j.kind == "BOOKING_CANCELLED" {
+			status = "CANCELLED"
 		}
-		// Linking a clinical file changes no administrative message content. Keep
-		// pending confirmations/reminders valid without enqueueing duplicates.
-		err = s.pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM bookings b WHERE id=$1 AND version>=$2 AND status=$3 AND ($4<>'BOOKING_REMINDER' OR start_at>clock_timestamp()) AND (version=$2 OR ((SELECT count(*) FROM booking_events e WHERE e.booking_id=b.id AND e.version>$2)=b.version-$2 AND NOT EXISTS(SELECT 1 FROM booking_events e WHERE e.booking_id=b.id AND e.version>$2 AND e.kind<>'PATIENT_LINKED'))))", *j.booking, *j.version, required, j.kind).Scan(&valid)
+		err = s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM bookings b WHERE b.id=$1 AND b.version>=$2 AND b.status=$3
+			AND ($3='CANCELLED' OR b.start_at>clock_timestamp())
+			AND NOT EXISTS(SELECT 1 FROM booking_events e WHERE e.booking_id=b.id AND e.version>$2 AND e.kind<>'PATIENT_LINKED'))`, *j.booking, *j.version, status).Scan(&valid)
 	} else if j.kind == "STAFF_INVITATION" && j.access != nil {
 		hash := Hash(m.Code)
 		if j.key != staffInvitationKeyPrefix+hash {
@@ -66,6 +55,8 @@ func (s *Service) current(ctx context.Context, j job, m Message) (bool, error) {
 		)`, *j.access, m.To, hash).Scan(&valid)
 	} else if j.recovery != nil {
 		err = s.pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM staff_email_recovery WHERE id=$1 AND consumed_at IS NULL AND expires_at>clock_timestamp() AND token_hash=$2)", *j.recovery, Hash(m.Code)).Scan(&valid)
+	} else if j.portal != nil {
+		err = s.pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM booking_portal_codes WHERE id=$1 AND expires_at>clock_timestamp() AND attempts<5 AND session_hash IS NULL)", *j.portal).Scan(&valid)
 	} else {
 		return false, errors.New("notification association invalid")
 	}
@@ -86,7 +77,7 @@ func (s *Service) finish(ctx context.Context, j job, state, code string) error {
 	return err
 }
 
-// ProcessOne never holds a booking lock or a database transaction during SMTP.
+// ProcessOne delivers current messages and retires jobs from the discontinued booking email flow.
 func (s *Service) ProcessOne(ctx context.Context) (bool, error) {
 	j, err := s.claim(ctx)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -95,7 +86,10 @@ func (s *Service) ProcessOne(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	// Retire invitations queued by older builds without contacting SMTP.
+	if j.booking != nil && !strings.HasPrefix(j.key, bookingEmailKeyPrefix) {
+		return true, s.finish(ctx, j, "OBSOLETE", "BOOKING_EMAIL_DISABLED")
+	}
+	// Retire invitations queued by older builds without contacting the mail service.
 	if j.kind == "STAFF_INVITATION" && !strings.HasPrefix(j.key, staffInvitationKeyPrefix) {
 		return true, s.finish(ctx, j, "OBSOLETE", "INVITATION_EMAIL_DISABLED")
 	}
@@ -108,23 +102,7 @@ func (s *Service) ProcessOne(ctx context.Context) (bool, error) {
 	if err != nil || json.Unmarshal(raw, &m) != nil {
 		state, code = "DEAD", "DECRYPTION_FAILED"
 	} else {
-		// Old encrypted outbox payloads predate the specialty field. Read the
-		// reservation's frozen classification, never the current public profile.
-		if j.booking != nil && m.Specialty == "" {
-			if err = s.pool.QueryRow(ctx, "SELECT specialty_snapshot->>'name' FROM bookings WHERE id=$1", *j.booking).Scan(&m.Specialty); err != nil {
-				return true, err
-			}
-		}
-		if j.booking != nil && m.Code != "" {
-			var usable bool
-			if e := s.pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM booking_confirmation_access WHERE booking_id=$1 AND token_hash=$2 AND revoked_at IS NULL AND expires_at>clock_timestamp())", *j.booking, Hash(m.Code)).Scan(&usable); e != nil {
-				return true, e
-			}
-			if !usable {
-				m.Code = ""
-			}
-		}
-		body, e := s.render(j.kind, j.key, m)
+		message, e := s.render(j.kind, j.key, m)
 		if e != nil {
 			state, code = "DEAD", "MESSAGE_INVALID"
 		} else {
@@ -134,11 +112,11 @@ func (s *Service) ProcessOne(ctx context.Context) (bool, error) {
 			} else if !valid {
 				state, code = "OBSOLETE", "STATE_CHANGED"
 			} else {
-				sendCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-				e = s.sender.Send(sendCtx, m.To, body)
+				sendCtx, cancel := context.WithTimeout(ctx, 25*time.Second)
+				_, e = s.sender.Send(sendCtx, message)
 				cancel()
 				if e != nil {
-					state, code = "PENDING", "SMTP_UNAVAILABLE"
+					state, code = "PENDING", "MAIL_SERVICE_UNAVAILABLE"
 				}
 			}
 		}

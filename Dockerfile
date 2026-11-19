@@ -6,7 +6,9 @@ RUN go mod download
 COPY cmd ./cmd
 COPY internal ./internal
 COPY db ./db
-RUN CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /doctorchart ./cmd/api \
+COPY templates ./templates
+ARG GO_BUILD_TAGS=
+RUN CGO_ENABLED=0 go build -tags "$GO_BUILD_TAGS" -trimpath -ldflags='-s -w' -o /doctorchart ./cmd/api \
     && mkdir -p /storage/studies /runtime-tmp \
     && chmod 700 /storage/studies && chmod 1777 /runtime-tmp
 

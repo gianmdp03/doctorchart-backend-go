@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func TestMultipleSpecialtySchedulesBookingsPublicOffersAndLinks(t *testing.T) {
+func TestMultipleSpecialtySchedulesBookingsAndPublicOffers(t *testing.T) {
 	f, c, start := bookingFixture(t)
 	first := contextID(t, f, owner)
 	var second, pending string
@@ -44,12 +44,6 @@ func TestMultipleSpecialtySchedulesBookingsPublicOffersAndLinks(t *testing.T) {
 	}
 	assertCode(t, bookingRequestFixture(f, "POST", "/bookings/"+one.ID+"/reschedule", owner, newBookingKey(), fmt.Sprintf(`{"expectedVersion":"1","clinicId":%q,"start":%q}`, c.ID, start.Add(90*time.Minute).Format(time.RFC3339))), 409, "BOOKING_CONTEXT_MISMATCH")
 	assertCode(t, bookingRequestFixture(f, "POST", "/bookings/"+two.ID+"/reschedule", owner, newBookingKey(), fmt.Sprintf(`{"expectedVersion":"1","clinicId":%q,"start":%q}`, c.ID, start.Add(90*time.Minute).Format(time.RFC3339))), 200, "")
-	var patient string
-	if err = f.pool.QueryRow(t.Context(), `INSERT INTO patients(user_id,workspace_id,specialty_context_id,full_name,birth_date,form_definition_snapshot,form_values,formula_context,formula_results,updated_at,version,workspace_version) SELECT $1,w.id,$2,'Synthetic','1990-01-01','{}','{}','{}','{}',now(),0,0 FROM doctor_workspaces w WHERE w.user_id=$1::varchar(100) RETURNING id::text`, owner, second).Scan(&patient); err != nil {
-		t.Fatal(err)
-	}
-	assertCode(t, bookingRequestFixture(f, "PUT", "/bookings/"+one.ID+"/patient", owner, newBookingKey(), fmt.Sprintf(`{"expectedVersion":"1","patientId":%q}`, patient)), 404, "PATIENT_NOT_FOUND")
-	assertCode(t, bookingRequestFixture(f, "PUT", "/bookings/"+two.ID+"/patient", owner, newBookingKey(), fmt.Sprintf(`{"expectedVersion":"2","patientId":%q}`, patient)), 200, "")
 	list := f.request("GET", "/bookings?from="+start.Add(-time.Hour).Format(time.RFC3339)+"&to="+start.Add(4*time.Hour).Format(time.RFC3339), owner, "")
 	assertCode(t, list, 200, "")
 	var bookings struct{ Items []Booking }
