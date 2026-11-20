@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/syntah/doctorchart-backend-go/db"
 	"github.com/syntah/doctorchart-backend-go/internal/api"
 	"github.com/syntah/doctorchart-backend-go/internal/wizard"
 )
@@ -248,13 +249,13 @@ func (s *Store) Edit(ctx context.Context, userID, operation string, request map[
 			if !w.Completed {
 				var available bool
 				err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM wizard_defaults
-					WHERE specialty_id=$1 AND published_version=$2 AND public.template_available(specialty_id))`,
+					WHERE specialty_id=$1 AND published_version=$2 AND `+db.UsableTemplate("wizard_defaults.specialty_id", true)+")",
 					w.Specialty.ID, w.DraftSourceVersion).Scan(&available)
 				if err != nil {
 					return err
 				}
 				if !available {
-					return api.Failure(409, "TEMPLATE_APPROVAL_REQUIRED", "La revisión de este alta inicial ya no está disponible. Cargá una publicación aprobada vigente antes de finalizar.")
+					return api.Failure(409, "TEMPLATE_APPROVAL_REQUIRED", "La revisión de esta alta inicial ya no está disponible. Volvé a cargar la plantilla vigente antes de finalizar.")
 				}
 			}
 			draft, err := wizard.Decode(w.Draft)

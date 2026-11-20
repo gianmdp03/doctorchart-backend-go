@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/syntah/doctorchart-backend-go/db"
 	"github.com/syntah/doctorchart-backend-go/internal/api"
 	"github.com/syntah/doctorchart-backend-go/internal/billing"
 )
@@ -181,7 +182,7 @@ func (s *Service) publicDirectory(w http.ResponseWriter, r *http.Request) error 
 	// Filter locations on the same enabled public clinic; never return private rows.
 	rows, err := s.pool.Query(r.Context(), `SELECT p.public_id::text FROM booking_publications p WHERE p.published AND strpos(lower(p.name),lower($1))>0 AND EXISTS(
  SELECT 1 FROM publication_specialty_contexts pc JOIN doctor_specialty_contexts cctx ON cctx.id=pc.specialty_context_id AND cctx.workspace_id=pc.workspace_id JOIN specialties s ON s.id=cctx.specialty_id JOIN clinic_publications cp ON cp.workspace_id=pc.workspace_id JOIN clinics c ON c.id=cp.clinic_id
- WHERE pc.workspace_id=p.workspace_id AND cctx.onboarding_completed AND cctx.definition IS NOT NULL AND public.template_available(s.id) AND (strpos(lower(s.display_name),lower($2))>0 OR lower(s.code)=lower($2)) AND cp.enabled AND c.status='ACTIVE' AND `+publicOfferExists+` AND ($6='' OR c.modality=$6) AND (c.modality='TELECONSULTATION' OR (strpos(lower(c.country),lower($3))>0 AND strpos(lower(c.province),lower($4))>0 AND strpos(lower(c.city),lower($5))>0))) ORDER BY lower(p.name),p.public_id LIMIT $7 OFFSET $8`, q.Get("name"), q.Get("specialty"), q.Get("country"), q.Get("province"), q.Get("city"), q.Get("modality"), size+1, page*size)
+ WHERE pc.workspace_id=p.workspace_id AND cctx.onboarding_completed AND cctx.definition IS NOT NULL AND `+db.UsableTemplate("s.id", true)+` AND (strpos(lower(s.display_name),lower($2))>0 OR lower(s.code)=lower($2)) AND cp.enabled AND c.status='ACTIVE' AND `+publicOfferExists+` AND ($6='' OR c.modality=$6) AND (c.modality='TELECONSULTATION' OR (strpos(lower(c.country),lower($3))>0 AND strpos(lower(c.province),lower($4))>0 AND strpos(lower(c.city),lower($5))>0))) ORDER BY lower(p.name),p.public_id LIMIT $7 OFFSET $8`, q.Get("name"), q.Get("specialty"), q.Get("country"), q.Get("province"), q.Get("city"), q.Get("modality"), size+1, page*size)
 	if err != nil {
 		return err
 	}
@@ -252,7 +253,7 @@ func (s *Service) publishedSpecialties(ctx context.Context, country, modality st
 		JOIN doctor_specialty_contexts cctx ON cctx.workspace_id = w.id
 		JOIN publication_specialty_contexts pcs ON pcs.workspace_id=w.id AND pcs.specialty_context_id=cctx.id
 		JOIN specialties s ON s.id = cctx.specialty_id
-		WHERE p.published AND cctx.onboarding_completed AND cctx.definition IS NOT NULL AND public.template_available(s.id) AND EXISTS (
+		WHERE p.published AND cctx.onboarding_completed AND cctx.definition IS NOT NULL AND `+db.UsableTemplate("s.id", true)+` AND EXISTS (
 			SELECT 1 FROM clinic_publications cp
 			JOIN clinics c ON c.id = cp.clinic_id
 			WHERE cp.workspace_id = p.workspace_id AND cp.enabled AND c.status = 'ACTIVE'

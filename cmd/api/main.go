@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"regexp"
 	"syscall"
 	"time"
 
@@ -167,11 +169,35 @@ func openPool(ctx context.Context, url string, maxConnections int32) (*pgxpool.P
 	config.ConnConfig.RuntimeParams["row_security"] = "on"
 	config.ConnConfig.RuntimeParams["doctorchart.template_lab"] = "off"
 	if config.ConnConfig.User == db.AppRole {
+		starterTemplates, err := starterTemplateConfig(os.Getenv("DOCTORCHART_STARTER_TEMPLATES"))
+		if err != nil {
+			return nil, err
+		}
+		config.ConnConfig.RuntimeParams["doctorchart.starter_templates"] = starterTemplates
 		if err := configureTemplateLab(config.ConnConfig); err != nil {
 			return nil, err
 		}
 	}
 	return pgxpool.NewWithConfig(ctx, config)
+}
+
+func starterTemplateConfig(raw string) (string, error) {
+	if raw == "" {
+		return "{}", nil
+	}
+	var entries map[string]string
+	if err := json.Unmarshal([]byte(raw), &entries); err != nil || entries == nil {
+		return "", errors.New("invalid initial template configuration")
+	}
+	code := regexp.MustCompile("^[a-z][a-z0-9_]{0,63}$")
+	fingerprint := regexp.MustCompile("^[a-f0-9]{64}$")
+	for key, value := range entries {
+		if !code.MatchString(key) || !fingerprint.MatchString(value) {
+			return "", errors.New("invalid initial template code or fingerprint")
+		}
+	}
+	normalized, err := json.Marshal(entries)
+	return string(normalized), err
 }
 
 func initializeDatabase() error {

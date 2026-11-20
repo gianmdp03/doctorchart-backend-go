@@ -3,6 +3,7 @@ package clinics
 import (
 	"context"
 	"github.com/jackc/pgx/v5"
+	"github.com/syntah/doctorchart-backend-go/db"
 	"github.com/syntah/doctorchart-backend-go/internal/api"
 	"strings"
 )
@@ -52,7 +53,7 @@ func readPublicContexts(ctx context.Context, q scheduleReader, workspace int64) 
 	rows, err := q.Query(ctx, `SELECT cctx.id::text,s.code,s.display_name,cp.public_id::text,c.name,c.country,c.province,c.city,cp.address,c.timezone,c.modality
  FROM publication_specialty_contexts pc JOIN doctor_specialty_contexts cctx ON cctx.id=pc.specialty_context_id AND cctx.workspace_id=pc.workspace_id
  JOIN specialties s ON s.id=cctx.specialty_id JOIN clinic_publications cp ON cp.workspace_id=pc.workspace_id JOIN clinics c ON c.id=cp.clinic_id
- WHERE pc.workspace_id=$1 AND cctx.onboarding_completed AND cctx.definition IS NOT NULL AND public.template_available(s.id) AND cp.enabled AND c.status='ACTIVE' AND `+publicOfferExists+` ORDER BY s.display_name,cctx.id,c.name,c.id`, workspace)
+ WHERE pc.workspace_id=$1 AND cctx.onboarding_completed AND cctx.definition IS NOT NULL AND `+db.UsableTemplate("s.id", true)+` AND cp.enabled AND c.status='ACTIVE' AND `+publicOfferExists+` ORDER BY s.display_name,cctx.id,c.name,c.id`, workspace)
 	if err != nil {
 		return nil, err
 	}

@@ -218,7 +218,12 @@ func (s *Store) Specialties(ctx context.Context, admin bool) ([]Specialty, error
 	err := s.transaction(ctx, true, func(tx pgx.Tx) error {
 		query := "SELECT " + specialtyColumns + " FROM specialties"
 		if !admin {
-			query += " WHERE public.template_available(id)"
+			query = `SELECT id,code,display_name,
+				CASE WHEN ` + db.StarterTemplate("specialties.id", true) + `
+					THEN 'Plantilla inicial editable · Revisión clínica pendiente'
+					ELSE description END,
+				active,version,navigation,patient_record_tabs,patient_record_actions
+				FROM specialties WHERE ` + db.UsableTemplate("specialties.id", true)
 		}
 		query += " ORDER BY display_name,id"
 		rows, err := tx.Query(ctx, query)

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/syntah/doctorchart-backend-go/db"
 	"github.com/syntah/doctorchart-backend-go/internal/api"
 	"github.com/syntah/doctorchart-backend-go/internal/wizard"
 )
@@ -98,7 +99,7 @@ type reviewDraft struct {
 
 func templateAvailable(ctx context.Context, tx pgx.Tx, id int64, requireActive bool) (bool, error) {
 	var available bool
-	err := tx.QueryRow(ctx, "SELECT public.template_available($1,$2)", id, requireActive).Scan(&available)
+	err := tx.QueryRow(ctx, "SELECT "+db.UsableTemplate("$1", requireActive), id).Scan(&available)
 	return available, err
 }
 
@@ -243,6 +244,15 @@ func (s *Store) reviewStatus(ctx context.Context, id, before int64) (reviewStatu
 		}
 		if draft.PublishedVersion > 0 {
 			result.PublicationState = "LEGACY"
+		}
+		if draft.PublishedVersion > 0 && draft.PublishedApprovalID == nil {
+			result.CanActivate, err = templateAvailable(ctx, tx, id, false)
+			if err != nil {
+				return err
+			}
+			if result.CanActivate {
+				result.PublicationState = "STARTER"
+			}
 		}
 		if draft.PublishedApprovalID != nil {
 			result.CanActivate, err = templateAvailable(ctx, tx, id, false)
