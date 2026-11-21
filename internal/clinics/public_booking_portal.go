@@ -377,10 +377,11 @@ func (s *Service) previewPortalBookings(w http.ResponseWriter, r *http.Request, 
 
 func (s *Service) changePortalBooking(w http.ResponseWriter, r *http.Request) error {
 	var req struct {
-		Reference       string `json:"reference"`
-		ExpectedVersion string `json:"expectedVersion"`
-		Start           string `json:"start,omitempty"`
-		Action          string `json:"action"`
+		Reference       string  `json:"reference"`
+		ExpectedVersion string  `json:"expectedVersion"`
+		Start           string  `json:"start,omitempty"`
+		Action          string  `json:"action"`
+		Reason          *string `json:"reason,omitempty"`
 	}
 	if err := decodePublic(w, r, &req); err != nil {
 		return err
@@ -397,7 +398,11 @@ func (s *Service) changePortalBooking(w http.ResponseWriter, r *http.Request) er
 		return err
 	}
 	op := "status"
-	request := bookingRequest{ExpectedVersion: req.ExpectedVersion, Status: "CANCELLED"}
+	reason, err := bookingReason(req.Reason)
+	if err != nil {
+		return err
+	}
+	request := bookingRequest{ExpectedVersion: req.ExpectedVersion, Status: "CANCELLED", Reason: reason}
 	switch req.Action {
 	case "cancel":
 		if req.Start != "" {
@@ -427,6 +432,10 @@ func (s *Service) changePortalBooking(w http.ResponseWriter, r *http.Request) er
 	if err != nil {
 		return err
 	}
-	hash := notifications.Hash(strings.Join([]string{req.Reference, req.ExpectedVersion, req.Action, req.Start}, "\n"))
+	change := []string{req.Reference, req.ExpectedVersion, req.Action, req.Start}
+	if reason != nil {
+		change = append(change, *reason)
+	}
+	hash := notifications.Hash(strings.Join(change, "\n"))
 	return s.applyBooking(w, r, owner, op, previous, request, "portal:"+key, hash, a)
 }

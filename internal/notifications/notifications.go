@@ -36,13 +36,19 @@ type Service struct {
 	origin string
 }
 type Message struct {
-	Date        time.Time `json:"date"`
-	To          string    `json:"to"`
-	Code        string    `json:"code,omitempty"`
-	Expires     time.Time `json:"expires,omitempty"`
-	StaffOrigin string    `json:"staffOrigin,omitempty"`
-	Start       time.Time `json:"start,omitempty"`
-	Timezone    string    `json:"timezone,omitempty"`
+	Date        time.Time      `json:"date"`
+	To          string         `json:"to"`
+	Code        string         `json:"code,omitempty"`
+	Expires     time.Time      `json:"expires,omitempty"`
+	StaffOrigin string         `json:"staffOrigin,omitempty"`
+	Start       time.Time      `json:"start,omitempty"`
+	Timezone    string         `json:"timezone,omitempty"`
+	Change      *bookingChange `json:"change,omitempty"`
+}
+
+type bookingChange struct {
+	Reason   string `json:"reason,omitempty"`
+	PublicID string `json:"publicId,omitempty"`
 }
 
 const staffInvitationKeyPrefix = "staff-invitation:"
@@ -170,7 +176,7 @@ func (s *Service) BookingPortalCode(ctx context.Context, tx pgx.Tx, id, email, c
 }
 
 // BookingChanged schedules email for the address explicitly provided with an online reservation.
-func (s *Service) BookingChanged(ctx context.Context, tx pgx.Tx, id, version, event, status string) error {
+func (s *Service) BookingChanged(ctx context.Context, tx pgx.Tx, id, version, event, status string, reason *string) error {
 	kind := ""
 	switch {
 	case event == "CREATED":
@@ -184,8 +190,11 @@ func (s *Service) BookingChanged(ctx context.Context, tx pgx.Tx, id, version, ev
 		return nil
 	}
 	var m Message
-	err := tx.QueryRow(ctx, "SELECT p.email,b.start_at,b.clinic_snapshot->>'timezone' FROM booking_public_details p JOIN bookings b ON b.id=p.booking_id WHERE b.id=$1", id).
-		Scan(&m.To, &m.Start, &m.Timezone)
+	var publicID string
+	err := tx.QueryRow(ctx, `SELECT p.email,b.start_at,b.clinic_snapshot->>'timezone',coalesce(profile.public_id::text,'')
+		FROM booking_public_details p JOIN bookings b ON b.id=p.booking_id
+		LEFT JOIN booking_publications profile ON profile.workspace_id=b.workspace_id AND profile.published
+		WHERE b.id=$1`, id).Scan(&m.To, &m.Start, &m.Timezone, &publicID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
 	}
@@ -193,13 +202,19 @@ func (s *Service) BookingChanged(ctx context.Context, tx pgx.Tx, id, version, ev
 		return err
 	}
 	m.Date = time.Now().UTC()
-	raw, err := json.Marshal(m)
-	if err != nil {
-		return err
+	if kind == "BOOKING_RESCHEDULED" || kind == "BOOKING_CANCELLED" {
+		m.Change = &bookingChange{PublicID: publicID}
+		if reason != nil {
+			m.Change.Reason = *reason
+		}
 	}
 	enqueue := func(kind string, due time.Time) error {
+		raw, err := json.Marshal(m)
+		if err != nil {
+			return err
+		}
 		key := bookingEmailKeyPrefix + id + ":" + version + ":" + kind
-		_, err := tx.Exec(ctx, "INSERT INTO notification_outbox(dedup_key,kind,booking_id,booking_version,payload,due_at) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(dedup_key) DO NOTHING",
+		_, err = tx.Exec(ctx, "INSERT INTO notification_outbox(dedup_key,kind,booking_id,booking_version,payload,due_at) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(dedup_key) DO NOTHING",
 			key, kind, id, version, s.seal(raw, key), due)
 		return err
 	}
@@ -207,6 +222,7 @@ func (s *Service) BookingChanged(ctx context.Context, tx pgx.Tx, id, version, ev
 		return err
 	}
 	if due := m.Start.Add(-24 * time.Hour); status == "CONFIRMED" && due.After(m.Date) {
+		m.Change = nil
 		return enqueue("BOOKING_REMINDER", due)
 	}
 	return nil

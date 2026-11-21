@@ -106,6 +106,38 @@ func TestNotificationSpanishAdministrativeTemplatesAndStableMessageID(t *testing
 		})
 	}
 }
+func TestBookingChangeIncludesReasonAndCorrectPatientLink(t *testing.T) {
+	s := &Service{origin: "https://doctorchart.example"}
+	m := Message{
+		Date: time.Date(2030, 3, 9, 19, 0, 0, 0, time.UTC), To: "recipient@example.invalid",
+		Start: time.Date(2030, 3, 10, 17, 30, 0, 0, time.UTC), Timezone: "America/Argentina/Buenos_Aires",
+		Change: &bookingChange{Reason: "Cambio de agenda <script>alert(1)</script>\nGracias por tu comprensión.", PublicID: "profile-id"},
+	}
+	cases := []struct{ kind, link, dateLabel string }{
+		{"BOOKING_CANCELLED", "/appointments/profile-id", "Fecha y hora del turno cancelado"},
+		{"BOOKING_RESCHEDULED", "/appointments/confirmation", "Nueva fecha y hora"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.kind, func(t *testing.T) {
+			message, err := s.render(tc.kind, "booking-change", m)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(message.Text, m.Change.Reason) || !strings.Contains(message.Text, "10/03/2030 a las 14:30") ||
+				!strings.Contains(message.HTML, tc.dateLabel) || !strings.Contains(message.HTML, s.origin+tc.link) ||
+				!strings.Contains(message.HTML, "&lt;script&gt;") || strings.Contains(message.HTML, "<script>") {
+				t.Fatal("unexpected content in booking change notification")
+			}
+		})
+	}
+	m.Change = &bookingChange{}
+	cancel, err := s.render("BOOKING_CANCELLED", "booking-change", m)
+	if err != nil || !strings.Contains(cancel.HTML, `href="https://doctorchart.example/appointments"`) ||
+		strings.Contains(cancel.Text, "Motivo de la cancelación") {
+		t.Fatal("cancellation without a published profile should link to the directory", err)
+	}
+}
+
 func TestNotificationRetryBoundaries(t *testing.T) {
 	if retry(1) != time.Second || retry(2) != 2*time.Second || retry(20) != 5*time.Minute {
 		t.Fatal("retry bounds changed")

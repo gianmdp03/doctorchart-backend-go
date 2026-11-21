@@ -216,11 +216,23 @@ type bookingRequest struct {
 	ContactName     string               `json:"contactName"`
 	ContactPhone    string               `json:"contactPhone"`
 	Status          string               `json:"status"`
+	Reason          *string              `json:"reason,omitempty"`
 	ContextID       string               `json:"specialtyContextId,omitempty"`
 	Portal          *bookingPortalIntake `json:"portal,omitempty"`
 }
 
 var idempotencyPattern = regexp.MustCompile(`^[A-Za-z0-9._:-]{16,128}$`)
+
+func bookingReason(value *string) (*string, error) {
+	if value == nil {
+		return nil, nil
+	}
+	reason := strings.TrimSpace(strings.ReplaceAll(*value, "\r\n", "\n"))
+	if reason == "" || api.JavaLength(reason) > 500 || strings.ContainsAny(reason, "\x00\r") {
+		return nil, api.Invalid("Ingresá un motivo de hasta 500 caracteres.")
+	}
+	return &reason, nil
+}
 
 func decodeBooking(w http.ResponseWriter, r *http.Request, op string) (bookingRequest, string, string, error) {
 	key := r.Header.Get("Idempotency-Key")
@@ -232,7 +244,7 @@ func decodeBooking(w http.ResponseWriter, r *http.Request, op string) (bookingRe
 	if err != nil {
 		return bookingRequest{}, "", "", err
 	}
-	allowed := []string{"expectedVersion", "status"}
+	allowed := []string{"expectedVersion", "status", "reason"}
 	required := []string{"expectedVersion", "status"}
 	if op == "create" {
 		allowed = []string{"clinicId", "start", "patientId", "contactName", "contactPhone", "attendeeName", "specialtyContextId", "portal"}
@@ -241,7 +253,7 @@ func decodeBooking(w http.ResponseWriter, r *http.Request, op string) (bookingRe
 	if op == "reschedule" {
 		allowed = []string{"expectedVersion", "clinicId", "start"}
 		required = allowed
-		allowed = append(allowed, "specialtyContextId")
+		allowed = append(allowed, "specialtyContextId", "reason")
 	}
 	if err = api.Only(body, allowed...); err != nil {
 		return bookingRequest{}, "", "", err
@@ -266,6 +278,15 @@ func decodeBooking(w http.ResponseWriter, r *http.Request, op string) (bookingRe
 	decoder.DisallowUnknownFields()
 	if err = decoder.Decode(&request); err != nil {
 		return request, "", "", api.Invalid("Revisá los tipos de los campos de la reserva.")
+	}
+	if request.Reason != nil {
+		if op != "reschedule" && request.Status != "CANCELLED" {
+			return request, "", "", field("reason", "UNEXPECTED_FIELD")
+		}
+		request.Reason, err = bookingReason(request.Reason)
+		if err != nil {
+			return request, "", "", err
+		}
 	}
 	if op != "create" {
 		if _, err = decimal(request.ExpectedVersion, false); err != nil {
@@ -589,7 +610,7 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 	}
 	if op == "create" || result.Version != previous.Version {
 		if s.notices != nil {
-			if err = s.notices.BookingChanged(ctx, tx, result.ID, result.Version, kind, result.Status); err != nil {
+			if err = s.notices.BookingChanged(ctx, tx, result.ID, result.Version, kind, result.Status, request.Reason); err != nil {
 				return err
 			}
 		}
