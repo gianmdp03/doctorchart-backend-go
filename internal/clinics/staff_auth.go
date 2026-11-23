@@ -12,6 +12,7 @@ import (
 	"net/mail"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/syntah/doctorchart-backend-go/internal/api"
@@ -50,8 +51,8 @@ func staffEmail(raw string) (string, error) {
 	return email, nil
 }
 func staffPassword(raw string) ([]byte, error) {
-	if len(raw) < 12 || len(raw) > 72 {
-		return nil, api.Invalid("La contraseña debe tener entre 12 y 72 bytes.")
+	if utf8.RuneCountInString(raw) < 6 || len(raw) > 72 {
+		return nil, api.Invalid("La contraseña debe tener al menos 6 caracteres y no superar 72 bytes.")
 	}
 	return bcrypt.GenerateFromPassword([]byte(raw), 12)
 }
