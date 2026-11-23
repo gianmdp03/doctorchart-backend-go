@@ -269,7 +269,7 @@ func TestConsolidatedCatalogDerivation(t *testing.T) {
 }
 
 func TestUnknownPostgreSQLMajorFailsClosed(t *testing.T) {
-	for _, major := range []int{16, 19} {
+	for _, major := range []int{16, 20} {
 		if _, err := catalogForMajor(major); err == nil {
 			t.Fatalf("unsupported major %d accepted", major)
 		}

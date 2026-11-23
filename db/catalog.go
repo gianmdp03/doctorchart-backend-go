@@ -62,12 +62,12 @@ const emptySQL = `SELECT NOT EXISTS(
  UNION ALL SELECT 1 FROM pg_extension WHERE extname<>'plpgsql'
 )`
 
-// Fingerprints derived by applying schema.sql to empty PostgreSQL 17 and 18 databases.
+// Fingerprints derived by applying schema.sql to empty PostgreSQL 17, 18 and 19 databases.
 func catalogForMajor(major int) (string, error) {
 	switch major {
 	case 17:
 		return "450d3acdc1c042a6bbe2c29442e5ecdda917b3da20ef0e1c3bd5c14f6f598866", nil
-	case 18:
+	case 18, 19:
 		return "f27d5878dc693a75a8b8906f9a9182a93f8691c7fe1efeacde8ff741d82cca4b", nil
 	default:
 		return "", fmt.Errorf("unsupported PostgreSQL major version %d; no schema changes performed", major)

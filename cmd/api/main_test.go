@@ -230,7 +230,7 @@ func TestStartupCreatesSchemaAndServesHealth(t *testing.T) {
 	if err := pool.QueryRow(ctx, "SELECT count(*) FROM specialties").Scan(&specialties); err != nil {
 		t.Fatal(err)
 	}
-	if tables != 55 || specialties == 0 {
+	if tables != 57 || specialties == 0 {
 		t.Fatalf("health served with %d tables and %d specialties", tables, specialties)
 	}
 	probe := func(path string, expected int) {
