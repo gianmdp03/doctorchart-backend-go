@@ -24,27 +24,32 @@ type Booking struct {
 	ID       string `json:"id"`
 	ClinicID string `json:"clinicId"`
 
-	Start          time.Time         `json:"start"`
-	End            time.Time         `json:"end"`
-	Status         string            `json:"status"`
-	Version        string            `json:"version"`
-	AttendeeName   string            `json:"attendeeName"`
-	ContactName    string            `json:"contactName"`
-	ContactPhone   string            `json:"contactPhone"`
-	CreatedAt      time.Time         `json:"createdAt"`
-	UpdatedAt      time.Time         `json:"updatedAt"`
-	ContextID      string            `json:"specialtyContextId"`
-	Specialty      BookingSpecialty  `json:"specialty"`
-	ClinicSnapshot BookingClinic     `json:"clinicSnapshot"`
-	Provenance     BookingProvenance `json:"provenance"`
+	Start              time.Time         `json:"start"`
+	End                time.Time         `json:"end"`
+	Status             string            `json:"status"`
+	Version            string            `json:"version"`
+	AttendeeName       string            `json:"attendeeName"`
+	ContactName        string            `json:"contactName"`
+	ContactPhone       string            `json:"contactPhone"`
+	CreatedAt          time.Time         `json:"createdAt"`
+	UpdatedAt          time.Time         `json:"updatedAt"`
+	ContextID          string            `json:"specialtyContextId"`
+	Specialty          BookingSpecialty  `json:"specialty"`
+	ClinicSnapshot     BookingClinic     `json:"clinicSnapshot"`
+	Provenance         BookingProvenance `json:"provenance"`
+	RescheduleResponse string            `json:"rescheduleResponse,omitempty"`
 }
 
-const bookingColumns = "b.id::text,b.clinic_id::text,b.start_at,b.end_at,b.status,b.version::text,COALESCE(b.attendee_name,b.contact_name),b.contact_name,b.contact_phone,b.created_at,b.updated_at,b.specialty_context_id::text,b.specialty_snapshot,b.clinic_snapshot,b.provenance"
+const latestBookingResponse = `SELECT e.after_document->>'rescheduleResponse'
+	FROM booking_events e WHERE e.booking_id=b.id AND e.kind<>'PATIENT_LINKED'
+	ORDER BY e.version DESC LIMIT 1`
+
+const bookingColumns = "b.id::text,b.clinic_id::text,b.start_at,b.end_at,b.status,b.version::text,COALESCE(b.attendee_name,b.contact_name),b.contact_name,b.contact_phone,b.created_at,b.updated_at,b.specialty_context_id::text,b.specialty_snapshot,b.clinic_snapshot,b.provenance,COALESCE((" + latestBookingResponse + "), '')"
 
 func scanBooking(row scanner) (Booking, error) {
 	var b Booking
 	var specialty, clinic, provenance []byte
-	err := row.Scan(&b.ID, &b.ClinicID, &b.Start, &b.End, &b.Status, &b.Version, &b.AttendeeName, &b.ContactName, &b.ContactPhone, &b.CreatedAt, &b.UpdatedAt, &b.ContextID, &specialty, &clinic, &provenance)
+	err := row.Scan(&b.ID, &b.ClinicID, &b.Start, &b.End, &b.Status, &b.Version, &b.AttendeeName, &b.ContactName, &b.ContactPhone, &b.CreatedAt, &b.UpdatedAt, &b.ContextID, &specialty, &clinic, &provenance, &b.RescheduleResponse)
 	if err == nil {
 		err = json.Unmarshal(specialty, &b.Specialty)
 	}
@@ -492,13 +497,24 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 	var result Booking
 	kind := "CREATED"
 	status = 200
-	if op == "status" {
+	if op == "confirm" {
+		if previous.RescheduleResponse != "AWAITING_PATIENT" {
+			return bookingState()
+		}
+		result, err = scanBooking(tx.QueryRow(ctx, "UPDATE bookings b SET version=version+1,updated_at=clock_timestamp() WHERE id=$1 RETURNING "+bookingColumns, previous.ID))
+		result.RescheduleResponse = "PATIENT_ACCEPTED"
+		kind = "STATUS_CHANGED"
+	} else if op == "status" {
 		if !bookingTransition(previous.Status, request.Status) {
+			return bookingState()
+		}
+		if previous.RescheduleResponse == "AWAITING_PATIENT" && request.Status != "CANCELLED" {
 			return bookingState()
 		}
 		result = previous
 		if previous.Status != request.Status {
 			result, err = scanBooking(tx.QueryRow(ctx, "UPDATE bookings b SET status=$1,version=version+1,updated_at=clock_timestamp() WHERE id=$2 RETURNING "+bookingColumns, request.Status, previous.ID))
+			result.RescheduleResponse = ""
 		}
 		kind = "STATUS_CHANGED"
 	} else {
@@ -583,6 +599,10 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 		} else {
 			kind = "RESCHEDULED"
 			result, err = scanBooking(tx.QueryRow(ctx, "UPDATE bookings b SET clinic_id=$1,start_at=$2,end_at=$3,clinic_snapshot=$5,provenance=$6,version=version+1,updated_at=clock_timestamp() WHERE id=$4 RETURNING "+bookingColumns, clinic.ID, start, end, previous.ID, json.RawMessage(clinicSnapshot), json.RawMessage(provenance)))
+			result.RescheduleResponse = ""
+			if public == nil && s.notices != nil {
+				result.RescheduleResponse = "AWAITING_PATIENT"
+			}
 		}
 	}
 	if err != nil {
@@ -604,16 +624,21 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 			return err
 		}
 	}
+	changed := op == "create" || result.Version != previous.Version
+	if changed && s.notices != nil {
+		queued, noticeErr := s.notices.BookingChanged(ctx, tx, result.ID, result.Version, kind, result.Status, request.Reason, result.RescheduleResponse)
+		if noticeErr != nil {
+			return noticeErr
+		}
+		if !queued && result.RescheduleResponse == "AWAITING_PATIENT" {
+			result.RescheduleResponse = ""
+		}
+	}
 	response, err = json.Marshal(result)
 	if err != nil {
 		return err
 	}
-	if op == "create" || result.Version != previous.Version {
-		if s.notices != nil {
-			if err = s.notices.BookingChanged(ctx, tx, result.ID, result.Version, kind, result.Status, request.Reason); err != nil {
-				return err
-			}
-		}
+	if changed {
 		actor := user
 		if staff != nil {
 			actor = "STAFF:" + staff.session.ID
@@ -632,7 +657,7 @@ func (s *Service) applyBooking(w http.ResponseWriter, r *http.Request, user, op 
 			}
 			before = json.RawMessage(raw)
 		}
-		if _, err = tx.Exec(ctx, "INSERT INTO booking_events(booking_id,version,kind,actor_id,before_document,after_document) VALUES($1,$2,$3,$4,$5,$6)", result.ID, result.Version, kind, actor, before, response); err != nil {
+		if _, err = tx.Exec(ctx, "INSERT INTO booking_events(booking_id,version,kind,actor_id,before_document,after_document) VALUES($1,$2,$3,$4,$5,$6::jsonb||jsonb_strip_nulls(jsonb_build_object('changeReason',$7::text)))", result.ID, result.Version, kind, actor, before, response, request.Reason); err != nil {
 			return err
 		}
 	}

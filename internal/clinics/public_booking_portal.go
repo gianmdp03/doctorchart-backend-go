@@ -315,6 +315,9 @@ func (s *Service) portalBookings(w http.ResponseWriter, r *http.Request) error {
 		'timezone',b.clinic_snapshot->>'timezone',
 		'modality',b.clinic_snapshot->>'modality','specialtyName',b.specialty_snapshot->>'name','version',b.version::text,
 		'canChange',b.start_at>clock_timestamp() AND b.status='CONFIRMED',
+		'rescheduleResponse',(`+latestBookingResponse+`),
+		'rescheduleProposalVersion',(SELECT e.version::text FROM booking_events e WHERE e.booking_id=b.id
+			AND e.kind='RESCHEDULED' ORDER BY e.version DESC LIMIT 1),
 		'publicDoctorId',CASE WHEN cp.enabled AND bp.published THEN bp.public_id::text END,
 		'publicClinicId',CASE WHEN cp.enabled AND bp.published THEN cp.public_id::text END,
 		'specialtyContextId',b.specialty_context_id::text)
@@ -413,8 +416,13 @@ func (s *Service) changePortalBooking(w http.ResponseWriter, r *http.Request) er
 			return err
 		}
 		op, request.Start, request.Status = "reschedule", req.Start, ""
+	case "confirm":
+		if req.Start != "" || req.Reason != nil {
+			return api.Invalid("Solicitud inválida.")
+		}
+		op, request.Status = "confirm", ""
 	default:
-		return api.Invalid("Elegí cancelar o reprogramar el turno.")
+		return api.Invalid("Elegí confirmar, cancelar o reprogramar el turno.")
 	}
 	var previous Booking
 	var owner string

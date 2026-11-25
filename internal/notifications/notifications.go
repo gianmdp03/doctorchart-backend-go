@@ -50,8 +50,10 @@ type Message struct {
 }
 
 type bookingChange struct {
-	Reason   string `json:"reason,omitempty"`
-	PublicID string `json:"publicId,omitempty"`
+	Reason          string `json:"reason,omitempty"`
+	PublicID        string `json:"publicId,omitempty"`
+	Reference       string `json:"reference,omitempty"`
+	ProposalVersion string `json:"proposalVersion,omitempty"`
 }
 
 const staffInvitationKeyPrefix = "staff-invitation:"
@@ -181,34 +183,42 @@ func (s *Service) BookingPortalCode(ctx context.Context, tx pgx.Tx, id, email, c
 }
 
 // BookingChanged schedules email for the address explicitly provided with an online reservation.
-func (s *Service) BookingChanged(ctx context.Context, tx pgx.Tx, id, version, event, status string, reason *string) error {
+func (s *Service) BookingChanged(ctx context.Context, tx pgx.Tx, id, version, event, status string, reason *string, response string) (bool, error) {
 	kind := ""
 	switch {
 	case event == "CREATED":
 		kind = "BOOKING_CONFIRMED"
+	case response == "PATIENT_ACCEPTED":
+		// The person just confirmed in the portal. Schedule their reminder only.
+		kind = "BOOKING_REMINDER"
 	case event == "RESCHEDULED":
 		kind = "BOOKING_RESCHEDULED"
 	case event == "STATUS_CHANGED" && status == "CANCELLED":
 		kind = "BOOKING_CANCELLED"
 	}
 	if kind == "" {
-		return nil
+		return false, nil
 	}
 	var m Message
-	var publicID string
-	err := tx.QueryRow(ctx, `SELECT p.email,b.start_at,b.clinic_snapshot->>'timezone',coalesce(profile.public_id::text,'')
+	var change bookingChange
+	err := tx.QueryRow(ctx, `SELECT p.email,b.start_at,b.clinic_snapshot->>'timezone',coalesce(profile.public_id::text,''),
+		p.reference::text
 		FROM booking_public_details p JOIN bookings b ON b.id=p.booking_id
 		LEFT JOIN booking_publications profile ON profile.workspace_id=b.workspace_id AND profile.published
-		WHERE b.id=$1`, id).Scan(&m.To, &m.Start, &m.Timezone, &publicID)
+		WHERE b.id=$1`, id).Scan(&m.To, &m.Start, &m.Timezone, &change.PublicID, &change.Reference)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil
+		return false, nil
 	}
 	if err != nil {
-		return err
+		return false, err
 	}
 	m.Date = time.Now().UTC()
+	proposal := kind == "BOOKING_RESCHEDULED" && response == "AWAITING_PATIENT"
 	if kind == "BOOKING_RESCHEDULED" || kind == "BOOKING_CANCELLED" {
-		m.Change = &bookingChange{PublicID: publicID}
+		m.Change = &bookingChange{PublicID: change.PublicID}
+		if proposal {
+			m.Change.Reference, m.Change.ProposalVersion = change.Reference, version
+		}
 		if reason != nil {
 			m.Change.Reason = *reason
 		}
@@ -223,14 +233,18 @@ func (s *Service) BookingChanged(ctx context.Context, tx pgx.Tx, id, version, ev
 			key, kind, id, version, s.seal(raw, key), due)
 		return err
 	}
-	if err = enqueue(kind, m.Date); err != nil {
-		return err
+	if kind != "BOOKING_REMINDER" {
+		if err = enqueue(kind, m.Date); err != nil {
+			return false, err
+		}
 	}
-	if due := m.Start.Add(-24 * time.Hour); status == "CONFIRMED" && due.After(m.Date) {
+	if due := m.Start.Add(-24 * time.Hour); status == "CONFIRMED" && !proposal && due.After(m.Date) {
 		m.Change = nil
-		return enqueue("BOOKING_REMINDER", due)
+		if err = enqueue("BOOKING_REMINDER", due); err != nil {
+			return false, err
+		}
 	}
-	return nil
+	return proposal, nil
 }
 func (s *Service) Invitation(ctx context.Context, tx pgx.Tx, access, email, code, origin string, expires time.Time) error {
 	return s.enqueue(ctx, tx, staffInvitationKeyPrefix+Hash(code), "STAFF_INVITATION", access, nil,

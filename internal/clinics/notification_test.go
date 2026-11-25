@@ -286,6 +286,100 @@ func TestVerifiedPortalReschedulesAndCancelsThroughBookingEngine(t *testing.T) {
 		t.Fatal("portal shows an obsolete status", w.Body.String())
 	}
 }
+func TestPatientCanAcceptOrBookAnAvailableAlternative(t *testing.T) {
+	f, clinic, start, publication, notices, sender := notificationFixture(t)
+	receipt, booking := notificationBooking(t, f, publication, start)
+	cookie := portalVerify(t, f, receipt, portalCodeFromMail(t, notices, sender))
+	const portalPath = "/public/appointments/my-bookings/change"
+	bookingPath := "/bookings/" + booking.ID
+	move := func(version string, at time.Time) Booking {
+		t.Helper()
+		body := map[string]string{"expectedVersion": version, "clinicId": clinic.ID, "start": at.Format(time.RFC3339)}
+		w := bookingRequestFixture(f, "POST", bookingPath+"/reschedule", owner, newBookingKey(), jsonString(body))
+		assertCode(t, w, 200, "")
+		return booked(t, w)
+	}
+	proposed := move(booking.Version, start.Add(30*time.Minute))
+	if proposed.RescheduleResponse != "AWAITING_PATIENT" {
+		t.Fatal("staff move was not awaiting patient", proposed.RescheduleResponse)
+	}
+	for range 2 {
+		processMail(t, notices)
+		if strings.Contains(sender.messages[len(sender.messages)-1].HTML, "Confirmar turno") {
+			break
+		}
+	}
+	if !strings.Contains(sender.messages[len(sender.messages)-1].HTML, "Confirmar turno") {
+		t.Fatal("the proposal email did not offer confirmation")
+	}
+	req := map[string]string{"reference": receipt.Reference, "expectedVersion": proposed.Version, "action": "confirm"}
+	assertCode(t, pubRequest(f, "POST", portalPath, newOpaqueID(), req), 403, "BOOKING_ACCESS_DENIED")
+	key := newOpaqueID()
+	assertCode(t, pubRequest(f, "POST", portalPath, key, req, cookie), 200, "")
+	assertCode(t, pubRequest(f, "POST", portalPath, key, req, cookie), 200, "")
+
+	w := f.request("GET", bookingPath, owner, "")
+	assertCode(t, w, 200, "")
+	accepted := booked(t, w)
+	if accepted.RescheduleResponse != "PATIENT_ACCEPTED" || !accepted.Start.Equal(proposed.Start) {
+		t.Fatal("confirmation did not preserve the proposed time", accepted)
+	}
+
+	proposed = move(accepted.Version, start.Add(time.Hour))
+	assertCode(t, pubRequest(f, "POST", portalPath, newOpaqueID(), req, cookie), 409, "VERSION_CONFLICT")
+	occupied := start.Add(90 * time.Minute)
+	free := start.Add(2 * time.Hour)
+	var publicClinic string
+	if err := f.pool.QueryRow(t.Context(), "SELECT public_id::text FROM clinic_publications WHERE clinic_id=$1", clinic.ID).Scan(&publicClinic); err != nil {
+		t.Fatal(err)
+	}
+	available := func(at time.Time) bool {
+		t.Helper()
+		path := "/public/appointments/doctors/" + publication.PublicID + "/clinics/" + publicClinic + "/availability?days=1&from=" + start.Format(time.DateOnly)
+		list := pubRequest(f, "GET", path, "", nil)
+		assertCode(t, list, 200, "")
+		var reply struct {
+			Days []struct{ Slots []AvailableSlot }
+		}
+		if err := json.Unmarshal(list.Body.Bytes(), &reply); err != nil {
+			t.Fatal(err)
+		}
+		for _, day := range reply.Days {
+			for _, slot := range day.Slots {
+				if slot.Start.Equal(at) {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	if !available(occupied) {
+		t.Fatal("the time should be available before another booking")
+	}
+	w = bookingRequestFixture(f, "POST", "/bookings", owner, newBookingKey(), createBookingBody(clinic.ID, occupied))
+	assertCode(t, w, 201, "")
+	if available(occupied) || !available(free) {
+		t.Fatal("the list should show the free time and exclude the occupied time")
+	}
+	req["expectedVersion"], req["action"], req["start"] = proposed.Version, "reschedule", occupied.Format(time.RFC3339)
+	assertCode(t, pubRequest(f, "POST", portalPath, newOpaqueID(), req, cookie), 409, "BOOKING_SLOT_UNAVAILABLE")
+	req["start"] = free.Format(time.RFC3339)
+	req["reason"] = "No puedo en el horario anterior"
+	w = pubRequest(f, "POST", portalPath, newOpaqueID(), req, cookie)
+	assertCode(t, w, 200, "")
+	w = f.request("GET", bookingPath, owner, "")
+	assertCode(t, w, 200, "")
+	alternate := booked(t, w)
+	if alternate.Status != "CONFIRMED" || alternate.RescheduleResponse != "" || !alternate.Start.Equal(free) {
+		t.Fatal("the new time should be confirmed immediately", alternate)
+	}
+	w = f.request("GET", bookingPath+"/events", owner, "")
+	assertCode(t, w, 200, "")
+	if !strings.Contains(w.Body.String(), "PATIENT_ACCEPTED") || !strings.Contains(w.Body.String(), req["reason"]) {
+		t.Fatal("missing history of the patient's actions")
+	}
+}
+
 func TestPublicConfirmationReplayKeepsSameCode(t *testing.T) {
 	f, _, start, p, _, _ := notificationFixture(t)
 	body := publicBody(t, f, p, start)

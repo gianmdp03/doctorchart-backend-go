@@ -30,6 +30,7 @@ var bookingChangeHTML = template.Must(template.New("booking-change").Parse(`<!do
 <table role="presentation" cellspacing="0" cellpadding="0"><tr><td bgcolor="#08666a" style="border-radius:9px;">
 <a href="{{.URL}}" style="display:inline-block;padding:13px 20px;border:1px solid #08666a;border-radius:9px;color:#ffffff;text-decoration:none;font-size:15px;font-weight:bold;">{{.Action}}</a>
 </td></tr></table>
+{{if .AlternateURL}}<p style="margin:16px 0 0;"><a href="{{.AlternateURL}}" style="color:#08666a;font-size:15px;font-weight:bold;">Reprogramar para otra fecha</a></p>{{end}}
 </td></tr>
 <tr><td style="padding:16px 28px;border-top:1px solid #dce5ea;color:#4f6471;font-size:12px;line-height:1.45;">DoctorChart · Aviso administrativo de tu turno.</td></tr>
 </table>
@@ -39,6 +40,7 @@ var bookingChangeHTML = template.Must(template.New("booking-change").Parse(`<!do
 type bookingChangeEmail struct {
 	Title, DateLabel, When, ReasonLabel, Instructions, URL, Action string
 	ReasonLines                                                    []string
+	AlternateURL                                                   string
 }
 
 var staffRecoveryHTML = template.Must(template.New("staff-recovery").Parse(`<!doctype html>
@@ -71,13 +73,26 @@ func (s *Service) renderBookingChange(subject, key, recipient, when string, chan
 		if change.PublicID != "" {
 			view.URL += "/" + url.PathEscape(change.PublicID)
 		}
+	} else if change.ProposalVersion != "" && change.Reference != "" {
+		link := func(action string) string {
+			return s.origin + "/appointments/confirmation#" + url.Values{
+				"action": {action}, "reference": {change.Reference}, "version": {change.ProposalVersion},
+			}.Encode()
+		}
+		view.Action, view.URL = "Confirmar turno", link("confirm")
+		view.Instructions = "Confirmá si podés asistir en el nuevo horario. Si no te sirve, elegí otro horario disponible."
+		view.AlternateURL = link("reschedule")
 	}
 	text := subject + ".\n\n" + view.DateLabel + "\n" + view.When
 	if change.Reason != "" {
 		view.ReasonLines = strings.Split(change.Reason, "\n")
 		text += "\n\n" + view.ReasonLabel + "\n" + change.Reason
 	}
-	text += "\n\n" + view.Instructions + "\n" + view.URL + "\n\nDoctorChart · Aviso administrativo de tu turno.\n"
+	text += "\n\n" + view.Instructions + "\n" + view.Action + ": " + view.URL
+	if view.AlternateURL != "" {
+		text += "\nReprogramar para otra fecha: " + view.AlternateURL
+	}
+	text += "\n\nDoctorChart · Aviso administrativo de tu turno.\n"
 	var html bytes.Buffer
 	if err := bookingChangeHTML.Execute(&html, view); err != nil {
 		return mailclient.Message{}, err
@@ -128,6 +143,9 @@ func (s *Service) render(kind, key string, m Message) (mailclient.Message, error
 			subject = "Tu turno está confirmado"
 		case "BOOKING_RESCHEDULED":
 			subject = "Tu turno fue reprogramado"
+			if m.Change != nil && m.Change.ProposalVersion != "" {
+				subject = "Confirmá el nuevo horario de tu turno"
+			}
 		case "BOOKING_CANCELLED":
 			subject = "Tu turno fue cancelado"
 		case "BOOKING_REMINDER":

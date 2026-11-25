@@ -104,7 +104,7 @@ func validatePublicIdentity(country, kind, document, email string) error {
 	return nil
 }
 func (a *publicAdmission) check(ctx context.Context, tx pgx.Tx, s *Service, workspace int64, snap billing.Snapshot) error {
-	if a.management == "status" {
+	if a.management == "status" || a.management == "confirm" {
 		return nil
 	}
 	if snap.OnlineBooking == nil || !*snap.OnlineBooking || !snap.ClinicManagement || !snap.AllowsAppointments() {

@@ -162,3 +162,24 @@ func TestNotificationRetryBoundaries(t *testing.T) {
 		t.Fatal("retry bounds changed")
 	}
 }
+
+func TestRescheduleProposalEmailOffersBothActions(t *testing.T) {
+	s := &Service{origin: "https://doctorchart.example"}
+	m := Message{
+		Date: time.Now(), To: "recipient@example.invalid", Start: time.Now().Add(time.Hour), Timezone: "UTC",
+		Change: &bookingChange{Reference: "opaque-reference", ProposalVersion: "3"},
+	}
+	message, err := s.render("BOOKING_RESCHEDULED", "proposal", m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, action := range []struct{ name, value string }{
+		{"Confirmar turno", "confirm"}, {"Reprogramar para otra fecha", "reschedule"},
+	} {
+		link := s.origin + "/appointments/confirmation#action=" + action.value
+		if !strings.Contains(message.HTML, link) || !strings.Contains(message.HTML, action.name) ||
+			!strings.Contains(message.Text, action.name+": "+link) {
+			t.Fatalf("missing %s link in the HTML or text email", action.value)
+		}
+	}
+}

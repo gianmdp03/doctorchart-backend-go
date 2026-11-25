@@ -218,3 +218,39 @@ func TestPublicDirectoryFiltersAndNoAdministrativeIdentity(t *testing.T) {
 	w = f.request("PUT", "/booking-publication", other, fmt.Sprintf(`{"expectedVersion":"0","name":"Other","description":"","published":true,"clinics":[{"clinicId":%q,"enabled":true,"address":"public"}],"questions":[]}`, p.Clinics[0].ClinicID))
 	assertCode(t, w, 404, "CLINIC_NOT_FOUND")
 }
+
+func TestPublicDirectoryCatalogIncludesSpecialtiesWithoutOffers(t *testing.T) {
+	f := newFixture(t)
+	mux := http.NewServeMux()
+	NewWithBookings(f.pool, f.rights, true, true).WithPublicBookings(true, "gateway-fixture").Routes(mux)
+	f.handler = api.Gateway("gateway-fixture", api.Dispatch(mux))
+
+	catalog := func() []publicSpecialty {
+		t.Helper()
+		w := pubRequest(f, "GET", "/public/appointments/doctors?includeSpecialties=only", "", nil)
+		assertCode(t, w, 200, "")
+		var response struct {
+			Specialties []publicSpecialty `json:"specialties"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+			t.Fatal(err)
+		}
+		return response.Specialties
+	}
+	before := catalog()
+	if len(before) < 2 {
+		t.Fatalf("expected multiple active specialties without published offers, got %v", before)
+	}
+	if _, err := f.pool.Exec(t.Context(), "UPDATE specialties SET active=false WHERE code=$1", before[0].Code); err != nil {
+		t.Fatal(err)
+	}
+	after := catalog()
+	if len(after) != len(before)-1 {
+		t.Fatalf("expected the updated catalog, got %v", after)
+	}
+	for _, specialty := range after {
+		if specialty.Code == before[0].Code {
+			t.Fatal("inactive specialty is still listed")
+		}
+	}
+}

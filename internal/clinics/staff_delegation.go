@@ -97,7 +97,7 @@ func staffBookingDocument(raw json.RawMessage) (map[string]any, error) {
 		return nil, err
 	}
 	document := staffFields(b, "id", "clinicId", "start", "end", "status", "version",
-		"attendeeName", "contactName", "contactPhone", "createdAt", "updatedAt", "specialtyContextId")
+		"attendeeName", "contactName", "contactPhone", "createdAt", "updatedAt", "specialtyContextId", "rescheduleResponse")
 	if clinic, ok := b["clinicSnapshot"].(map[string]any); ok {
 		document["clinicSnapshot"] = staffFields(clinic, "name", "timezone", "modality")
 	}

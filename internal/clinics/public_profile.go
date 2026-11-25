@@ -158,7 +158,7 @@ func (s *Service) publicDirectory(w http.ResponseWriter, r *http.Request) error 
 				return api.Invalid("Modalidad inválida.")
 			}
 		case "includeSpecialties":
-			if v[0] != "1" {
+			if v[0] != "1" && v[0] != "only" {
 				return api.Invalid("Filtro no admitido.")
 			}
 		default:
@@ -178,6 +178,14 @@ func (s *Service) publicDirectory(w http.ResponseWriter, r *http.Request) error 
 		if err != nil || size < 1 || size > 20 {
 			return api.Invalid("Tamaño inválido.")
 		}
+	}
+	if q.Get("includeSpecialties") == "only" {
+		specialties, err := s.directorySpecialties(r.Context())
+		if err != nil {
+			return err
+		}
+		api.WriteJSON(w, 200, map[string]any{"specialties": specialties})
+		return nil
 	}
 	// Filter locations on the same enabled public clinic; never return private rows.
 	rows, err := s.pool.Query(r.Context(), `SELECT p.public_id::text FROM booking_publications p WHERE p.published AND strpos(lower(p.name),lower($1))>0 AND EXISTS(
@@ -233,7 +241,7 @@ func (s *Service) publicDirectory(w http.ResponseWriter, r *http.Request) error 
 	}
 	response := map[string]any{"items": result, "page": page, "size": size, "hasMore": more}
 	if q.Has("includeSpecialties") {
-		specialties, err := s.publishedSpecialties(r.Context(), q.Get("country"), q.Get("modality"))
+		specialties, err := s.directorySpecialties(r.Context())
 		if err != nil {
 			return err
 		}
@@ -243,23 +251,13 @@ func (s *Service) publicDirectory(w http.ResponseWriter, r *http.Request) error 
 	return nil
 }
 
-// Return only catalog labels for specialties represented by a published clinic.
-// Online rights and slot availability are still verified by the booking flow.
-func (s *Service) publishedSpecialties(ctx context.Context, country, modality string) ([]publicSpecialty, error) {
+// The specialty selector uses the active catalog independently of available offers.
+func (s *Service) directorySpecialties(ctx context.Context) ([]publicSpecialty, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT DISTINCT s.code, s.display_name
-		FROM booking_publications p
-		JOIN doctor_workspaces w ON w.id = p.workspace_id
-		JOIN doctor_specialty_contexts cctx ON cctx.workspace_id = w.id
-		JOIN publication_specialty_contexts pcs ON pcs.workspace_id=w.id AND pcs.specialty_context_id=cctx.id
-		JOIN specialties s ON s.id = cctx.specialty_id
-		WHERE p.published AND cctx.onboarding_completed AND cctx.definition IS NOT NULL AND `+db.UsableTemplate("s.id", true)+` AND EXISTS (
-			SELECT 1 FROM clinic_publications cp
-			JOIN clinics c ON c.id = cp.clinic_id
-			WHERE cp.workspace_id = p.workspace_id AND cp.enabled AND c.status = 'ACTIVE'
-			  AND ($2='' OR c.modality=$2) AND (c.modality='TELECONSULTATION' OR strpos(lower(c.country), lower($1)) > 0) AND `+publicOfferExists+`
-		)
-		ORDER BY s.display_name, s.code`, country, modality)
+		SELECT s.code, s.display_name
+		FROM specialties s
+		WHERE `+db.UsableTemplate("s.id", true)+`
+		ORDER BY s.display_name, s.code`)
 	if err != nil {
 		return nil, err
 	}
