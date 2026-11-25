@@ -41,6 +41,20 @@ type bookingChangeEmail struct {
 	ReasonLines                                                    []string
 }
 
+var staffRecoveryHTML = template.Must(template.New("staff-recovery").Parse(`<!doctype html>
+<html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<body style="margin:0;background:#f3f6f8;color:#19313f;font-family:Arial,sans-serif">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:24px 12px">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:520px;background:#fff;border:1px solid #dce5ea;border-radius:16px;text-align:left">
+<tr><td style="padding:28px">
+<p style="margin:0;color:#08666a;font-weight:bold">DoctorChart · Secretaría</p>
+<h1 style="font-size:24px;margin:20px 0 12px">Tu código de recuperación</h1>
+<p style="line-height:1.5">Ingresalo en la pantalla de recuperación de Secretaría.</p>
+<p style="background:#e5f4f1;border-radius:10px;padding:16px;text-align:center;color:#08666a;font-size:30px;letter-spacing:6px;font-weight:bold">{{.}}</p>
+<p style="line-height:1.5">Vence en 15 minutos y se puede usar una sola vez. Si pediste otro, usá el último.</p>
+<p style="line-height:1.5;color:#4f6471">Si no solicitaste el código, ignorá este correo. No lo compartas con nadie.</p>
+</td></tr></table></td></tr></table></body></html>`))
+
 func (s *Service) renderBookingChange(subject, key, recipient, when string, change bookingChange, cancelled bool) (mailclient.Message, error) {
 	view := bookingChangeEmail{
 		Title: subject, DateLabel: "Nueva fecha y hora", When: when,
@@ -100,8 +114,14 @@ func (s *Service) render(kind, key string, m Message) (mailclient.Message, error
 		subject = "Tu código de DoctorChart"
 		text = "Tu código para acceder a Mis turnos es:\n\n" + m.Code + "\n\nVence en 10 minutos. Si no lo pediste, ignorá este correo."
 	} else if kind == "STAFF_RECOVERY" {
-		subject = "Recuperación de acceso a Doctor Chart"
-		text = "Recibimos una solicitud para recuperar tu acceso local de secretaría.\nAbrí " + s.origin + "/staff/recover y elegí recuperación por email. Ingresá este código:\n\n" + m.Code + "\n\nVence en 15 minutos. Si no lo solicitaste, ignorá este correo: tu contraseña y sesiones no fueron modificadas. Nunca compartas contraseñas ni tu código personal de recuperación."
+		subject = "Tu código para recuperar el acceso a DoctorChart"
+		text = "Ingresá este código de seis dígitos en la pantalla de recuperación de Secretaría:\n\n" + m.Code + "\n\nVence en 15 minutos y se puede usar una sola vez. Si pediste otro, usá el último.\n\nSi no solicitaste el código, ignorá este correo. No lo compartas con nadie."
+		var html bytes.Buffer
+		if err := staffRecoveryHTML.Execute(&html, m.Code); err != nil {
+			return mailclient.Message{}, err
+		}
+		return mailclient.Message{ID: "doctorchart:" + Hash(key), Category: "security",
+			To: recipient.Address, Subject: subject, Text: text, HTML: html.String()}, nil
 	} else {
 		switch kind {
 		case "BOOKING_CONFIRMED":
@@ -133,8 +153,6 @@ func (s *Service) render(kind, key string, m Message) (mailclient.Message, error
 	switch {
 	case strings.HasPrefix(kind, "BOOKING_"):
 		category = "appointments"
-	case kind == "STAFF_RECOVERY":
-		category = "security"
 	}
 	return mailclient.Message{
 		ID: "doctorchart:" + Hash(key), Category: category, To: recipient.Address, Subject: subject, Text: text,

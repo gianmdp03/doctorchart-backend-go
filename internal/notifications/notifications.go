@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
@@ -12,6 +13,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"net/url"
 	"time"
 	_ "time/tzdata"
@@ -30,10 +32,11 @@ type Sender interface {
 	Send(context.Context, mailclient.Message) (mailclient.Result, error)
 }
 type Service struct {
-	pool   *pgxpool.Pool
-	cipher cipher.AEAD
-	sender Sender
-	origin string
+	pool        *pgxpool.Pool
+	cipher      cipher.AEAD
+	sender      Sender
+	origin      string
+	recoveryKey []byte
 }
 type Message struct {
 	Date        time.Time      `json:"date"`
@@ -102,7 +105,9 @@ func NewWithSender(pool *pgxpool.Pool, key string, sender Sender) (*Service, err
 	if err != nil {
 		return nil, err
 	}
-	return &Service{pool: pool, cipher: aead, sender: sender}, nil
+	mac := hmac.New(sha256.New, raw)
+	mac.Write([]byte("doctorchart/staff-email-recovery/v1"))
+	return &Service{pool: pool, cipher: aead, sender: sender, recoveryKey: mac.Sum(nil)}, nil
 }
 func (s *Service) seal(value []byte, aad string) []byte {
 	nonce := make([]byte, s.cipher.NonceSize())
@@ -233,10 +238,40 @@ func (s *Service) Invitation(ctx context.Context, tx pgx.Tx, access, email, code
 }
 
 func (s *Service) Recovery(ctx context.Context, tx pgx.Tx, account, email string) error {
-	id, code := uuid(), Token()
+	var previousID, previousHash string
+	err := tx.QueryRow(ctx, `SELECT e.id::text,e.token_hash FROM staff_email_recovery e
+		JOIN notification_outbox o ON o.recovery_id=e.id WHERE e.account_id=$1 ORDER BY o.id DESC LIMIT 1`, account).Scan(&previousID, &previousHash)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return err
+	}
+	var code string
+	for {
+		n, err := rand.Int(rand.Reader, big.NewInt(1_000_000))
+		if err != nil {
+			return err
+		}
+		code = fmt.Sprintf("%06d", n.Int64())
+		if previousID == "" || !s.MatchesRecoveryCode(previousID, code, previousHash) {
+			break
+		}
+	}
+	if _, err := tx.Exec(ctx, "UPDATE staff_email_recovery SET consumed_at=clock_timestamp() WHERE account_id=$1 AND consumed_at IS NULL", account); err != nil {
+		return err
+	}
+	id := uuid()
 	expires := time.Now().UTC().Add(15 * time.Minute)
-	if _, err := tx.Exec(ctx, "INSERT INTO staff_email_recovery(id,account_id,token_hash,expires_at) VALUES($1,$2,$3,$4)", id, account, Hash(code), expires); err != nil {
+	if _, err := tx.Exec(ctx, "INSERT INTO staff_email_recovery(id,account_id,token_hash,expires_at) VALUES($1,$2,$3,$4)", id, account, s.recoveryCodeHash(id, code), expires); err != nil {
 		return err
 	}
 	return s.enqueue(ctx, tx, "recovery:"+id, "STAFF_RECOVERY", nil, id, Message{To: email, Code: code, Expires: expires})
+}
+
+func (s *Service) recoveryCodeHash(id, code string) string {
+	mac := hmac.New(sha256.New, s.recoveryKey)
+	mac.Write([]byte(id + ":" + code))
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
+func (s *Service) MatchesRecoveryCode(id, code, hash string) bool {
+	return hmac.Equal([]byte(s.recoveryCodeHash(id, code)), []byte(hash))
 }

@@ -86,7 +86,7 @@ func TestNotificationSpanishAdministrativeTemplatesAndStableMessageID(t *testing
 		t.Fatal(err)
 	}
 	s.origin = "https://doctorchart.example"
-	m := Message{Date: time.Date(2030, 3, 10, 7, 0, 0, 0, time.UTC), To: "recipient@example.invalid", Code: Token()}
+	m := Message{Date: time.Date(2030, 3, 10, 7, 0, 0, 0, time.UTC), To: "recipient@example.invalid", Code: "012345"}
 	for _, kind := range []string{"STAFF_RECOVERY"} {
 		t.Run(kind, func(t *testing.T) {
 			a, err := s.render(kind, "stable-job", m)
@@ -97,13 +97,32 @@ func TestNotificationSpanishAdministrativeTemplatesAndStableMessageID(t *testing
 			if err != nil || a != b {
 				t.Fatal("retry changed identity")
 			}
-			if !strings.Contains(a.Text, m.Code) {
+			if !strings.Contains(a.Text, "\n"+m.Code+"\n") || !strings.Contains(a.HTML, ">"+m.Code+"<") {
 				t.Fatal("missing recovery code")
 			}
 			if strings.Contains(a.Subject+a.ID+a.To, m.Code) {
 				t.Fatal("secret in mail metadata")
 			}
 		})
+	}
+}
+
+func TestStaffRecoveryDigestIsBoundToIssueAndSecret(t *testing.T) {
+	newService := func(key byte) *Service {
+		t.Helper()
+		s, err := NewWithSender(nil, base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{key}, 32)), discardMail{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+	s := newService(1)
+	const code = "012345"
+	digest := s.recoveryCodeHash("issue-1", code)
+	if digest == Hash(code) || !s.MatchesRecoveryCode("issue-1", code, digest) ||
+		s.MatchesRecoveryCode("issue-2", code, digest) || s.MatchesRecoveryCode("issue-1", "012346", digest) ||
+		newService(2).MatchesRecoveryCode("issue-1", code, digest) {
+		t.Fatal("recovery digest is not bound to its issue, code and private key")
 	}
 }
 func TestBookingChangeIncludesReasonAndCorrectPatientLink(t *testing.T) {

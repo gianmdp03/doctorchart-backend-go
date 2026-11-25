@@ -18,8 +18,8 @@ const staffTestPassword = "A-test-password-29!"
 const staffTestOrigin = "https://doctorchart.test"
 
 type staffTestClient struct {
-	cookie         *http.Cookie
-	csrf, recovery string
+	cookie *http.Cookie
+	csrf   string
 }
 
 func staffFixture(t *testing.T) (*fixture, Clinic, time.Time) {
@@ -69,17 +69,20 @@ func staffActivateTest(t *testing.T, f *fixture, code string) staffTestClient {
 		RecoveryCode string
 	}
 	json.Unmarshal(w.Body.Bytes(), &body)
+	if body.RecoveryCode != "" {
+		t.Fatal("activation returned a personal recovery code")
+	}
 	cookies := w.Result().Cookies()
 	if len(cookies) != 1 {
 		t.Fatal("missing cookie")
 	}
-	return staffTestClient{cookie: cookies[0], csrf: body.CSRFToken, recovery: body.RecoveryCode}
+	return staffTestClient{cookie: cookies[0], csrf: body.CSRFToken}
 }
 func TestStaffActivationSessionsRecoveryAndCSRF(t *testing.T) {
 	f, c, _ := staffFixture(t)
 	_, code := staffInvite(t, f, owner, c, []string{"view", "create"})
 	client := staffActivateTest(t, f, code)
-	if !client.cookie.Secure || !client.cookie.HttpOnly || client.cookie.SameSite != http.SameSiteStrictMode || client.cookie.Path != staffBase || len(client.recovery) != 43 {
+	if !client.cookie.Secure || !client.cookie.HttpOnly || client.cookie.SameSite != http.SameSiteStrictMode || client.cookie.Path != staffBase {
 		t.Fatal("unsafe session or recovery")
 	}
 	assertCode(t, staffReq(f, client, "GET", "/session", nil), 200, "")
@@ -104,25 +107,9 @@ func TestStaffActivationSessionsRecoveryAndCSRF(t *testing.T) {
 	if err := f.pool.QueryRow(t.Context(), "SELECT a.password_hash,a.recovery_hash,t.token_hash FROM staff_accounts a JOIN staff_sessions t ON t.account_id=a.id").Scan(&passwordHash, &recoveryHash, &tokenHash); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(passwordHash, staffTestPassword) || tokenHash == client.cookie.Value || recoveryHash == client.recovery || !strings.HasPrefix(passwordHash, "$2a$12$") {
+	if strings.Contains(passwordHash, staffTestPassword) || tokenHash == client.cookie.Value || !strings.HasPrefix(passwordHash, "$2a$12$") {
 		t.Fatal("secrets not protected")
 	}
-	reset := map[string]string{"email": "assistant@example.invalid", "recoveryCode": client.recovery, "password": "Changed-password-42!"}
-	w = staffReq(f, staffTestClient{}, "POST", "/recover", reset)
-	assertCode(t, w, 200, "")
-	var result struct{ RecoveryCode string }
-	json.Unmarshal(w.Body.Bytes(), &result)
-	if result.RecoveryCode == client.recovery || len(result.RecoveryCode) != 43 {
-		t.Fatal("recovery not rotated")
-	}
-	assertCode(t, staffReq(f, client, "GET", "/session", nil), 401, "STAFF_UNAUTHENTICATED")
-	assertCode(t, staffReq(f, staffTestClient{}, "POST", "/recover", reset), 401, "INVALID_CREDENTIALS")
-	assertCode(t, staffReq(f, staffTestClient{}, "POST", "/login", map[string]string{"email": "assistant@example.invalid", "password": staffTestPassword}), 401, "INVALID_CREDENTIALS")
-	w = staffReq(f, staffTestClient{}, "POST", "/login", map[string]string{"email": "assistant@example.invalid", "password": "Changed-password-42!"})
-	assertCode(t, w, 200, "")
-	var session staffSession
-	json.Unmarshal(w.Body.Bytes(), &session)
-	client = staffTestClient{cookie: w.Result().Cookies()[0], csrf: session.CSRF}
 	assertCode(t, staffReq(f, client, "POST", "/logout", map[string]string{}), 204, "")
 	assertCode(t, staffReq(f, client, "GET", "/session", nil), 401, "STAFF_UNAUTHENTICATED")
 }

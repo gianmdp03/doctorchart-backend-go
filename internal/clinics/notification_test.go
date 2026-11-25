@@ -336,7 +336,7 @@ func TestNotificationStaffInvitationAndEmailRecovery(t *testing.T) {
 	// Only decrypt the captured test mailbox's MIME body, never query a plaintext token.
 	var emailCode string
 	for _, line := range strings.Split(sender.messages[1].Text, "\n") {
-		if len(line) == 43 {
+		if staffEmailCode.MatchString(line) {
 			emailCode = line
 			break
 		}
@@ -344,10 +344,33 @@ func TestNotificationStaffInvitationAndEmailRecovery(t *testing.T) {
 	if emailCode == "" {
 		t.Fatal("mailbox did not receive recovery code")
 	}
-	w := staffReq(f, staffTestClient{}, "POST", "/recover-email", map[string]string{"email": "assistant@example.invalid", "emailCode": emailCode, "password": "New-local-password-2026!"})
+	previousEmailCode := emailCode
+	assertCode(t, staffReq(f, staffTestClient{}, "POST", "/recovery-email", map[string]string{"email": "assistant@example.invalid"}), 202, "")
+	processMail(t, n)
+	emailCode = ""
+	for _, line := range strings.Split(sender.messages[2].Text, "\n") {
+		if staffEmailCode.MatchString(line) {
+			emailCode = line
+			break
+		}
+	}
+	if emailCode == "" || emailCode == previousEmailCode {
+		t.Fatal("resending did not issue a different code")
+	}
+	assertCode(t, staffReq(f, staffTestClient{}, "POST", "/recover-email", map[string]string{"email": "assistant@example.invalid", "emailCode": previousEmailCode}), 401, "INVALID_CREDENTIALS")
+	verify := map[string]string{"email": "assistant@example.invalid", "emailCode": emailCode}
+	w := staffReq(f, staffTestClient{}, "POST", "/recover-email", verify)
 	assertCode(t, w, 200, "")
+	var grant struct{ ResetToken string }
+	if err := json.Unmarshal(w.Body.Bytes(), &grant); err != nil || len(grant.ResetToken) != 43 {
+		t.Fatal("missing reset grant")
+	}
+	assertCode(t, staffReq(f, client, "GET", "/session", nil), 200, "")
+	assertCode(t, staffReq(f, staffTestClient{}, "POST", "/recover-email", verify), 401, "INVALID_CREDENTIALS")
+	reset := map[string]string{"email": "assistant@example.invalid", "resetToken": grant.ResetToken, "password": "New-local-password-2026!"}
+	assertCode(t, staffReq(f, staffTestClient{}, "POST", "/recover-email", reset), 204, "")
 	assertCode(t, staffReq(f, client, "GET", "/session", nil), 401, "STAFF_UNAUTHENTICATED")
-	assertCode(t, staffReq(f, staffTestClient{}, "POST", "/recover-email", map[string]string{"email": "assistant@example.invalid", "emailCode": emailCode, "password": "Another-password-2026!"}), 401, "INVALID_CREDENTIALS")
+	assertCode(t, staffReq(f, staffTestClient{}, "POST", "/recover-email", reset), 401, "INVALID_CREDENTIALS")
 	assertCode(t, staffReq(f, staffTestClient{}, "POST", "/login", map[string]string{"email": "assistant@example.invalid", "password": "New-local-password-2026!"}), 200, "")
 	for range 3 {
 		assertCode(t, staffReq(f, staffTestClient{}, "POST", "/recovery-email", map[string]string{"email": "unknown@example.invalid"}), 202, "")
@@ -444,7 +467,7 @@ func TestNotificationConcurrentEmailRecoveryTokensAreSingleUse(t *testing.T) {
 	processMail(t, n)
 	emailCode := ""
 	for _, line := range strings.Split(sender.messages[0].Text, "\n") {
-		if len(line) == 43 {
+		if staffEmailCode.MatchString(line) {
 			emailCode = line
 			break
 		}
@@ -456,7 +479,7 @@ func TestNotificationConcurrentEmailRecoveryTokensAreSingleUse(t *testing.T) {
 	var wg sync.WaitGroup
 	for range 2 {
 		wg.Go(func() {
-			w := staffReq(f, staffTestClient{}, "POST", "/recover-email", map[string]string{"email": "assistant@example.invalid", "emailCode": emailCode, "password": "Concurrent-password-2026!"})
+			w := staffReq(f, staffTestClient{}, "POST", "/recover-email", map[string]string{"email": "assistant@example.invalid", "emailCode": emailCode})
 			results <- w.Code
 		})
 	}

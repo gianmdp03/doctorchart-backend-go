@@ -170,7 +170,6 @@ func (s *Service) staffAuthRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST "+staffBase+"/login", wrap(s.staffLogin))
 	mux.HandleFunc("POST "+staffBase+"/activate", wrap(s.staffActivate))
 	mux.HandleFunc("POST "+staffBase+"/invitation", wrap(s.staffInvitation))
-	mux.HandleFunc("POST "+staffBase+"/recover", wrap(s.staffRecover))
 	mux.HandleFunc("GET "+staffBase+"/session", wrap(func(w http.ResponseWriter, r *http.Request) error {
 		session, err := s.staffSession(r, false)
 		if err != nil {
@@ -323,7 +322,7 @@ func (s *Service) staffActivate(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	var id, stored string
-	recovery := ""
+
 	err = tx.QueryRow(r.Context(), "SELECT id::text,password_hash FROM staff_accounts WHERE email=$1 FOR UPDATE", email).Scan(&id, &stored)
 	if errors.Is(err, pgx.ErrNoRows) {
 		hash, e := staffPassword(req.Password)
@@ -331,8 +330,8 @@ func (s *Service) staffActivate(w http.ResponseWriter, r *http.Request) error {
 			return e
 		}
 		id = newOpaqueID()
-		recovery = staffToken()
-		_, err = tx.Exec(r.Context(), "INSERT INTO staff_accounts(id,email,name,password_hash,recovery_hash) VALUES($1,$2,$3,$4,$5)", id, email, name, string(hash), staffHash(recovery))
+
+		_, err = tx.Exec(r.Context(), "INSERT INTO staff_accounts(id,email,name,password_hash,recovery_hash) VALUES($1,$2,$3,$4,$5)", id, email, name, string(hash), staffHash(staffToken()))
 		if err != nil {
 			return err
 		}
@@ -358,68 +357,7 @@ func (s *Service) staffActivate(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	setStaffCookie(w, token, expires)
-	api.WriteJSON(w, 200, map[string]any{"email": email, "name": name, "csrfToken": staffHash(token + ":csrf"), "expiresAt": expires, "recoveryCode": recovery})
-	return nil
-}
-func (s *Service) staffRecover(w http.ResponseWriter, r *http.Request) error {
-	if err := s.staffOriginCheck(r); err != nil {
-		return err
-	}
-	var req struct {
-		Email    string `json:"email"`
-		Code     string `json:"recoveryCode"`
-		Password string `json:"password"`
-	}
-	if err := decodePublic(w, r, &req); err != nil {
-		return err
-	}
-	email, err := staffEmail(req.Email)
-	if err != nil {
-		return staffCredentials()
-	}
-	if err = s.staffRate(r, email); err != nil {
-		return err
-	}
-	if len(req.Code) != 43 {
-		return staffCredentials()
-	}
-	hash, err := staffPassword(req.Password)
-	if err != nil {
-		return err
-	}
-	tx, err := s.pool.Begin(r.Context())
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(context.Background())
-	var id string
-	err = tx.QueryRow(r.Context(), "SELECT id::text FROM staff_accounts WHERE email=$1 AND recovery_hash=$2 FOR UPDATE", email, staffHash(req.Code)).Scan(&id)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return staffCredentials()
-	}
-	if err != nil {
-		return err
-	}
-	recovery := staffToken()
-	if s.notices != nil {
-		if _, err = tx.Exec(r.Context(), "UPDATE staff_email_recovery SET consumed_at=COALESCE(consumed_at,clock_timestamp()) WHERE account_id=$1", id); err != nil {
-			return err
-		}
-	}
-	if _, err = tx.Exec(r.Context(), "UPDATE staff_accounts SET password_hash=$1,recovery_hash=$2 WHERE id=$3", string(hash), staffHash(recovery), id); err != nil {
-		return err
-	}
-	if _, err = tx.Exec(r.Context(), "UPDATE staff_sessions SET revoked_at=clock_timestamp() WHERE account_id=$1 AND revoked_at IS NULL", id); err != nil {
-		return err
-	}
-	if err = staffAudit(r.Context(), tx, id, "", "ACCESS_RECOVERED"); err != nil {
-		return err
-	}
-	if err = tx.Commit(r.Context()); err != nil {
-		return err
-	}
-	setStaffCookie(w, "", time.Unix(1, 0))
-	api.WriteJSON(w, 200, map[string]string{"recoveryCode": recovery})
+	api.WriteJSON(w, 200, map[string]any{"email": email, "name": name, "csrfToken": staffHash(token + ":csrf"), "expiresAt": expires})
 	return nil
 }
 func (s *Service) staffChangePassword(w http.ResponseWriter, r *http.Request) error {

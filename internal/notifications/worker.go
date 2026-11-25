@@ -54,7 +54,7 @@ func (s *Service) current(ctx context.Context, j job, m Message) (bool, error) {
 				AND i.consumed_at IS NULL AND i.expires_at>clock_timestamp()
 		)`, *j.access, m.To, hash).Scan(&valid)
 	} else if j.recovery != nil {
-		err = s.pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM staff_email_recovery WHERE id=$1 AND consumed_at IS NULL AND expires_at>clock_timestamp() AND token_hash=$2)", *j.recovery, Hash(m.Code)).Scan(&valid)
+		err = s.pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM staff_email_recovery WHERE id=$1 AND consumed_at IS NULL AND expires_at>clock_timestamp() AND token_hash=$2)", *j.recovery, s.recoveryCodeHash(*j.recovery, m.Code)).Scan(&valid)
 	} else if j.portal != nil {
 		err = s.pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM booking_portal_codes WHERE id=$1 AND expires_at>clock_timestamp() AND attempts<5 AND session_hash IS NULL)", *j.portal).Scan(&valid)
 	} else {

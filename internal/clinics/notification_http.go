@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -62,7 +63,7 @@ func (s *Service) staffRecoveryEmail(w http.ResponseWriter, r *http.Request) err
 	}
 	defer tx.Rollback(context.Background())
 	var account string
-	err = tx.QueryRow(r.Context(), "SELECT id::text FROM staff_accounts WHERE email=$1 FOR SHARE", email).Scan(&account)
+	err = tx.QueryRow(r.Context(), "SELECT id::text FROM staff_accounts WHERE email=$1 FOR UPDATE", email).Scan(&account)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return err
 	}
@@ -80,14 +81,18 @@ func (s *Service) staffRecoveryEmail(w http.ResponseWriter, r *http.Request) err
 	api.WriteJSON(w, 202, map[string]string{"message": "Si existe una cuenta con ese correo, recibirás un código para recuperar tu acceso."})
 	return nil
 }
+
+var staffEmailCode = regexp.MustCompile(`^[0-9]{6}$`)
+
 func (s *Service) staffRecoverEmail(w http.ResponseWriter, r *http.Request) error {
 	if err := s.staffOriginCheck(r); err != nil {
 		return err
 	}
 	var req struct {
-		Email    string `json:"email"`
-		Code     string `json:"emailCode"`
-		Password string `json:"password"`
+		Email      string `json:"email"`
+		Code       string `json:"emailCode"`
+		ResetToken string `json:"resetToken"`
+		Password   string `json:"password"`
 	}
 	if err := decodePublic(w, r, &req); err != nil {
 		return err
@@ -99,12 +104,20 @@ func (s *Service) staffRecoverEmail(w http.ResponseWriter, r *http.Request) erro
 	if err = s.staffRate(r, email); err != nil {
 		return err
 	}
-	if len(req.Code) != 43 {
-		return staffCredentials()
-	}
-	hash, err := staffPassword(req.Password)
-	if err != nil {
-		return err
+	verifying := req.ResetToken == ""
+	var hash []byte
+	if verifying {
+		if !staffEmailCode.MatchString(req.Code) || req.Password != "" {
+			return staffCredentials()
+		}
+	} else {
+		if req.Code != "" || len(req.ResetToken) != 43 {
+			return staffCredentials()
+		}
+		hash, err = staffPassword(req.Password)
+		if err != nil {
+			return err
+		}
 	}
 	tx, err := s.pool.Begin(r.Context())
 	if err != nil {
@@ -112,24 +125,51 @@ func (s *Service) staffRecoverEmail(w http.ResponseWriter, r *http.Request) erro
 	}
 	defer tx.Rollback(context.Background())
 	var account string
-	err = tx.QueryRow(r.Context(), "SELECT a.id::text FROM staff_accounts a WHERE a.email=$1 AND EXISTS(SELECT 1 FROM staff_email_recovery e WHERE e.account_id=a.id AND e.token_hash=$2 AND e.consumed_at IS NULL AND e.expires_at>clock_timestamp()) FOR UPDATE OF a", email, staffHash(req.Code)).Scan(&account)
+	err = tx.QueryRow(r.Context(), "SELECT id::text FROM staff_accounts WHERE email=$1 FOR UPDATE", email).Scan(&account)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return staffCredentials()
 	}
 	if err != nil {
 		return err
 	}
-	// READ COMMITTED must recheck after acquiring the account lock: another
-	// successful recovery can have invalidated all sibling codes while we waited.
+	// Read recovery state after taking the same account lock as issuance.
+	if verifying {
+		var id, stored string
+		var expires time.Time
+		err = tx.QueryRow(r.Context(), `SELECT id::text,token_hash,expires_at FROM staff_email_recovery
+			WHERE account_id=$1 AND consumed_at IS NULL AND expires_at>clock_timestamp()
+			ORDER BY expires_at DESC LIMIT 1`, account).Scan(&id, &stored, &expires)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return staffCredentials()
+		}
+		if err != nil {
+			return err
+		}
+		if !s.notices.MatchesRecoveryCode(id, req.Code, stored) {
+			return staffCredentials()
+		}
+		token := staffToken()
+		if _, err = tx.Exec(r.Context(), "UPDATE staff_email_recovery SET consumed_at=clock_timestamp() WHERE account_id=$1 AND consumed_at IS NULL", account); err != nil {
+			return err
+		}
+		if _, err = tx.Exec(r.Context(), "INSERT INTO staff_email_recovery(id,account_id,token_hash,expires_at) VALUES($1,$2,$3,$4)",
+			newOpaqueID(), account, staffHash("reset:"+token), expires); err != nil {
+			return err
+		}
+		if err = tx.Commit(r.Context()); err != nil {
+			return err
+		}
+		api.WriteJSON(w, 200, map[string]string{"resetToken": token})
+		return nil
+	}
 	var valid bool
-	if err = tx.QueryRow(r.Context(), "SELECT EXISTS(SELECT 1 FROM staff_email_recovery WHERE account_id=$1 AND token_hash=$2 AND consumed_at IS NULL AND expires_at>clock_timestamp())", account, staffHash(req.Code)).Scan(&valid); err != nil {
+	if err = tx.QueryRow(r.Context(), "SELECT EXISTS(SELECT 1 FROM staff_email_recovery WHERE account_id=$1 AND token_hash=$2 AND consumed_at IS NULL AND expires_at>clock_timestamp())", account, staffHash("reset:"+req.ResetToken)).Scan(&valid); err != nil {
 		return err
 	}
 	if !valid {
 		return staffCredentials()
 	}
-	recovery := staffToken()
-	if _, err = tx.Exec(r.Context(), "UPDATE staff_accounts SET password_hash=$1,recovery_hash=$2 WHERE id=$3", string(hash), staffHash(recovery), account); err != nil {
+	if _, err = tx.Exec(r.Context(), "UPDATE staff_accounts SET password_hash=$1,recovery_hash=$2 WHERE id=$3", string(hash), staffHash(staffToken()), account); err != nil {
 		return err
 	}
 	if _, err = tx.Exec(r.Context(), "UPDATE staff_email_recovery SET consumed_at=COALESCE(consumed_at,clock_timestamp()) WHERE account_id=$1", account); err != nil {
@@ -145,6 +185,6 @@ func (s *Service) staffRecoverEmail(w http.ResponseWriter, r *http.Request) erro
 		return err
 	}
 	setStaffCookie(w, "", time.Unix(1, 0))
-	api.WriteJSON(w, 200, map[string]string{"recoveryCode": recovery})
+	w.WriteHeader(http.StatusNoContent)
 	return nil
 }

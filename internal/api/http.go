@@ -231,7 +231,7 @@ func StaffRoute(method, p string) bool {
 		}
 		if method == "POST" {
 			switch parts[0] {
-			case "login", "activate", "invitation", "recover", "logout", "password", "recovery-email", "recover-email":
+			case "login", "activate", "invitation", "logout", "password", "recovery-email", "recover-email":
 				return true
 			}
 		}
