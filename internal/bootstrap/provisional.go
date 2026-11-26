@@ -66,15 +66,15 @@ func seedProvisional(ctx context.Context, tx pgx.Tx, validator *wizard.Validator
 		err = tx.QueryRow(ctx, `
      INSERT INTO specialties(code,display_name,description,active,version,navigation,
         patient_record_tabs,patient_record_actions,created_at,updated_at)
-     VALUES($1,$2,$3,false,0,$4,$5,$6,clock_timestamp(),clock_timestamp())
+     VALUES($1,$2,$3,true,0,$4,$5,$6,clock_timestamp(),clock_timestamp())
      RETURNING id
    `, code, draft.Name, draft.Description, experience.Navigation, experience.PatientRecordTabs, experience.PatientRecordActions).Scan(&id)
 		if err != nil {
 			return fmt.Errorf("insert provisional specialty %s: %w", code, err)
 		}
 		if _, err := tx.Exec(ctx, `
-     INSERT INTO wizard_defaults(specialty_id,draft_definition,published_version,version,updated_at)
-     VALUES($1,$2,0,0,clock_timestamp())
+     INSERT INTO wizard_defaults(specialty_id,draft_definition,published_definition,published_version,version,updated_at)
+     VALUES($1,$2,$2,1,0,clock_timestamp())
    `, id, draft.Definition); err != nil {
 			return fmt.Errorf("insert provisional wizard %s: %w", code, err)
 		}
