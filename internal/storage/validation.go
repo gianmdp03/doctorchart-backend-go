@@ -43,7 +43,8 @@ func extension(name string) string {
 func inspect(ctx context.Context, data []byte, name string) (string, error) {
 	ext := extension(name)
 	if ext == "pdf" {
-		document, err := pdfapi.ReadContext(ctx, bytes.NewReader(data), model.NewDefaultConfiguration())
+		// Upload validation must work in containers without a writable user config.
+		document, err := pdfapi.ReadContext(ctx, bytes.NewReader(data), model.NewStatelessConfiguration())
 		if err != nil || document.Encrypt != nil {
 			return "", unsupported()
 		}

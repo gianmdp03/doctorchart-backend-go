@@ -15,6 +15,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/go-pdf/fpdf"
 )
 
 func TestPrivateStudyRoundTripAndDeletion(t *testing.T) {
@@ -127,6 +129,28 @@ func TestStudyRejectsOversizedResolutionWithoutDecodingOrResampling(t *testing.T
 	}
 }
 
+func TestStudyPDFWithUnavailableUserConfig(t *testing.T) {
+	unavailable := filepath.Join(t.TempDir(), "not-a-directory")
+	if err := os.WriteFile(unavailable, nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("APPDATA", unavailable)
+	t.Setenv("XDG_CONFIG_HOME", unavailable)
+
+	pdf := fpdf.New("P", "mm", "A4", "")
+	pdf.AddPage()
+	pdf.SetFont("Helvetica", "", 12)
+	pdf.Cell(0, 10, "Synthetic clinical attachment")
+	var original bytes.Buffer
+	if err := pdf.Output(&original); err != nil {
+		t.Fatal(err)
+	}
+	got, err := inspect(t.Context(), original.Bytes(), "synthetic-order.pdf")
+	if err != nil || got != "application/pdf" {
+		t.Fatalf("expected a valid PDF without user configuration, got %q: %v", got, err)
+	}
+}
+
 func TestStudyContentValidation(t *testing.T) {
 	for _, name := range []string{"../a.pdf", "a\\b.png", "a:pdf", "a\n.png", "a\u202e.png", ""} {
 		if validateName(name) == nil {
@@ -147,6 +171,7 @@ func TestStudyContentValidation(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
 func TestStudySymbolicLinkRejected(t *testing.T) {
 	directory := t.TempDir()
 	if err := os.Chmod(directory, 0700); err != nil {
