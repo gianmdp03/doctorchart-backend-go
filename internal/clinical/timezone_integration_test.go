@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -138,4 +139,61 @@ func TestDashboardUsesRequestCalendarDay(t *testing.T) {
 		t.Fatal(err)
 	}
 	call(0)
+}
+
+func TestDashboardPatientActivityCountsPeopleOncePerMonthAndListsUnseenPatients(t *testing.T) {
+	services, pool := integrityFixture(t, 100, 100)
+	s := services[0]
+	const zoneName = "America/Argentina/Buenos_Aires"
+	ctx := zoneContext(t, zoneName)
+	identity := api.Identity{UserID: "integrity-owner", Plan: "BASIC"}
+	attended := integrityPatient(t, s)
+	for _, kind := range []string{"FIRST_VISIT", "FOLLOW_UP"} {
+		if _, err := s.CreateEncounter(ctx, identity, integrityEncounterRequest(attended.ID, kind)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	previousVisit, err := s.CreateEncounter(ctx, identity, integrityEncounterRequest(attended.ID, "FOLLOW_UP"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// One visit in the previous local month; both months contain the same patient.
+	now := time.Now().In(s.viewZone(ctx))
+	monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+	if _, err := pool.Exec(ctx, "UPDATE clinical_encounters SET encounter_date=$2 WHERE id=$1",
+		previousVisit.ID, monthStart.Add(-time.Microsecond)); err != nil {
+		t.Fatal(err)
+	}
+
+	createUnseen := func(owner string, serial int) Patient {
+		t.Helper()
+		body := integrityPatientRequest()
+		body["values"].(map[string]any)["sys_dni"] = fmt.Sprintf("%d", 20000000+serial)
+		patient, err := s.CreatePatient(ctx, api.Identity{UserID: owner, Plan: "BASIC"}, body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return patient
+	}
+	var latest Patient
+	for i := range 5 {
+		latest = createUnseen(identity.UserID, i)
+	}
+	createUnseen("integrity-other", 5)
+
+	dashboard := followUpDashboard(t, s, identity.UserID, zoneName)
+	activity := dashboard.PatientActivity
+	if dashboard.Month != 2 || activity.FirstVisitsThisMonth != 1 {
+		t.Fatalf("wrong monthly encounters: %+v", dashboard)
+	}
+	wantPatients := [3]int64{0, 1, 1}
+	for i, month := range activity.MonthlyPatients {
+		if month.Month == "" || month.Patients != wantPatients[i] {
+			t.Fatalf("wrong month %d: %+v", i, month)
+		}
+	}
+	if activity.WithoutEncounters != 5 || len(activity.PatientsWithoutEncounter) != 4 ||
+		activity.PatientsWithoutEncounter[0].ID != latest.ID {
+		t.Fatalf("wrong queue: %+v", activity)
+	}
 }

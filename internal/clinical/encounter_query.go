@@ -57,13 +57,61 @@ type recentEncounter struct {
 	NationalID *string          `json:"patientNationalId"`
 	Date       string           `json:"encounterLocalDate"`
 }
+
+type dashboardPatient struct {
+	ID       int64  `json:"patientId"`
+	FullName string `json:"patientFullName"`
+}
+
+type dashboardPatientMonth struct {
+	Month    string `json:"month"`
+	Patients int64  `json:"patients"`
+}
+
+type dashboardPatientActivity struct {
+	MonthlyPatients          [3]dashboardPatientMonth `json:"monthlyPatients"`
+	FirstVisitsThisMonth     int64                    `json:"firstVisitsThisMonth"`
+	WithoutEncounters        int64                    `json:"withoutEncounters"`
+	PatientsWithoutEncounter []dashboardPatient       `json:"patientsWithoutEncounter"`
+}
+
 type encounterDashboard struct {
-	Patients int64              `json:"totalPatients"`
-	Month    int64              `json:"encountersThisMonth"`
-	Today    int64              `json:"encountersToday"`
-	Date     string             `json:"asOfDate"`
-	Recent   []recentEncounter  `json:"recentEncounters"`
-	Upcoming []upcomingFollowUp `json:"upcomingFollowUps"`
+	Patients        int64                    `json:"totalPatients"`
+	Month           int64                    `json:"encountersThisMonth"`
+	Today           int64                    `json:"encountersToday"`
+	Date            string                   `json:"asOfDate"`
+	Recent          []recentEncounter        `json:"recentEncounters"`
+	Upcoming        []upcomingFollowUp       `json:"upcomingFollowUps"`
+	PatientActivity dashboardPatientActivity `json:"patientActivity"`
+}
+
+const dashboardPatientScope = `p.user_id=$1 AND p.annulled_at IS NULL AND (
+	p.specialty_context_id=$2 OR $2::bigint=0 AND (
+		SELECT count(*) FROM doctor_specialty_contexts scope_c
+		JOIN doctor_workspaces scope_w ON scope_w.id=scope_c.workspace_id
+		WHERE scope_w.user_id=$1
+	)=1)`
+
+func (activity *dashboardPatientActivity) readWithoutEncounters(ctx context.Context, tx pgx.Tx, owner string, specialtyContextID int64) error {
+	rows, err := tx.Query(ctx, `SELECT p.id, p.full_name, count(*) OVER()
+		FROM patients p WHERE `+dashboardPatientScope+`
+		AND NOT EXISTS (
+			SELECT 1 FROM clinical_encounters e WHERE e.patient_id=p.id AND e.annulled_at IS NULL
+		)
+		ORDER BY p.id DESC LIMIT 4`, owner, specialtyContextID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	activity.PatientsWithoutEncounter = []dashboardPatient{}
+	for rows.Next() {
+		var patient dashboardPatient
+		if err := rows.Scan(&patient.ID, &patient.FullName, &activity.WithoutEncounters); err != nil {
+			return err
+		}
+		activity.PatientsWithoutEncounter = append(activity.PatientsWithoutEncounter, patient)
+	}
+	return rows.Err()
 }
 
 func (s *Service) encounterQueryRoutes(mux *http.ServeMux) {
@@ -98,10 +146,36 @@ func (s *Service) encounterQueryRoutes(mux *http.ServeMux) {
 		today := time.Now().In(s.viewZone(r.Context()))
 		start := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, s.viewZone(r.Context()))
 		month := time.Date(today.Year(), today.Month(), 1, 0, 0, 0, 0, s.viewZone(r.Context()))
+		previousMonth := month.AddDate(0, -1, 0)
+		earliestMonth := month.AddDate(0, -2, 0)
 		result := encounterDashboard{Date: today.Format("2006-01-02"), Recent: []recentEncounter{}}
+		activity := &result.PatientActivity
+		activity.MonthlyPatients = [3]dashboardPatientMonth{
+			{Month: earliestMonth.Format("2006-01")},
+			{Month: previousMonth.Format("2006-01")},
+			{Month: month.Format("2006-01")},
+		}
 		err := s.readSnapshot(r.Context(), func(tx pgx.Tx) error {
 			owner := api.User(r.Context()).UserID
-			if err := tx.QueryRow(r.Context(), `SELECT (SELECT count(*) FROM patients WHERE user_id=$1 AND annulled_at IS NULL AND ($6::bigint=0 AND (SELECT count(*) FROM doctor_specialty_contexts scope_c JOIN doctor_workspaces scope_w ON scope_w.id=scope_c.workspace_id WHERE scope_w.user_id=$1)=1 OR specialty_context_id=$6)),count(*) FILTER(WHERE e.encounter_date>=$2 AND e.encounter_date<$3),count(*) FILTER(WHERE e.encounter_date>=$4 AND e.encounter_date<$5) FROM clinical_encounters e JOIN patients p ON p.id=e.patient_id AND p.annulled_at IS NULL WHERE e.annulled_at IS NULL AND p.user_id=$1 AND ($6::bigint=0 AND (SELECT count(*) FROM doctor_specialty_contexts scope_c JOIN doctor_workspaces scope_w ON scope_w.id=scope_c.workspace_id WHERE scope_w.user_id=$1)=1 OR p.specialty_context_id=$6)`, owner, month, month.AddDate(0, 1, 0), start, start.AddDate(0, 0, 1), api.SpecialtyContextID(r.Context())).Scan(&result.Patients, &result.Month, &result.Today); err != nil {
+			specialtyContextID := api.SpecialtyContextID(r.Context())
+			if err := tx.QueryRow(r.Context(), `SELECT
+				(SELECT count(*) FROM patients p WHERE `+dashboardPatientScope+`),
+				count(*) FILTER (WHERE e.encounter_date >= $3 AND e.encounter_date < $4),
+				count(*) FILTER (WHERE e.encounter_date >= $5 AND e.encounter_date < $6),
+				count(DISTINCT e.patient_id) FILTER (WHERE e.encounter_date >= $7 AND e.encounter_date < $8),
+				count(DISTINCT e.patient_id) FILTER (WHERE e.encounter_date >= $8 AND e.encounter_date < $3),
+				count(DISTINCT e.patient_id) FILTER (WHERE e.encounter_date >= $3 AND e.encounter_date < $4),
+				count(*) FILTER (WHERE e.encounter_date >= $3 AND e.encounter_date < $4 AND e.consultation_type='FIRST_VISIT')
+				FROM clinical_encounters e JOIN patients p ON p.id=e.patient_id
+				WHERE e.annulled_at IS NULL AND `+dashboardPatientScope+`
+				AND e.encounter_date >= LEAST($7, $5) AND e.encounter_date < GREATEST($4, $6)`,
+				owner, specialtyContextID, month, month.AddDate(0, 1, 0), start, start.AddDate(0, 0, 1), earliestMonth, previousMonth,
+			).Scan(&result.Patients, &result.Month, &result.Today,
+				&activity.MonthlyPatients[0].Patients, &activity.MonthlyPatients[1].Patients,
+				&activity.MonthlyPatients[2].Patients, &activity.FirstVisitsThisMonth); err != nil {
+				return err
+			}
+			if err := activity.readWithoutEncounters(r.Context(), tx, owner, specialtyContextID); err != nil {
 				return err
 			}
 			var err error
@@ -110,7 +184,7 @@ func (s *Service) encounterQueryRoutes(mux *http.ServeMux) {
 				return err
 			}
 			// Read the additional patient fields in the same query and snapshot.
-			rows, err := tx.Query(r.Context(), "SELECT "+encounterColumns+`,p.birth_date::text,p.national_id`+encounterFrom+"WHERE p.user_id=$1 AND ($2::bigint=0 AND (SELECT count(*) FROM doctor_specialty_contexts scope_c JOIN doctor_workspaces scope_w ON scope_w.id=scope_c.workspace_id WHERE scope_w.user_id=$1)=1 OR p.specialty_context_id=$2) ORDER BY e.encounter_date DESC,e.id DESC LIMIT 8", owner, api.SpecialtyContextID(r.Context()))
+			rows, err := tx.Query(r.Context(), "SELECT "+encounterColumns+`,p.birth_date::text,p.national_id`+encounterFrom+"WHERE "+dashboardPatientScope+" ORDER BY e.encounter_date DESC,e.id DESC LIMIT 8", owner, specialtyContextID)
 			if err != nil {
 				return err
 			}
