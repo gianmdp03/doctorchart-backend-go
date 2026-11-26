@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -33,6 +34,7 @@ func TestDocumentIssueAndContextualExport(t *testing.T) {
 		r := httptest.NewRequest(method, fmt.Sprintf("/api/doctorchart/patients/%d%s%sspecialtyContextId=%d", p.ID, suffix, separator, contextID), strings.NewReader(body))
 		r.Header.Set("X-Gateway-Secret", "document-fixture")
 		r.Header.Set("X-User-Id", actor)
+		r.Header.Set("X-Clinical-Author-Name", base64.RawURLEncoding.EncodeToString([]byte("Lucía María Benítez")))
 		r.Header.Set("X-User-Role", role)
 		r.Header.Set("X-User-Plan", "BASIC")
 		r.Header.Set("X-User-Plan-Expires-At", "2099-01-01T00:00:00Z")
@@ -67,13 +69,16 @@ func TestDocumentIssueAndContextualExport(t *testing.T) {
 		return issued
 	}
 	first, second := create(), create()
-	if first.ID == second.ID || first.Code == second.Code || first.SHA256 == second.SHA256 {
+	if first.ID == second.ID || first.Code == second.Code {
 		t.Fatal("new issue re-used earlier evidence")
 	}
 	path := fmt.Sprintf("/documents/%d/pdf", first.ID)
 	original := owner("GET", path, "", 200).Body.Bytes()
 	if !bytes.HasPrefix(original, []byte("%PDF")) || fmt.Sprintf("%x", sha256.Sum256(original)) != first.SHA256 {
 		t.Fatal("PDF did not match issue evidence")
+	}
+	if !projectionFixturePDFContains(t, original, "Lucía María Benítez") || projectionFixturePDFContains(t, original, first.Code) || projectionFixturePDFContains(t, original, first.Issuer) || projectionFixturePDFContains(t, original, "FORGED") {
+		t.Fatal("stored PDF displays unexpected author or internal identifiers")
 	}
 	owner("POST", fmt.Sprintf("/documents/%d/annul", first.ID), `{"reason":"Synthetic annulment"}`, 204)
 	if data := owner("GET", path, "", 200).Body.Bytes(); !bytes.Equal(data, original) {

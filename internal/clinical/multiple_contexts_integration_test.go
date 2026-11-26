@@ -121,6 +121,14 @@ func TestSameDoctorMultipleContextClinicalHTTPIsolation(t *testing.T) {
 	assertCode(call("GET", "/patients", "integrity-owner", "bad", nil), 400, "INVALID_REQUEST")
 	assertCode(call("GET", "/patients", "integrity-other", fmt.Sprint(b.ContextID), nil), 404, "SPECIALTY_CONTEXT_NOT_FOUND")
 	assertCode(call("POST", "/patients", "integrity-other", fmt.Sprint(b.ContextID), integrityPatientRequest()), 404, "SPECIALTY_CONTEXT_NOT_FOUND")
+	for _, patient := range []Patient{pA, pB} {
+		lookup := call("POST", "/patients/check-dni", "integrity-owner", fmt.Sprint(patient.ContextID), map[string]any{"nationalId": patient.NationalID})
+		assertCode(lookup, 200, "")
+		var result struct{ PatientID int64 }
+		if err := json.Unmarshal(lookup.Body.Bytes(), &result); err != nil || result.PatientID != patient.ID {
+			t.Fatalf("DNI lookup mixed specialty contexts: %v, %s", err, lookup.Body)
+		}
+	}
 	for _, path := range []string{
 		fmt.Sprintf("/patients/%d", pA.ID), fmt.Sprintf("/patients/%d/clinical-summary", pA.ID), fmt.Sprintf("/patients/%d/studies", pA.ID), fmt.Sprintf("/patients/%d/prescriptions", pA.ID),
 		fmt.Sprintf("/patients/%d/vaccinations", pA.ID), fmt.Sprintf("/patients/%d/growth", pA.ID), fmt.Sprintf("/patients/%d/measurements", pA.ID),

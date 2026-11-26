@@ -106,7 +106,9 @@ func TestQuotaAvailabilityOfflinePolicies(t *testing.T) {
 			service.rules = billing.New(provider.URL)
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()
-			_, patientErr := service.CreatePatient(ctx, policy.identity, integrityPatientRequest())
+			request := integrityPatientRequest()
+			request["values"].(map[string]any)["sys_dni"] = "87654321"
+			_, patientErr := service.CreatePatient(ctx, policy.identity, request)
 			_, encounterErr := service.CreateEncounter(ctx, policy.identity, integrityEncounterRequest(patient.ID, "FIRST_VISIT"))
 			if policy.status != 0 {
 				integrityError(t, patientErr, policy.status, policy.code)

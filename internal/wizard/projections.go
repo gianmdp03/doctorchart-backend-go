@@ -71,6 +71,15 @@ func ClinicalProjections(form, values map[string]any) map[string]any {
 		}
 		projected := map[string]any{}
 		projectValue(key, values[key], projected)
+		if target == "patient.nationalId" {
+			if dni, ok := projected[target].(string); ok {
+				dni = strings.TrimSpace(dni)
+				if dni == "" {
+					continue
+				}
+				projected[target] = dni
+			}
+		}
 		result[target] = projected[target]
 	}
 	_, protectedFirst := fields["sys_firstName"]

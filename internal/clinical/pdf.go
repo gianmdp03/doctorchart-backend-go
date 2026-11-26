@@ -39,9 +39,9 @@ func (s *Service) printPDF(doc printDocument, metadata url.Values) ([]byte, erro
 		kind = "PRESCRIPTION"
 	}
 	pdf := fpdf.NewCustom(&fpdf.InitType{OrientationStr: "P", UnitStr: "pt", Size: fpdf.SizeType{Wd: 595, Ht: 842}})
-	pdf.SetMargins(40, 36, 40)
+	pdf.SetMargins(42, 34, 42)
 	pdf.SetCellMargin(0)
-	pdf.SetAutoPageBreak(true, 36)
+	pdf.SetAutoPageBreak(true, 42)
 
 	regular, err := clinicalFonts.ReadFile("fonts/DejaVuSansCondensed.ttf")
 	if err != nil {
@@ -51,14 +51,13 @@ func (s *Service) printPDF(doc printDocument, metadata url.Values) ([]byte, erro
 	if err != nil {
 		return nil, err
 	}
-	for style, file := range map[string]string{"": "DejaVuSansCondensed.ttf", "B": "DejaVuSansCondensed-Bold.ttf", "I": "DejaVuSansCondensed-Oblique.ttf"} {
+	for style, file := range map[string]string{"": "DejaVuSansCondensed.ttf", "B": "DejaVuSansCondensed-Bold.ttf"} {
 		data, err := clinicalFonts.ReadFile("fonts/" + file)
 		if err != nil {
 			return nil, err
 		}
 		pdf.AddUTF8FontFromBytes("Clinical", style, data)
 	}
-	pdf.AddPage()
 	var contentErr error
 	var glyphBuffer sfnt.Buffer
 	translate := func(value string) string {
@@ -78,242 +77,234 @@ func (s *Service) printPDF(doc printDocument, metadata url.Values) ([]byte, erro
 		}
 		return value
 	}
-	has := func(value string) bool { return api.JavaTrim(value) != "" }
-	fallback := func(value, otherwise string) string {
-		if has(value) {
-			return api.JavaTrim(value)
-		}
-		return otherwise
-	}
+	has := func(value string) bool { return strings.TrimSpace(value) != "" }
 	pointer := func(value *string) string {
 		if value == nil {
 			return ""
 		}
 		return *value
 	}
-	primary, muted, dark, accent := []int{15, 23, 42}, []int{100, 116, 139}, []int{51, 65, 85}, []int{13, 148, 136}
-	font := func(style string, size float64, color []int) {
+
+	const left, right, width, bottom = 42.0, 553.0, 511.0, 800.0
+	ink := [3]int{28, 43, 42}
+	muted := [3]int{74, 93, 91}
+	accent := [3]int{22, 91, 82}
+	border := [3]int{213, 222, 217}
+	font := func(style string, size float64, color [3]int) {
 		pdf.SetFont("Clinical", style, size)
 		pdf.SetTextColor(color[0], color[1], color[2])
 	}
-	line := func(width, height float64, value, style string, size float64, color []int, align string) {
+	text := func(x, w, leading float64, value, style string, size float64, color [3]int, align string) {
 		font(style, size, color)
-		pdf.MultiCell(width, height, translate(value), "", align, false)
-	}
-	// Keep medicine names distinct from doses and field labels from clinical values.
-	rich := func(x, width, height float64, label, value string, labelSize, valueSize float64, labelStyle, valueStyle string) {
 		pdf.SetX(x)
-		pdf.SetRightMargin(595 - x - width)
-		font(labelStyle, labelSize, primary)
-		pdf.Write(height, translate(label))
-		font(valueStyle, valueSize, dark)
-		pdf.Write(height, translate(value))
-		pdf.Ln(height)
-		pdf.SetRightMargin(40)
+		pdf.MultiCell(w, leading, translate(value), "", align, false)
 	}
-	column := func(x, width, y float64, values []string, sizes []float64, boldFirst bool, align string) float64 {
-		for index, value := range values {
-			if !has(value) {
-				continue
-			}
-			pdf.SetXY(x, y)
-			style := ""
-			color := muted
-			if index == 0 {
-				color = primary
-				if boldFirst {
-					style = "B"
-				}
-			}
-			line(width, sizes[index]*1.5, value, style, sizes[index], color, align)
-			y = pdf.GetY()
+	rule := func(x1, x2, y float64) {
+		pdf.SetDrawColor(border[0], border[1], border[2])
+		pdf.SetLineWidth(.75)
+		pdf.Line(x1, y, x2, y)
+	}
+	room := func(height float64) {
+		if pdf.GetY()+height > bottom {
+			pdf.AddPage()
 		}
-		return y
 	}
-	label, signature := "Vista previa técnica", "Vista previa sin firma digital"
-	if doc.emitted {
-		label, signature = "Emisión técnica", "Emitido sin firma digital"
+	field := func(x, w float64, label, value, style string, size float64) {
+		text(x, w, 13, label, "B", 8.5, muted, "L")
+		text(x, w, size+5, value, style, size, ink, "L")
 	}
-	doctor, specialty := "Profesional "+doc.Author.UserID, pointer(doc.Author.Specialty)
-	leftEnd := column(40, 283.25, 42, []string{"DoctorChart", label}, []float64{13, 8.5}, true, "L")
-	rightEnd := column(323.25, 231.75, 41.4, []string{doctor, specialty}, []float64{10, 8.5}, true, "R")
-	end := leftEnd
-	if rightEnd > end {
-		end = rightEnd
-	}
-	pdf.SetDrawColor(226, 232, 240)
-	pdf.SetLineWidth(1)
-	pdf.Line(40, end+8, 555, end+8)
-	pdf.SetY(end + 22)
-	title := "RECETA MÉDICA"
+	title, section := "Receta médica", "Medicamentos indicados"
 	if kind == "STUDY_ORDERS" {
-		title = "ORDEN DE ESTUDIOS MÉDICOS"
+		title, section = "Orden de estudios médicos", "Estudios solicitados"
 	}
-	y := pdf.GetY()
-	pdf.SetX(40)
-	line(309, 19.5, title, "B", 13, accent, "L")
-	pdf.SetXY(349, y)
-	line(206, 12.75, "Fecha: "+doc.at.In(s.documentZone(doc.IssuanceZone)).Format("02/01/2006")+"  |  ID: "+doc.Code, "", 8.5, dark, "R")
-	pdf.SetY(y + 27.5)
+	pdf.SetTitle(title+" | DoctorChart", true)
+	pdf.SetHeaderFunc(func() {
+		pdf.SetFillColor(accent[0], accent[1], accent[2])
+		pdf.Rect(left, 34, 23, 3, "F")
+		pdf.SetY(44)
+		text(left, width, 16, "DoctorChart", "B", 11, accent, "L")
+		if pdf.PageNo() > 1 {
+			pdf.SetY(44)
+			text(left+150, width-150, 16, title+" · Continuación", "", 9, muted, "R")
+			rule(left, right, 67)
+			pdf.SetY(83)
+		}
+	})
+	pdf.AddPage()
+	pdf.SetY(69)
+	text(left, 365, 31, title, "B", 24, ink, "L")
+	titleBottom := pdf.GetY()
+	pdf.SetY(70)
+	dateLabel := "Fecha del registro"
+	if doc.emitted {
+		dateLabel = "Fecha de emisión"
+	}
+	text(right-130, 130, 12, dateLabel, "B", 8.5, muted, "R")
+	text(right-130, 130, 17, doc.at.In(s.documentZone(doc.IssuanceZone)).Format("02/01/2006"), "B", 11, ink, "R")
+	pdf.SetY(max(titleBottom, pdf.GetY()) + 12)
+	rule(left, right, pdf.GetY())
+	pdf.Ln(12)
+	name := strings.TrimSpace(doc.Author.name)
+	specialty := strings.TrimSpace(pointer(doc.Author.Specialty))
+	license := strings.TrimSpace(doc.Author.license)
+	if name != "" || specialty != "" || license != "" {
+		text(left, width, 13, "Profesional tratante", "B", 8.5, muted, "L")
+		if name != "" {
+			text(left, width, 19, name, "B", 14, ink, "L")
+		}
+		if specialty != "" {
+			text(left, width, 15, specialty, "", 10, muted, "L")
+		}
+		if license != "" {
+			text(left, width, 15, "Matrícula profesional: "+license, "", 10, muted, "L")
+		}
+		pdf.Ln(17)
+	}
+
 	insurance, err := wizard.Decode(doc.Patient.Insurance)
 	if err != nil {
 		return nil, err
 	}
-	coverage := "Particular / Sin obra social informada"
-	if provider, ok := insurance["providerName"].(string); ok && has(provider) {
-		coverage = api.JavaTrim(provider)
-		if plan, ok := insurance["planName"].(string); ok && has(plan) {
-			coverage += " " + api.JavaTrim(plan)
-		}
-		if affiliate, ok := insurance["affiliateNumber"].(string); ok && has(affiliate) {
-			coverage += " · N° " + api.JavaTrim(affiliate)
+	provider, _ := insurance["providerName"].(string)
+	coverage := strings.TrimSpace(provider)
+	if coverage == "" {
+		coverage = "No informada"
+	}
+	if plan, ok := insurance["planName"].(string); ok && has(plan) {
+		coverage += " · Plan: " + strings.TrimSpace(plan)
+	}
+	if affiliate, ok := insurance["affiliateNumber"].(string); ok && has(affiliate) {
+		coverage += " · Número de afiliación " + strings.TrimSpace(affiliate)
+	}
+
+	// A filled cell per wrapped line keeps long patient data inside the printable area.
+	pdf.SetFillColor(246, 247, 242)
+	patientLine := func(value, style string, size, leading float64, color [3]int) {
+		font(style, size, color)
+		value = strings.ReplaceAll(strings.ReplaceAll(translate(value), "\r", ""), "\t", " ")
+		for _, part := range pdf.SplitText(value, width-30) {
+			room(leading)
+			y := pdf.GetY()
+			pdf.Rect(left, y, width, leading, "F")
+			pdf.SetX(left + 15)
+			pdf.CellFormat(width-30, leading, part, "", 1, "L", false, 0, "")
 		}
 	}
-	y = pdf.GetY()
-	pdf.SetFillColor(248, 250, 252)
-	pdf.SetDrawColor(226, 232, 240)
+	room(106)
+	y := pdf.GetY()
+	pdf.Rect(left, y, width, 11, "F")
+	pdf.SetDrawColor(accent[0], accent[1], accent[2])
 	pdf.SetLineWidth(1)
-	// Grow the patient box for wrapped names/coverage; no medical field is clipped.
-	font("", 9.5, primary)
-	leftLines := len(pdf.SplitText(translate("Paciente: "+fallback(doc.Patient.Name, "No especificado")), 287))
-	coverageLines := len(pdf.SplitText(translate("Cobertura: "+coverage), 287))
-	rightLines := len(pdf.SplitText(translate("DNI / Doc: "+fallback(pointer(doc.Patient.NationalID), "No informado")), 187))
-	if rightLines > leftLines {
-		leftLines = rightLines
+	pdf.Line(left, y, right, y)
+	pdf.Ln(11)
+	patientLine("Paciente", "B", 8.5, 13, muted)
+	if patientName := strings.TrimSpace(doc.Patient.Name); patientName != "" {
+		patientLine(patientName, "B", 15, 23, ink)
 	}
-	if leftLines < 1 {
-		leftLines = 1
+	if has(pointer(doc.Patient.NationalID)) {
+		patientLine("Documento de identidad: "+api.JavaTrim(*doc.Patient.NationalID), "", 10, 16, ink)
 	}
-	if coverageLines < 1 {
-		coverageLines = 1
+	if has(pointer(doc.Patient.Age)) {
+		patientLine("Edad: "+api.JavaTrim(*doc.Patient.Age), "", 10, 16, ink)
 	}
-	height := 16 + float64(leftLines+coverageLines)*20
-	pdf.Rect(40, y, 515, height, "DF")
-	pdf.SetY(y + 10)
-	rich(50, 287, 20, "Paciente: ", fallback(doc.Patient.Name, "No especificado"), 8.5, 10, "B", "B")
-	pdf.SetY(y + 10)
-	rich(349.4, 195.6, 20, "DNI / Doc: ", fallback(pointer(doc.Patient.NationalID), "No informado"), 8.5, 9.5, "B", "")
-	secondY := y + 10 + float64(leftLines)*20
-	pdf.SetY(secondY)
-	rich(50, 287, 20, "Cobertura: ", coverage, 8.5, 9.5, "B", "")
-	pdf.SetY(secondY)
-	rich(349.4, 195.6, 20, "Edad: ", fallback(pointer(doc.Patient.Age), "No informada"), 8.5, 9.5, "B", "")
-	pdf.SetY(y + height + 14)
+	patientLine("Cobertura: "+coverage, "", 10, 16, ink)
+	if pdf.GetY()+11 <= bottom {
+		pdf.Rect(left, pdf.GetY(), width, 11, "F")
+		pdf.Ln(11)
+	}
+	pdf.Ln(21)
+
+	room(84)
+	text(left, width, 23, section, "B", 15, accent, "L")
+	rule(left, right, pdf.GetY()+3)
+	pdf.Ln(11)
+
 	if kind == "PRESCRIPTION" {
-		line(515, 22.5, "Rp/", "B", 15, accent, "L")
-		pdf.Ln(8)
 		for index, item := range medications {
-			text := func(key string) string { value, _ := item[key].(string); return value }
-			pdf.SetX(42)
-			main := fmt.Sprintf("%d. %s", index+1, text("medicationName"))
-			dose := ""
-			if has(text("dosage")) {
-				dose += "  " + api.JavaTrim(text("dosage"))
+			value := func(key string) string {
+				field, _ := item[key].(string)
+				return api.JavaTrim(field)
 			}
-			if has(text("administrationRoute")) {
-				dose += " (" + api.JavaTrim(text("administrationRoute")) + ")"
-			}
-			rich(42, 511, 16, main, dose, 10, 9, "B", "")
-			frequency := api.JavaTrim(text("frequency"))
+			room(47)
+			text(left, width, 19, fmt.Sprintf("%d. %s", index+1, value("medicationName")), "B", 13, ink, "L")
 			duration := ""
 			if days, ok := item["durationDays"].(float64); ok && days > 0 {
-				duration = fmt.Sprintf("Duración: %.0f días", days)
+				duration = fmt.Sprintf("%.0f días", days)
+				if days == 1 {
+					duration = "1 día"
+				}
 			}
-			sub := ""
-			if has(frequency) {
-				sub = "Frecuencia: " + frequency
+			for _, detail := range []struct{ label, value string }{
+				{"Dosis", value("dosage")},
+				{"Vía de administración", value("administrationRoute")},
+				{"Frecuencia", value("frequency")},
+				{"Duración", duration},
+				{"Indicación", value("instructions")},
+			} {
+				if detail.value == "" {
+					continue
+				}
+				room(16)
+				y := pdf.GetY()
+				text(left+13, 106, 16, detail.label, "B", 9, muted, "L")
+				pdf.SetY(y)
+				text(left+124, width-124, 16, detail.value, "", 10, ink, "L")
 			}
-			if sub != "" && duration != "" {
-				sub += "  ·  "
-			}
-			sub += duration
-			if sub != "" {
-				pdf.SetX(54)
-				line(499, 16, sub, "", 9, dark, "L")
-			}
-			if has(text("instructions")) {
-				pdf.SetX(54)
-				line(499, 16, "Indicación: "+api.JavaTrim(text("instructions")), "I", 8.5, dark, "L")
-			}
-			pdf.SetDrawColor(226, 232, 240)
-			pdf.SetLineWidth(.5)
-			pdf.Line(40, pdf.GetY()+6, 555, pdf.GetY()+6)
-			pdf.Ln(10)
+			pdf.Ln(9)
+			rule(left, right, pdf.GetY())
+			pdf.Ln(9)
 		}
 	} else {
-		line(515, 13.5, "Solicito la realización de los siguientes estudios diagnósticos y prácticas:", "", 9, dark, "L")
+		const orderGutter = 32.0
+		number := 0
+		for _, savedOrder := range doc.Orders {
+			order := strings.TrimSpace(savedOrder)
+			if order == "" {
+				continue
+			}
+			number++
+			room(31)
+			start := pdf.GetY()
+			text(left, orderGutter-8, 19, fmt.Sprintf("%d.", number), "B", 10, accent, "L")
+			pdf.SetY(start)
+			text(left+orderGutter, width-orderGutter, 19, order, "B", 12, ink, "L")
+			if pdf.GetY()+6 <= bottom {
+				rule(left+orderGutter, right, pdf.GetY()+6)
+			}
+			pdf.Ln(14)
+		}
+	}
+	if has(pointer(doc.Diagnosis)) {
+		heading := "Diagnóstico"
+		if kind == "STUDY_ORDERS" {
+			heading = "Diagnóstico registrado"
+		}
+		diagnosis := api.JavaTrim(*doc.Diagnosis)
+		if has(pointer(doc.DiagnosisCode)) {
+			diagnosis = "[" + api.JavaTrim(*doc.DiagnosisCode) + "] " + diagnosis
+		}
+		room(36)
+		field(left, width, heading, diagnosis, "", 10)
 		pdf.Ln(8)
-		for index, order := range doc.Orders {
-			pdf.SetX(42)
-			line(511, 15, fmt.Sprintf("%d. %s", index+1, order), "B", 10, primary, "L")
-			pdf.SetDrawColor(226, 232, 240)
-			pdf.SetLineWidth(.5)
-			pdf.Line(40, pdf.GetY()+6, 555, pdf.GetY()+6)
-			pdf.Ln(11)
-		}
 	}
-	pdf.Ln(12)
-	if has(pointer(doc.Diagnosis)) || has(pointer(doc.Instructions)) {
-		notes := []string{}
-		if has(pointer(doc.Diagnosis)) {
-			label := "Diagnóstico: "
-			if kind == "STUDY_ORDERS" {
-				label = "Diagnóstico presuntivo: "
-			}
-			if has(pointer(doc.DiagnosisCode)) {
-				label += "[" + api.JavaTrim(*doc.DiagnosisCode) + "] "
-			}
-			notes = append(notes, label+api.JavaTrim(*doc.Diagnosis))
+	if has(pointer(doc.Instructions)) {
+		heading := "Indicaciones generales"
+		if kind == "STUDY_ORDERS" {
+			heading = "Indicaciones para los estudios"
 		}
-		if has(pointer(doc.Instructions)) {
-			label := "Indicaciones generales: "
-			if kind == "STUDY_ORDERS" {
-				label = "Preparación / Indicaciones: "
-			}
-			notes = append(notes, label+api.JavaTrim(*doc.Instructions))
-		}
-		font("", 9, dark)
-		y := pdf.GetY()
-		height := 16.0
-		for _, note := range notes {
-			height += float64(len(pdf.SplitText(translate(note), 499))) * 16
-		}
-		if y+height > 806 {
-			pdf.AddPage()
-			y = pdf.GetY()
-		}
-		pdf.SetDrawColor(226, 232, 240)
-		pdf.SetFillColor(248, 250, 252)
-		pdf.SetLineWidth(.5)
-		pdf.Rect(40, y, 515, height, "DF")
-		pdf.SetY(y + 8)
-		for _, note := range notes {
-			label, value, _ := strings.Cut(note, ": ")
-			rich(48, 499, 16, label+": ", value, 9, 9, "B", "")
-		}
-		pdf.SetY(y + height + 16)
+		room(36)
+		field(left, width, heading, api.JavaTrim(*doc.Instructions), "", 10)
 	}
-	// Keep the entire signature block on one page.
-	if pdf.GetY()+100 > 806 {
-		pdf.AddPage()
+	room(86)
+	pdf.Ln(41)
+	rule(right-182, right, pdf.GetY())
+	pdf.Ln(5)
+	text(right-182, 182, 15, "Firma y sello del profesional", "B", 9, ink, "C")
+	status := "Vista previa sin firma digital"
+	if doc.emitted {
+		status = "Emitido sin firma digital"
 	}
-	y = pdf.GetY() + 20
-	origin := "Receta Médica Asistencial"
-	if kind == "STUDY_ORDERS" {
-		origin = "Orden de Prácticas y Estudios"
-	}
-	pdf.SetXY(40, y+44)
-	line(231.75, 12, "Documento emitido: "+doc.Code+"\n"+origin, "", 8, muted, "L")
-	pdf.SetXY(271.75, y)
-	line(283.25, 12, "____________________________________", "", 8, muted, "C")
-	pdf.SetX(271.75)
-	line(283.25, 14.25, doctor, "B", 9.5, primary, "C")
-	pdf.SetX(271.75)
-	if specialty != "" {
-		line(283.25, 12, specialty, "", 8, muted, "C")
-	}
-	pdf.SetX(271.75)
-	line(283.25, 12, signature, "", 8, muted, "C")
+	text(right-182, 182, 13, status, "", 8.5, muted, "C")
 	var buffer bytes.Buffer
 	if contentErr != nil {
 		return nil, contentErr

@@ -14,6 +14,7 @@ require (
 	github.com/nyaruka/phonenumbers/v2 v2.0.17
 	github.com/pdfcpu/pdfcpu v0.16.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
+	go.foxforensics.eu/go-zip v1.0.0
 	golang.org/x/image v0.46.0
 	golang.org/x/text v0.42.0
 )

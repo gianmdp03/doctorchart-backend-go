@@ -23,6 +23,8 @@ type printPatient struct {
 type printAuthor struct {
 	UserID    string  `json:"userId"`
 	Specialty *string `json:"specialtyName"`
+	name      string
+	license   string
 }
 type printDocument struct {
 	IssuanceZone  string          `json:"issuanceZone"`
@@ -50,13 +52,24 @@ func printAge(birth, reference time.Time) *string {
 	}
 	var result string
 	if *months == 0 {
-		result = fmt.Sprintf("%d días", int(reference.Sub(birth).Hours()/24))
+		days := int(reference.Sub(birth).Hours() / 24)
+		result = "1 día"
+		if days != 1 {
+			result = fmt.Sprintf("%d días", days)
+		}
 	} else if *months < 24 {
-		result = fmt.Sprintf("%d meses", *months)
+		result = "1 mes"
+		if *months != 1 {
+			result = fmt.Sprintf("%d meses", *months)
+		}
 	} else {
 		result = fmt.Sprintf("%d años", *months/12)
-		if *months%12 != 0 {
-			result += fmt.Sprintf(" %dm", *months%12)
+		switch remaining := *months % 12; remaining {
+		case 0:
+		case 1:
+			result += " y 1 mes"
+		default:
+			result += fmt.Sprintf(" y %d meses", remaining)
 		}
 	}
 	return &result
@@ -170,6 +183,10 @@ func (s *Service) readPrintable(ctx context.Context, tx pgx.Tx, user string, pat
 	}
 	if string(doc.Medications) == "[]" && len(doc.Orders) == 0 {
 		return api.Failure(400, "EMPTY_DOCUMENT", "El documento no tiene medicamentos ni estudios registrados para imprimir.")
+	}
+	if identity := api.User(ctx); identity.UserID == doc.Author.UserID {
+		doc.Author.name = identity.ClinicalName
+		doc.Author.license = identity.ClinicalLicense
 	}
 	if err := s.detail(ctx, tx, &patient); err != nil {
 		return err

@@ -19,6 +19,7 @@ import (
 // Fixed labels keep routes, queries and request bodies out of the audit table.
 var accessOperations = map[string]string{
 	"GET /api/doctorchart/patients":                                                 "PATIENT_SEARCH",
+	"POST /api/doctorchart/patients/check-dni":                                      "PATIENT_SEARCH",
 	"GET /api/doctorchart/patients/{id}":                                            "PATIENT_READ",
 	"GET /api/doctorchart/patients/archived":                                        "PATIENT_ARCHIVE_LIST",
 	"GET /api/doctorchart/patients/{id}/clinical-summary":                           "CLINICAL_SUMMARY",

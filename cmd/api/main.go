@@ -23,6 +23,7 @@ import (
 	"github.com/syntah/doctorchart-backend-go/internal/clinical"
 	"github.com/syntah/doctorchart-backend-go/internal/clinics"
 	"github.com/syntah/doctorchart-backend-go/internal/config"
+	"github.com/syntah/doctorchart-backend-go/internal/dataexport"
 	"github.com/syntah/doctorchart-backend-go/internal/notifications"
 	"github.com/syntah/doctorchart-backend-go/internal/storage"
 	"github.com/syntah/doctorchart-backend-go/internal/wizard"
@@ -123,6 +124,12 @@ func run() error {
 	clinicalService.CalculatorRoutes(mux)
 	clinicalService.StudyRoutes(mux)
 	clinicalService.PrintRoutes(mux)
+	exports, err := dataexport.New(ctx, pool, files, c.BillingURL, c.BillingSecret)
+	if err != nil {
+		return err
+	}
+	defer exports.Close()
+	exports.Routes(mux)
 	notificationsDone := make(chan struct{})
 	go func() {
 		defer close(notificationsDone)

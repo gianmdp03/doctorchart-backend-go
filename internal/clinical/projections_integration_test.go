@@ -120,7 +120,7 @@ func TestHistoricalProjectionHTTPReadsKeepStoredRows(t *testing.T) {
 	hiddenLegacy := projectionFixtureField("followUp")
 	hiddenLegacy["visibleWhen"] = map[string]any{"fieldKey": "show", "equals": true}
 	show := map[string]any{"key": "show", "label": "Show", "type": "BOOLEAN", "required": false}
-	for _, test := range []struct {
+	for i, test := range []struct {
 		name   string
 		form   map[string]any
 		values map[string]any
@@ -137,6 +137,7 @@ func TestHistoricalProjectionHTTPReadsKeepStoredRows(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			request := integrityPatientRequest()
 			request["workspaceVersion"] = json.Number("1")
+			request["values"].(map[string]any)["sys_dni"] = fmt.Sprintf("%08d", 12345678+i)
 			p, err := s.CreatePatient(ctx, api.Identity{UserID: "integrity-owner", Plan: "BASIC"}, request)
 			if err != nil {
 				t.Fatal(err)

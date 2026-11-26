@@ -77,7 +77,12 @@ func New(config Config) (*Store, error) {
 			return nil, err
 		}
 		store.library = &common.Library{Manager: manager}
-		return store, nil
+		// A managed installation can still have studies from its former
+		// private store. Initialize that reader when a locator is configured.
+		if config.Type == "s3" && api.JavaBlank(config.Bucket) ||
+			config.Type != "s3" && api.JavaBlank(config.Directory) {
+			return store, nil
+		}
 	}
 	if config.Type == "s3" {
 		if api.JavaBlank(config.Bucket) {
@@ -313,6 +318,35 @@ func (s *Store) OpenWithDigest(ctx context.Context, key string) (io.ReadCloser, 
 	}
 	file, size, err := s.openLegacy(ctx, key)
 	return file, size, "", err
+}
+
+// OpenForExport checks the managed asset against the patient and owner from
+// the read-only DoctorChart snapshot. Legacy rows use the private legacy store.
+func (s *Store) OpenForExport(ctx context.Context, owner, patient, assetID, legacyKey string) (io.ReadCloser, int64, string, error) {
+	if assetID == "" {
+		if s.client == nil && s.root == "" {
+			return nil, 0, "", Missing()
+		}
+		file, size, err := s.openLegacy(ctx, legacyKey)
+		return file, size, "", err
+	}
+	if s.library == nil || assetID != legacyKey {
+		return nil, 0, "", Missing()
+	}
+	asset, err := s.library.Catalog.Get(ctx, assetID)
+	if err != nil {
+		return nil, 0, "", mediaReadError(err)
+	}
+	if asset.OwnerID != owner || asset.Service != "doctorchart" || asset.Visibility != "private" {
+		return nil, 0, "", Missing()
+	}
+	for _, link := range asset.Associations {
+		if link.EntityType == "patient" && link.EntityID == patient && link.Role == "study" {
+			file, err := s.library.Manager.Open(ctx, asset)
+			return file, asset.Size, asset.SHA256, mediaReadError(err)
+		}
+	}
+	return nil, 0, "", Missing()
 }
 
 func (s *Store) openLegacy(ctx context.Context, key string) (io.ReadCloser, int64, error) {

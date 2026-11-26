@@ -26,6 +26,10 @@ type formField struct {
 var emailInput = regexp.MustCompile(`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
 var dniInput = regexp.MustCompile(`^[0-9]{6,8}$`)
 
+func ValidNationalID(value string) bool {
+	return dniInput.MatchString(strings.TrimSpace(value))
+}
+
 func telephoneField(key string) bool {
 	switch key {
 	case "sys_phone", "phone", "patient.phone", "primaryContactPhone", "patient.guardianInfo.primaryContactPhone":
@@ -45,7 +49,7 @@ func personalTextError(key, value string) string {
 			return "INVALID_EMAIL"
 		}
 	case "sys_dni", "nationalId", "patient.nationalId":
-		if !dniInput.MatchString(value) {
+		if !ValidNationalID(value) {
 			return "INVALID_DNI"
 		}
 	}

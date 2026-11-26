@@ -1110,6 +1110,8 @@ CREATE INDEX idx_encounters_patient_id ON public.clinical_encounters USING btree
 
 CREATE INDEX idx_patients_user_id ON public.patients USING btree (user_id);
 
+CREATE UNIQUE INDEX patients_active_national_id_idx ON public.patients (user_id, specialty_context_id, national_id) WHERE annulled_at IS NULL AND national_id IS NOT NULL;
+
 CREATE INDEX idx_prescription_patient_date ON public.patient_prescription_records USING btree (patient_id, created_at, id);
 
 CREATE INDEX notification_outbox_booking_idx ON public.notification_outbox USING btree (booking_id, booking_version);

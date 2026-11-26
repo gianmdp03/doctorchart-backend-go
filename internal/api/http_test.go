@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -62,6 +63,8 @@ func TestGatewayIdentityBoundary(t *testing.T) {
 			request := httptest.NewRequest(test.method, test.path, nil)
 			request.Header.Set("X-Gateway-Secret", test.secret)
 			request.Header.Set("X-User-Id", test.user)
+			request.Header.Set("X-Clinical-Author-Name", base64.RawURLEncoding.EncodeToString([]byte("Lucía María Benítez")))
+			request.Header.Set("X-Clinical-Author-License", base64.RawURLEncoding.EncodeToString([]byte("12345")))
 			request.Header.Set("X-User-Role", test.role)
 			request.Header.Set("X-User-Plan", "PRO")
 			request.Header.Set("X-User-Plan-Expires-At", time.Now().Add(time.Hour).Format(time.RFC3339Nano))
@@ -77,6 +80,10 @@ func TestGatewayIdentityBoundary(t *testing.T) {
 				}
 				if (id.UserID != "") != test.authenticated {
 					t.Fatalf("identity trust changed: %+v", id)
+				}
+				if test.authenticated && (id.ClinicalName != "Lucía María Benítez" || id.ClinicalLicense != "12345") ||
+					!test.authenticated && (id.ClinicalName != "" || id.ClinicalLicense != "") {
+					t.Fatal("clinical display profile crossed the wrong gateway boundary")
 				}
 			}
 		})

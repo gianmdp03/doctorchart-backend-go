@@ -190,6 +190,9 @@ func clinicalDBError(err error) error {
 	if errors.As(err, &pg) && pg.Code == "23505" && pg.ConstraintName == "clinical_encounters_one_first_visit" {
 		return api.Failure(400, "FIRST_VISIT_ALREADY_EXISTS", "El paciente ya cuenta con una primera consulta registrada.")
 	}
+	if errors.As(err, &pg) && pg.Code == "23505" && pg.ConstraintName == "patients_active_national_id_idx" {
+		return api.Failure(409, "PATIENT_DNI_ALREADY_EXISTS", "Ya tenés un paciente con este DNI en esta especialidad.")
+	}
 	if errors.Is(err, pgx.ErrNoRows) || errors.As(err, &pg) && (strings.HasPrefix(pg.Code, "23") || pg.Code == "22001") {
 		return api.Failure(409, "VERSION_CONFLICT", "La configuración cambió. Actualizá los datos antes de guardar.")
 	}
@@ -591,6 +594,7 @@ func (s *Service) UpdatePatient(ctx context.Context, userID string, id int64, re
 }
 
 func (s *Service) Routes(mux *http.ServeMux) {
+	s.handle(mux, "POST /api/doctorchart/patients/check-dni", s.checkPatientDNI)
 	s.handle(mux, "POST /api/doctorchart/patients/{patientId}/export", s.exportChart)
 	s.handle(mux, "GET /api/doctorchart/workspace/clinical-access", s.readClinicalAccess)
 	s.revisionRoutes(mux)
@@ -641,4 +645,35 @@ func (s *Service) Routes(mux *http.ServeMux) {
 		}
 		api.WriteJSON(w, 200, p)
 	})
+}
+
+func (s *Service) checkPatientDNI(w http.ResponseWriter, r *http.Request) {
+	request, err := api.Decode(w, r)
+	if err == nil {
+		err = api.Only(request, "nationalId")
+	}
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+	dni, _ := request["nationalId"].(string)
+	if !wizard.ValidNationalID(dni) {
+		api.WriteError(w, api.Invalid("Ingresá un DNI de 6 a 8 dígitos, sin puntos."))
+		return
+	}
+	ctx := r.Context()
+	var patientID *int64
+	err = s.transaction(ctx, true, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT (
+			SELECT id FROM patients
+			WHERE user_id=$1 AND specialty_context_id=$2 AND national_id=$3 AND annulled_at IS NULL
+		)`, api.User(ctx).UserID, api.SpecialtyContextID(ctx), strings.TrimSpace(dni)).Scan(&patientID)
+	})
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+	api.WriteJSON(w, 200, struct {
+		PatientID *int64 `json:"patientId"`
+	}{patientID})
 }

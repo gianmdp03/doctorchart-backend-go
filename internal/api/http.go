@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"crypto/subtle"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,12 +13,15 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 type Identity struct {
-	UserID string
-	Roles  []string
-	Plan   string
+	UserID          string
+	Roles           []string
+	Plan            string
+	ClinicalName    string
+	ClinicalLicense string
 }
 type identityKey struct{}
 
@@ -77,6 +81,17 @@ func Public(method, path string) bool {
 	return method == "OPTIONS" || method == "GET" && (path == "/api/doctorchart/ping" || path == "/api/doctorchart/health") || method == "POST" && (path == "/internal/webhooks/billing/limits-updated" || path == "/api/doctorchart/internal/webhooks/billing/limits-updated")
 }
 
+func clinicalProfileText(encoded string, limit int) string {
+	if len(encoded) > base64.RawURLEncoding.EncodedLen(limit) {
+		return ""
+	}
+	value, err := base64.RawURLEncoding.DecodeString(encoded)
+	if err != nil || !utf8.Valid(value) {
+		return ""
+	}
+	return strings.Join(strings.Fields(string(value)), " ")
+}
+
 func Gateway(secret string, next http.Handler) http.Handler {
 	next = WithTimeZone(next)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -114,7 +129,12 @@ func Gateway(secret string, next http.Handler) http.Handler {
 			securityError(Failure(401, "UNAUTHENTICATED", "Se requiere autenticación."))
 			return
 		}
-		id := Identity{UserID: JavaTrim(user), Plan: JavaTrim(r.Header.Get("X-User-Plan"))}
+		id := Identity{
+			UserID:          JavaTrim(user),
+			Plan:            JavaTrim(r.Header.Get("X-User-Plan")),
+			ClinicalName:    clinicalProfileText(r.Header.Get("X-Clinical-Author-Name"), 256),
+			ClinicalLicense: clinicalProfileText(r.Header.Get("X-Clinical-Author-License"), 80),
+		}
 		for _, role := range strings.Split(r.Header.Get("X-User-Role"), ",") {
 			role = JavaTrim(role)
 			if !JavaBlank(role) {
@@ -130,7 +150,7 @@ func Gateway(secret string, next http.Handler) http.Handler {
 		}
 		// The gateway resolves DoctorChart's own active, time-bounded benefit.
 		// An empty/invalid benefit must never fall back to paid BASIC quotas.
-		if !id.HasRole("SUPER_ADMIN") {
+		if !id.HasRole("SUPER_ADMIN") && !DoctorExportRoute(r.Method, r.URL.Path) {
 			id.Plan = strings.ToUpper(strings.TrimSpace(id.Plan))
 			expires, err := time.Parse(time.RFC3339Nano, r.Header.Get("X-User-Plan-Expires-At"))
 			validTier := false
