@@ -64,6 +64,7 @@ type fixture struct {
 	mode    atomic.Int32
 	staff   atomic.Bool
 	online  atomic.Bool
+	avatar  atomic.Bool
 	limit   atomic.Int64
 	calls   atomic.Int32
 }
@@ -120,6 +121,18 @@ func newFixture(t *testing.T) *fixture {
 		if r.Header.Get("X-Internal-Secret") != secret {
 			t.Error("missing internal authentication")
 			w.WriteHeader(401)
+			return
+		}
+		if strings.HasSuffix(r.URL.Path, "/avatar") {
+			if r.URL.Path != "/internal/doctorchart/owners/"+owner+"/avatar" {
+				t.Error("unexpected avatar owner")
+			}
+			if !f.avatar.Load() {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			w.Header().Set("Content-Type", "image/webp")
+			_, _ = w.Write([]byte(testAvatar))
 			return
 		}
 		mode := f.mode.Load()

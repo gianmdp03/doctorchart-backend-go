@@ -219,6 +219,36 @@ func TestPublicDirectoryFiltersAndNoAdministrativeIdentity(t *testing.T) {
 	assertCode(t, w, 404, "CLINIC_NOT_FOUND")
 }
 
+const testAvatar = "RIFF\x1a\x00\x00\x00WEBPVP8 \x0e\x00\x00\x00\x10\x01\x00\x9d\x01\x2a\x01\x00\x01\x00\x00\x00\x00\x00"
+
+func TestPublicDoctorAvatarFollowsBookingVisibility(t *testing.T) {
+	f, _, _, publication := publicFixture(t)
+	directory := "/public/appointments/doctors"
+	path := directory + "/" + publication.PublicID + "/avatar"
+	for _, route := range []string{directory, directory + "/" + publication.PublicID} {
+		response := pubRequest(f, "GET", route, "", nil)
+		assertCode(t, response, 200, "")
+		if !strings.Contains(response.Body.String(), path) || strings.Contains(response.Body.String(), owner) {
+			t.Fatal("missing public avatar path or private owner leaked")
+		}
+	}
+	assertCode(t, pubRequest(f, "GET", path, "", nil), 404, "PUBLIC_AVATAR_NOT_FOUND")
+
+	f.avatar.Store(true)
+	response := pubRequest(f, "GET", path, "", nil)
+	assertCode(t, response, 200, "")
+	if response.Header().Get("Content-Type") != "image/webp" ||
+		!strings.Contains(response.Header().Get("Cache-Control"), "no-store") ||
+		response.Body.String() != testAvatar {
+		t.Fatal("avatar bytes or response headers changed")
+	}
+
+	publication.ExpectedVersion = publication.Version
+	publication.Published = false
+	assertCode(t, f.request("PUT", "/booking-publication", owner, jsonString(publication)), 200, "")
+	assertCode(t, pubRequest(f, "GET", path, "", nil), 404, "PUBLIC_PROFILE_NOT_FOUND")
+}
+
 func TestPublicDirectoryCatalogIncludesSpecialtiesWithoutOffers(t *testing.T) {
 	f := newFixture(t)
 	mux := http.NewServeMux()

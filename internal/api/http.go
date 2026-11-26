@@ -225,6 +225,9 @@ func PublicAppointments(method, p string) bool {
 	}
 	parts := strings.Split(strings.TrimPrefix(p, "/api/doctorchart/public/appointments"), "/")
 	if method == "GET" {
+		if len(parts) == 4 && parts[1] == "doctors" && publicUUID.MatchString(parts[2]) && parts[3] == "avatar" {
+			return true
+		}
 		return len(parts) == 2 && parts[1] == "doctors" || len(parts) == 3 && parts[1] == "doctors" && publicUUID.MatchString(parts[2]) || len(parts) == 6 && parts[1] == "doctors" && publicUUID.MatchString(parts[2]) && parts[3] == "clinics" && publicUUID.MatchString(parts[4]) && parts[5] == "availability"
 	}
 	if method != http.MethodPost {

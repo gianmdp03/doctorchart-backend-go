@@ -43,6 +43,7 @@ type PublicDoctor struct {
 	Clinics       []PublicClinic  `json:"clinics"`
 	Form          PublicForm      `json:"form"`
 	Specialties   []PublicContext `json:"specialties"`
+	AvatarPath    string          `json:"avatarPath,omitempty"`
 	owner         string
 	workspace     int64
 	published     bool
@@ -102,6 +103,7 @@ func (s *Service) readPublicDoctor(ctx context.Context, q scheduleReader, id str
 	if len(d.Specialties) == 1 {
 		d.SpecialtyCode, d.Specialty = d.Specialties[0].Code, d.Specialties[0].Name
 	}
+	d.AvatarPath = "/public/appointments/doctors/" + d.ID + "/avatar"
 	return d, nil
 }
 func (s *Service) onlineRights(ctx context.Context, owner string) (billing.Snapshot, error) {
@@ -124,25 +126,51 @@ func (s *Service) onlineRights(ctx context.Context, owner string) (billing.Snaps
 	}
 	return snap, nil
 }
-func (s *Service) publicProfile(w http.ResponseWriter, r *http.Request) error {
-	d, err := s.readPublicDoctor(r.Context(), s.pool, r.PathValue("publicId"))
+func (s *Service) visiblePublicDoctor(ctx context.Context, id string) (PublicDoctor, error) {
+	d, err := s.readPublicDoctor(ctx, s.pool, id)
 	if err != nil {
-		return err
+		return d, err
 	}
 	if !d.published || len(d.Clinics) == 0 {
-		return publicMissing()
+		return d, publicMissing()
 	}
-	snap, err := s.onlineRights(r.Context(), d.owner)
+	snap, err := s.onlineRights(ctx, d.owner)
 	if err != nil {
-		return err
+		return d, err
 	}
 	if !snap.AllowsTeleconsultation() {
 		filterPublicOffers(&d, inPerson, "", "", "", "")
 		if len(d.Clinics) == 0 {
-			return publicMissing()
+			return d, publicMissing()
 		}
 	}
+	return d, nil
+}
+
+func (s *Service) publicProfile(w http.ResponseWriter, r *http.Request) error {
+	d, err := s.visiblePublicDoctor(r.Context(), r.PathValue("publicId"))
+	if err != nil {
+		return err
+	}
 	api.WriteJSON(w, 200, d)
+	return nil
+}
+
+func (s *Service) publicAvatar(w http.ResponseWriter, r *http.Request) error {
+	d, err := s.visiblePublicDoctor(r.Context(), r.PathValue("publicId"))
+	if err != nil {
+		return err
+	}
+	image, err := s.publicRights.DoctorAvatar(r.Context(), d.owner)
+	if errors.Is(err, billing.ErrDoctorAvatarMissing) {
+		return api.Failure(404, "PUBLIC_AVATAR_NOT_FOUND", "El profesional no tiene una foto de perfil disponible.")
+	}
+	if err != nil {
+		return api.Failure(503, "PUBLIC_AVATAR_UNAVAILABLE", "La foto de perfil no está disponible en este momento.")
+	}
+	w.Header().Set("Content-Type", "image/webp")
+	w.Header().Set("Content-Length", strconv.Itoa(len(image)))
+	_, _ = w.Write(image)
 	return nil
 }
 func (s *Service) publicDirectory(w http.ResponseWriter, r *http.Request) error {
