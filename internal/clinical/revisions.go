@@ -88,7 +88,7 @@ func (s *Service) annulPatient(ctx context.Context, user string, id int64, reque
 		}
 		// Preserve child rows and their foreign keys. Keeping the study row
 		// also keeps its physical file referenced by both media backends.
-		for _, table := range []string{"clinical_encounters", "patient_prescription_records", "patient_medical_studies", "patient_vaccinations"} {
+		for _, table := range []string{"clinical_encounters", "patient_prescription_records", "patient_medical_studies", "patient_vaccinations", "patient_whatsapp_consultations"} {
 			if _, err := annulRows(ctx, tx, table, "patient_id=$1", id, nil); err != nil {
 				return err
 			}
@@ -222,7 +222,7 @@ func (s *Service) revisionRoutes(mux *http.ServeMux) {
 				return err
 			}
 			result.CalculationsEnabled = s.workspaces.Feature(ctx, tx, user, "CALCULATORS") == nil
-			entities := []string{"PATIENT", "ENCOUNTER"}
+			entities := []string{"PATIENT", "ENCOUNTER", "WHATSAPP_CONSULTATION"}
 			for _, item := range []struct{ entity, feature string }{
 				{"STUDY", "STUDIES"}, {"PRESCRIPTION", "PRESCRIPTIONS"}, {"VACCINATION", "PATIENT_VACCINATION"},
 			} {

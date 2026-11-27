@@ -217,6 +217,10 @@ func TestPatientContextDatabaseOwnershipAndImmutability(t *testing.T) {
 	for _, table := range []string{"clinical_encounters", "patient_prescription_records", "patient_medical_studies", "patient_vaccinations"} {
 		reject("UPDATE " + table + " SET patient_id=2 WHERE id=1")
 	}
+	if _, err := pool.Exec(`INSERT INTO patient_whatsapp_consultations(id,patient_id,workspace_id,specialty_context_id,author_user_id,consulted_at,content) VALUES(1,1,1,1,'m1-owner',now(),'Consulta WhatsApp fixture')`); err != nil {
+		t.Fatal(err)
+	}
+	reject("UPDATE patient_whatsapp_consultations SET patient_id=2 WHERE id=1")
 	reject("UPDATE patient_prescription_records SET author_user_id='m1-other' WHERE id=1")
 	reject("UPDATE doctor_specialty_contexts SET workspace_id=2 WHERE workspace_id=1")
 	if _, err := pool.Exec("INSERT INTO specialties(id,active,code,created_at,display_name,navigation,patient_record_actions,patient_record_tabs,updated_at,version) VALUES(3,true,'fixture-other',now(),'Synthetic','[]','[]','[]',now(),0)"); err != nil {

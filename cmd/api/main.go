@@ -123,6 +123,7 @@ func run() error {
 	clinicalService.VaccinationRoutes(mux)
 	clinicalService.CalculatorRoutes(mux)
 	clinicalService.StudyRoutes(mux)
+	clinicalService.WhatsAppConsultationRoutes(mux)
 	clinicalService.PrintRoutes(mux)
 	exports, err := dataexport.New(ctx, pool, files, c.BillingURL, c.BillingSecret)
 	if err != nil {

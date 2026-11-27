@@ -40,10 +40,15 @@ var accessOperations = map[string]string{
 	"GET /api/doctorchart/patients/{patientId}/encounters/{recordId}/print":         "ENCOUNTER_PRINT_DATA",
 	"GET /api/doctorchart/patients/{patientId}/encounters/{recordId}/pdf":           "ENCOUNTER_PDF",
 	"GET /api/doctorchart/patients/{patientId}/clinical-history/pdf":                "CLINICAL_HISTORY_PDF",
-	"GET /api/doctorchart/patients/{patientId}/studies":                             "STUDIES_READ",
-	"GET /api/doctorchart/patients/{patientId}/studies/{studyId}":                   "STUDY_READ",
-	"GET /api/doctorchart/patients/{patientId}/studies/{studyId}/file":              "STUDY_DOWNLOAD",
-	"GET /api/doctorchart/patients/{patientId}/revisions/studies/{studyId}/file":    "ARCHIVED_STUDY_DOWNLOAD",
+	"GET /api/doctorchart/patients/{patientId}/studies":                                            "STUDIES_READ",
+	"GET /api/doctorchart/patients/{patientId}/studies/{studyId}":                                  "STUDY_READ",
+	"GET /api/doctorchart/patients/{patientId}/studies/{studyId}/file":                             "STUDY_DOWNLOAD",
+	"GET /api/doctorchart/patients/{patientId}/revisions/studies/{studyId}/file":                   "ARCHIVED_STUDY_DOWNLOAD",
+	"GET /api/doctorchart/patients/{patientId}/whatsapp-consultations":                            "WHATSAPP_CONSULTATIONS_READ",
+	"POST /api/doctorchart/patients/{patientId}/whatsapp-consultations":                           "WHATSAPP_CONSULTATION_CREATE",
+	"GET /api/doctorchart/patients/{patientId}/whatsapp-consultations/{consultationId}":           "WHATSAPP_CONSULTATION_READ",
+	"PUT /api/doctorchart/patients/{patientId}/whatsapp-consultations/{consultationId}":           "WHATSAPP_CONSULTATION_UPDATE",
+	"DELETE /api/doctorchart/patients/{patientId}/whatsapp-consultations/{consultationId}":        "WHATSAPP_CONSULTATION_ANNUL",
 	"GET /api/doctorchart/calculators/patients/{patientId}/history":                 "CALCULATION_HISTORY",
 	"GET /api/doctorchart/calculators/patients/{patientId}/autofill":                "CALCULATION_AUTOFILL",
 	"POST /api/doctorchart/calculators/execute":                                     "CALCULATION_EXECUTE",
@@ -85,7 +90,7 @@ func (s *Service) accessBoundary(w http.ResponseWriter, r *http.Request, operati
 		ResponseWriter: w, store: s, ctx: r.Context(), operation: operation, requestID: requestID,
 		patientID: auditID(r, "patientId"),
 	}
-	for _, key := range []string{"documentId", "studyId", "recordId", "id"} {
+	for _, key := range []string{"documentId", "studyId", "consultationId", "recordId", "id"} {
 		if value := auditID(r, key); value != nil {
 			a.entityID = value
 			break

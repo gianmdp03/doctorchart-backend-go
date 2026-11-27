@@ -26,6 +26,8 @@ func TestClinicalRLSWithoutQueryFilters(t *testing.T) {
 		UPDATE patients SET national_id='12345678' WHERE id=1;
 		INSERT INTO patient_calculation_logs(patient_id,user_id,encounter_id,calculation_code,calculation_name,input_snapshot,formatted_result,created_at)
 		 VALUES(1,'m1-owner',1,'fixture','Fixture','{}','Synthetic',now());
+		INSERT INTO patient_whatsapp_consultations(id,patient_id,workspace_id,specialty_context_id,author_user_id,consulted_at,content)
+		 VALUES(1,1,1,1,'m1-owner',now(),'Consulta WhatsApp fixture');
 		INSERT INTO study_file_deletions(storage_key,requested_at) SELECT stored_file_name,now() FROM patient_medical_studies;
 	`); err != nil {
 		t.Fatal(err)
@@ -109,7 +111,7 @@ func TestClinicalRLSWithoutQueryFilters(t *testing.T) {
 		}
 	}
 	tables := []string{"patients", "clinical_encounters", "patient_calculation_logs", "patient_medical_studies",
-		"patient_prescription_records", "patient_vaccinations", "prescription_diagnostic_orders", "prescription_medications"}
+		"patient_prescription_records", "patient_vaccinations", "patient_whatsapp_consultations", "prescription_diagnostic_orders", "prescription_medications"}
 	for _, table := range tables {
 		count(conn, table, 0)
 	}

@@ -456,7 +456,8 @@ func writeContext(ctx context.Context, tx pgx.Tx, w io.Writer, owner string, sc 
 		EXISTS(SELECT 1 FROM patient_medical_studies s WHERE s.patient_id=p.id),
 		EXISTS(SELECT 1 FROM patient_prescription_records r WHERE r.patient_id=p.id),
 		EXISTS(SELECT 1 FROM patient_vaccinations v WHERE v.patient_id=p.id),
-		EXISTS(SELECT 1 FROM clinical_document_issues d WHERE d.patient_id=p.id)
+		EXISTS(SELECT 1 FROM clinical_document_issues d WHERE d.patient_id=p.id),
+		EXISTS(SELECT 1 FROM patient_whatsapp_consultations w WHERE w.patient_id=p.id)
 		FROM patients p WHERE p.user_id=$1 AND p.specialty_context_id=$2 ORDER BY p.full_name,p.id`, owner, sc.ID)
 	if err != nil {
 		return err
@@ -466,9 +467,9 @@ func writeContext(ctx context.Context, tx pgx.Tx, w io.Writer, owner string, sc 
 		var id int64
 		var name string
 		var archived bool
-		var canVisit [6]bool
+		var canVisit [7]bool
 		canVisit[0] = true
-		if err := rows.Scan(&id, &name, &archived, &canVisit[1], &canVisit[2], &canVisit[3], &canVisit[4], &canVisit[5]); err != nil {
+		if err := rows.Scan(&id, &name, &archived, &canVisit[1], &canVisit[2], &canVisit[3], &canVisit[4], &canVisit[5], &canVisit[6]); err != nil {
 			return err
 		}
 		status := ""
@@ -478,7 +479,7 @@ func writeContext(ctx context.Context, tx pgx.Tx, w io.Writer, owner string, sc 
 		if _, err := fmt.Fprintf(w, `<article><h3>%s%s</h3><p>Ficha %d</p><ul>`, html.EscapeString(name), status, id); err != nil {
 			return err
 		}
-		for i, section := range []string{"fichas", "consultas", "estudios", "recetas-y-ordenes", "vacunas", "emisiones"} {
+		for i, section := range []string{"fichas", "consultas", "estudios", "recetas-y-ordenes", "vacunas", "emisiones", "consultas-whatsapp"} {
 			if !canVisit[i] {
 				continue
 			}
@@ -498,7 +499,7 @@ func writeContext(ctx context.Context, tx pgx.Tx, w io.Writer, owner string, sc 
 }
 
 func sectionTitle(name string) string {
-	titles := map[string]string{"fichas": "Fichas", "consultas": "Consultas", "estudios": "Estudios y adjuntos", "recetas-y-ordenes": "Recetas y órdenes", "vacunas": "Vacunas", "emisiones": "Documentos emitidos", "especialidades": "Especialidades, wizards y borradores", "calculos": "Cálculos", "auditoria-accesos": "Auditoría de accesos"}
+	titles := map[string]string{"fichas": "Fichas", "consultas": "Consultas", "estudios": "Estudios y adjuntos", "recetas-y-ordenes": "Recetas y órdenes", "vacunas": "Vacunas", "emisiones": "Documentos emitidos", "consultas-whatsapp": "Consultas por WhatsApp", "especialidades": "Especialidades, wizards y borradores", "calculos": "Cálculos", "auditoria-accesos": "Auditoría de accesos"}
 	if title := titles[name]; title != "" {
 		return title
 	}
@@ -556,8 +557,9 @@ func writeRecord(w io.Writer, row []byte, up, table string) error {
 		Study     string          `json:"study_name"`
 		Original  string          `json:"original_file_name"`
 		Code      string          `json:"code"`
-		When      string          `json:"encounter_date"`
-		Complaint string          `json:"chief_complaint"`
+		When        string          `json:"encounter_date"`
+		ConsultedAt string          `json:"consulted_at"`
+		Complaint   string          `json:"chief_complaint"`
 		File      string          `json:"archivo"`
 		Form      json.RawMessage `json:"form_definition_snapshot"`
 		Values    json.RawMessage `json:"form_values"`
@@ -574,6 +576,9 @@ func writeRecord(w io.Writer, row []byte, up, table string) error {
 	}
 	if table == "clinical_document_issues" {
 		label = summary.Code
+	}
+	if table == "patient_whatsapp_consultations" {
+		label = strings.TrimSpace("Consulta por WhatsApp " + summary.ConsultedAt)
 	}
 	if label == "" {
 		label = strings.TrimSpace("Registro " + summary.ID)

@@ -59,6 +59,7 @@ var contextSections = []section{
 	{"items-ordenes", "prescription_diagnostic_orders", `JOIN patient_prescription_records r ON r.id = x.record_id JOIN patients p ON p.id = r.patient_id`, `p.user_id = $1 AND p.specialty_context_id = $2`, "p.id, x.record_id, x.item_position", "record_id study_description item_position"},
 	{"items-medicacion", "prescription_medications", `JOIN patient_prescription_records r ON r.id = x.record_id JOIN patients p ON p.id = r.patient_id`, `p.user_id = $1 AND p.specialty_context_id = $2`, "p.id, x.record_id, x.item_position", "record_id administration_route dosage duration_days frequency instructions medication_name item_position"},
 	{"vacunas", "patient_vaccinations", `JOIN patients p ON p.id = x.patient_id`, `p.user_id = $1 AND p.specialty_context_id = $2`, "x.patient_id, x.id", "annulled_at version id applied_at dose_id patient_id"},
+	{"consultas-whatsapp", "patient_whatsapp_consultations", `JOIN patients p ON p.id = x.patient_id`, `p.user_id = $1 AND p.specialty_context_id = $2`, "x.patient_id, x.consulted_at DESC, x.id DESC", "id patient_id workspace_id specialty_context_id author_user_id consulted_at content created_at updated_at annulled_at version"},
 	{"referencias-dosis", "vaccination_doses", "", `EXISTS (SELECT 1 FROM patient_vaccinations v JOIN patients p ON p.id=v.patient_id WHERE p.user_id = $1 AND p.specialty_context_id = $2 AND v.dose_id=x.id)`, "x.id", "id calendar_id"},
 	{"referencias-calendarios", "vaccination_calendars", "", `EXISTS (SELECT 1 FROM patient_vaccinations v JOIN patients p ON p.id=v.patient_id JOIN vaccination_doses d ON d.id=v.dose_id WHERE p.user_id = $1 AND p.specialty_context_id = $2 AND d.calendar_id=x.id)`, "x.id", "id definition"},
 	{"revisiones", "clinical_revisions", "", `x.owner_user_id = $1 AND x.specialty_context_id = $2`, "x.patient_id, x.id", "id entity entity_id patient_id workspace_id specialty_context_id owner_user_id actor_user_id occurred_at operation previous_version new_version reason previous_content"},
@@ -104,7 +105,7 @@ func (s section) query() string {
 	case "clinical_document_annulments":
 		patient = "i.patient_id"
 	case "clinical_encounters", "patient_calculation_logs", "patient_medical_studies", "clinical_access_events",
-		"patient_prescription_records", "patient_vaccinations", "clinical_revisions", "clinical_document_issues", "clinical_export_evidence":
+		"patient_prescription_records", "patient_vaccinations", "patient_whatsapp_consultations", "clinical_revisions", "clinical_document_issues", "clinical_export_evidence":
 		patient = "x.patient_id"
 	}
 	if s.table == "patient_medical_studies" {

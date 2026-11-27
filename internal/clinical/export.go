@@ -82,6 +82,7 @@ var chartSections = []struct{ name, query string }{
 	{"vacunas", `SELECT to_jsonb(v)||jsonb_build_object('dose',to_jsonb(d),'calendar',c.definition) FROM patient_vaccinations v
 		LEFT JOIN vaccination_doses d ON d.id=v.dose_id LEFT JOIN vaccination_calendars c ON c.id=d.calendar_id
 		WHERE v.patient_id=$1 ORDER BY v.applied_at,v.id`},
+	{"consultas-whatsapp", `SELECT to_jsonb(w)-'workspace_id' FROM patient_whatsapp_consultations w WHERE w.patient_id=$1 ORDER BY w.consulted_at,w.id`},
 	{"calculos", `SELECT to_jsonb(c) FROM patient_calculation_logs c WHERE c.patient_id=$1 ORDER BY c.created_at,c.id`},
 	{"revisiones", `SELECT (to_jsonb(r)-ARRAY['workspace_id','previous_content']) ||
 		jsonb_build_object('previous_content',r.previous_content-ARRAY['stored_file_name','media_asset_id','media_identity','workspace_id'])
@@ -96,6 +97,7 @@ var chartSections = []struct{ name, query string }{
 			UNION ALL SELECT created_at,'RECETA_ORDEN',id,annulled_at IS NOT NULL FROM patient_prescription_records WHERE patient_id=$1
 			UNION ALL SELECT uploaded_at,'ESTUDIO',id,annulled_at IS NOT NULL FROM patient_medical_studies WHERE patient_id=$1
 			UNION ALL SELECT applied_at::timestamp AT TIME ZONE 'UTC','VACUNA',id,annulled_at IS NOT NULL FROM patient_vaccinations WHERE patient_id=$1
+			UNION ALL SELECT consulted_at,'CONSULTA_WHATSAPP',id,annulled_at IS NOT NULL FROM patient_whatsapp_consultations WHERE patient_id=$1
 			UNION ALL SELECT created_at,'CALCULO',id,false FROM patient_calculation_logs WHERE patient_id=$1
 			UNION ALL SELECT occurred_at,operation,id,operation='ANNUL' FROM clinical_revisions WHERE patient_id=$1
 			UNION ALL SELECT issued_at,'EMISION',id,false FROM clinical_document_issues WHERE patient_id=$1

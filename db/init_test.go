@@ -58,7 +58,7 @@ func TestBaselineEmptyRestartAndSequences(t *testing.T) {
 		t.Fatal(err)
 	}
 	var count int
-	if err := pool.QueryRow("SELECT count(*) FROM pg_tables WHERE schemaname='public'").Scan(&count); err != nil || count != 61 {
+	if err := pool.QueryRow("SELECT count(*) FROM pg_tables WHERE schemaname='public'").Scan(&count); err != nil || count != 62 {
 		t.Fatal(count, err)
 	}
 	var generation int64
@@ -92,6 +92,7 @@ func TestBaselineRejectsDriftWithoutRepair(t *testing.T) {
 		"UPDATE app_schema_state SET baseline_version=10", "UPDATE app_schema_state SET baseline_version=999", "UPDATE app_schema_state SET sql_sha256=repeat('0',64)", "UPDATE app_schema_state SET catalog_sha256=repeat('0',64)", "UPDATE app_schema_state SET backend='other'", "DELETE FROM app_schema_state",
 		"ALTER TABLE patients DROP COLUMN phone", "DROP INDEX clinical_encounters_one_first_visit", "ALTER TABLE clinical_encounters DROP CONSTRAINT clinical_encounters_consultation_type_check",
 		"ALTER TABLE patient_medical_studies DROP COLUMN study_name", "ALTER TABLE patient_medical_studies ALTER COLUMN study_name DROP NOT NULL",
+		"ALTER TABLE patient_whatsapp_consultations DROP COLUMN consulted_at", "ALTER TABLE patient_whatsapp_consultations DROP CONSTRAINT patient_whatsapp_consultations_content_check",
 	} {
 		t.Run(mutation, func(t *testing.T) {
 			pool := fixture(t)
