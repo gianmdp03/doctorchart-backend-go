@@ -10,6 +10,7 @@ import (
 // PostgreSQL supplies normalized definitions. Object identities are qualified
 // names, never OIDs. Mutable rows, sequence values, privileges and deployment
 // owners are deliberately excluded; those do not describe schema structure.
+// Bytewise ordering makes the fingerprint independent of the database locale.
 const catalogSQL = `WITH namespaces AS (
  SELECT oid,nspname FROM pg_namespace WHERE left(nspname,3)<>'pg_' AND nspname<>'information_schema'
 ), relations AS (
@@ -50,7 +51,7 @@ const catalogSQL = `WITH namespaces AS (
  SELECT 'policy',r.nspname||'.'||r.relname||'.'||p.polname,jsonb_build_object('command',p.polcmd,'permissive',p.polpermissive,'using',pg_get_expr(p.polqual,p.polrelid),'check',pg_get_expr(p.polwithcheck,p.polrelid),'roles',(SELECT jsonb_agg(CASE WHEN role=0 THEN 'public' ELSE pg_get_userbyid(role) END ORDER BY role) FROM unnest(p.polroles) role)) FROM pg_policy p JOIN relations r ON r.oid=p.polrelid
  UNION ALL
  SELECT 'rule',r.nspname||'.'||r.relname||'.'||w.rulename,jsonb_build_object('definition',pg_get_ruledef(w.oid,false),'enabled',w.ev_enabled) FROM pg_rewrite w JOIN relations r ON r.oid=w.ev_class WHERE w.rulename<>'_RETURN'
-) SELECT COALESCE(jsonb_agg(jsonb_build_object('kind',kind,'name',name,'definition',definition) ORDER BY kind,name,definition::text),'[]'::jsonb)::text FROM objects`
+) SELECT COALESCE(jsonb_agg(jsonb_build_object('kind',kind,'name',name,'definition',definition) ORDER BY kind COLLATE "C",name COLLATE "C",(definition::text) COLLATE "C"),'[]'::jsonb)::text FROM objects`
 
 const emptySQL = `SELECT NOT EXISTS(
  SELECT 1 FROM pg_namespace WHERE left(nspname,3)<>'pg_' AND nspname NOT IN ('public','information_schema')
