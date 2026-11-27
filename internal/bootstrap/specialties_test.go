@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -165,6 +166,55 @@ UPDATE wizard_defaults SET version=9,published_version=4,draft_definition=jsonb_
 	var preserved bool
 	if err := pool.QueryRow(ctx, `SELECT NOT s.active AND s.display_name='Personalizada' AND w.published_version=8 AND w.version=12 FROM specialties s JOIN wizard_defaults w ON w.specialty_id=s.id WHERE code='dermatology'`).Scan(&preserved); err != nil || !preserved {
 		t.Fatal("admin defaults changed", err)
+	}
+}
+
+func TestFreshStarterCatalogRollsBackIfSpecialtiesWouldBeHidden(t *testing.T) {
+	pool := schemaFixture(t)
+	initializeFixture(t, pool)
+	var approved string
+	if err := pool.QueryRow(t.Context(), `SELECT jsonb_object_agg(s.code,
+		encode(sha256(convert_to(public.template_review_content(w.published_definition,
+			public.template_experience(s.navigation,s.patient_record_tabs,s.patient_record_actions))::text,'UTF8')),'hex'))
+		FROM specialties s JOIN wizard_defaults w ON w.specialty_id=s.id`).Scan(&approved); err != nil {
+		t.Fatal(err)
+	}
+	var stale map[string]string
+	if err := json.Unmarshal([]byte(approved), &stale); err != nil {
+		t.Fatal(err)
+	}
+	stale["pediatrics"] = strings.Repeat("0", 64)
+	delete(stale, "dermatology")
+	stale["removed_specialty"] = strings.Repeat("1", 64)
+	invalid, err := json.Marshal(stale)
+	if err != nil {
+		t.Fatal(err)
+	}
+	validator, err := wizard.NewValidator()
+	if err != nil {
+		t.Fatal(err)
+	}
+	replacement := schemaFixture(t)
+	err = RunWithStarterCatalog(t.Context(), replacement, validator, string(invalid))
+	if err == nil || !strings.Contains(err.Error(), "dermatology, pediatrics, removed_specialty") {
+		t.Fatalf("expected actionable starter catalog failure, got %v", err)
+	}
+	var empty bool
+	if err := replacement.QueryRow(t.Context(), "SELECT to_regclass('public.app_schema_state') IS NULL AND to_regclass('public.specialties') IS NULL").Scan(&empty); err != nil || !empty {
+		t.Fatalf("failed initialization did not roll back: %v", err)
+	}
+	if err := RunWithStarterCatalog(t.Context(), replacement, validator, approved); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := replacement.Exec(t.Context(), "UPDATE specialties SET active=false WHERE code='dermatology'"); err != nil {
+		t.Fatal(err)
+	}
+	if err := RunWithStarterCatalog(t.Context(), replacement, validator, approved); err != nil {
+		t.Fatal(err)
+	}
+	var active bool
+	if err := replacement.QueryRow(t.Context(), "SELECT active FROM specialties WHERE code='dermatology'").Scan(&active); err != nil || active {
+		t.Fatalf("existing administrator choice changed: %v", err)
 	}
 }
 

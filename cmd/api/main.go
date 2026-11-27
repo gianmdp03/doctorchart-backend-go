@@ -208,10 +208,22 @@ func starterTemplateConfig(raw string) (string, error) {
 	return string(normalized), err
 }
 
-func initializeDatabase() error {
+func initializeDatabase(requireStarterCatalog bool) error {
 	url := os.Getenv("DATABASE_URL")
 	if url == "" {
 		return errors.New("init-db requires DATABASE_URL for the schema owner")
+	}
+	var manifest string
+	raw, configured := os.LookupEnv("DOCTORCHART_STARTER_TEMPLATES")
+	if requireStarterCatalog || configured {
+		var err error
+		manifest, err = starterTemplateConfig(raw)
+		if err != nil {
+			return err
+		}
+		if manifest == "{}" {
+			return errors.New("init-db requires a non-empty DOCTORCHART_STARTER_TEMPLATES manifest when verifying the starter catalog")
+		}
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -224,6 +236,9 @@ func initializeDatabase() error {
 	if err != nil {
 		return err
 	}
+	if manifest != "" {
+		return bootstrap.RunWithStarterCatalog(ctx, pool, validator, manifest)
+	}
 	return bootstrap.Run(ctx, pool, validator)
 }
 
@@ -234,9 +249,11 @@ func main() {
 	case len(os.Args) == 1:
 		err = run()
 	case len(os.Args) == 2 && os.Args[1] == "init-db":
-		err = initializeDatabase()
+		err = initializeDatabase(false)
+	case len(os.Args) == 3 && os.Args[1] == "init-db" && os.Args[2] == "--require-starter-catalog":
+		err = initializeDatabase(true)
 	default:
-		err = errors.New("supported command: init-db")
+		err = errors.New("supported command: init-db [--require-starter-catalog]")
 	}
 	if err != nil {
 		slog.Error("startup failed", "error", err)

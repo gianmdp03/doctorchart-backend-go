@@ -31,6 +31,37 @@ func Run(ctx context.Context, pool *pgxpool.Pool, validator *wizard.Validator) e
 	})
 }
 
+// RunWithStarterCatalog verifies the clinician-visible catalog before committing
+// a new baseline. Existing databases retain their administered choices.
+func RunWithStarterCatalog(ctx context.Context, pool *pgxpool.Pool, validator *wizard.Validator, manifest string) error {
+	return db.Ensure(ctx, pool, func(ctx context.Context, tx pgx.Tx) error {
+		var fresh bool
+		if err := tx.QueryRow(ctx, "SELECT NOT EXISTS (SELECT FROM public.app_schema_state)").Scan(&fresh); err != nil {
+			return err
+		}
+		if err := seed(ctx, tx, validator); err != nil || !fresh {
+			return err
+		}
+		if _, err := tx.Exec(ctx, "SELECT set_config('doctorchart.starter_templates', $1, true)", manifest); err != nil {
+			return err
+		}
+		var hidden []string
+		if err := tx.QueryRow(ctx, `SELECT COALESCE(array_agg(code ORDER BY code), ARRAY[]::text[])
+			FROM (
+				SELECT s.code FROM public.specialties s WHERE NOT `+db.UsableTemplate("s.id", true)+`
+				UNION
+				SELECT expected.code FROM jsonb_object_keys($1::jsonb) AS expected(code)
+				WHERE NOT EXISTS (SELECT 1 FROM public.specialties s WHERE s.code = expected.code)
+			) unavailable`, manifest).Scan(&hidden); err != nil {
+			return err
+		}
+		if len(hidden) > 0 {
+			return fmt.Errorf("starter specialty catalog would hide: %s", strings.Join(hidden, ", "))
+		}
+		return nil
+	})
+}
+
 // seed uses the transaction and advisory lock owned by db.Ensure. Both catalog
 // groups succeed together, including when an existing database is checked.
 func seed(ctx context.Context, tx pgx.Tx, validator *wizard.Validator) error {

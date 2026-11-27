@@ -192,6 +192,20 @@ esquema antes de arrancar el API con su usuario restringido. No ejecutar schema.
 alterar app_schema_state/checksums para adoptar una base incompatible.
 La política y excepciones de AGENTS.md de cada proyecto mandan sobre el esquema.
 
+Para DoctorChart, preparar una base de reemplazo vacía antes de detener el
+servicio. Ejecutar el binario de la nueva imagen con
+`init-db --require-starter-catalog`, el `DATABASE_URL` del dueño apuntando al
+reemplazo y el valor exacto de `DOCTORCHART_STARTER_TEMPLATES` que usará el API
+desde `production/doctorchart.env`. El comando revierte la inicialización si
+alguna especialidad quedaría oculta o falta una entrada esperada. Resolver
+cualquier cambio de huella con autorización antes de reemplazar la base.
+Después del corte, comprobar los códigos visibles en
+`/api/doctorchart/public/appointments/doctors?includeSpecialties=1`.
+
+`seed.json` restaura el catálogo y los wizards globales. Los contextos y
+personalizaciones de cada profesional son datos de cuenta. Si deben conservarse,
+usar un procedimiento de recuperación de datos acordado antes de un wipe.
+
 El ejemplo siguiente sólo aplica a Pointly. DoctorChart requiere comprobar
 primero el propietario separado y el procedimiento de inicialización.
 Elegir service explícitamente; no agregar otros productos a esta lista sin
