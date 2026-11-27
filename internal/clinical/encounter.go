@@ -28,6 +28,7 @@ type EncounterSummary struct {
 	Specialty        workspace.Summary `json:"specialty"`
 	Type             string            `json:"consultationType"`
 	Complaint        *string           `json:"chiefComplaint"`
+	Disease          *string           `json:"disease"`
 	DiagnosisCode    *string           `json:"primaryDiagnosisCode"`
 	Diagnosis        *string           `json:"primaryDiagnosisDescription"`
 	VitalSigns       json.RawMessage   `json:"vitalSigns"`
@@ -42,6 +43,8 @@ type EncounterSummary struct {
 	Snapshot         json.RawMessage   `json:"formDefinitionSnapshot"`
 	Context          json.RawMessage   `json:"formulaContext"`
 	WorkspaceVersion int64             `json:"workspaceVersion"`
+	TemplateID       *int64            `json:"encounterTemplateId,omitempty"`
+	TemplateName     *string           `json:"encounterTemplateName,omitempty"`
 }
 type Encounter struct {
 	EncounterSummary
@@ -53,12 +56,12 @@ type Encounter struct {
 	instant    time.Time
 }
 
-const encounterColumns = `e.id,e.version,e.patient_id,p.full_name,e.encounter_date,e.specialty_id,s.id,s.code,s.display_name,s.description,e.consultation_type,e.chief_complaint,e.primary_diagnosis_code,e.primary_diagnosis_description,e.vital_signs,e.prescriptions,e.history_of_present_illness,e.treatment_plan,e.follow_up_instructions,e.follow_up_date::text,e.weight_kg,e.height_cm,e.head_circumference_cm,e.form_values,e.formula_results,e.form_definition_snapshot,e.formula_context,e.workspace_version,e.physical_examination,e.secondary_diagnoses,e.clinical_impression,e.diagnostic_orders,p.user_id,p.specialty_context_id`
+const encounterColumns = `e.id,e.version,e.patient_id,p.full_name,e.encounter_date,e.specialty_id,s.id,s.code,s.display_name,s.description,e.consultation_type,e.chief_complaint,e.disease,e.primary_diagnosis_code,e.primary_diagnosis_description,e.vital_signs,e.prescriptions,e.history_of_present_illness,e.treatment_plan,e.follow_up_instructions,e.follow_up_date::text,e.weight_kg,e.height_cm,e.head_circumference_cm,e.form_values,e.formula_results,e.form_definition_snapshot,e.formula_context,e.workspace_version,e.encounter_template_id,e.encounter_template_name,e.physical_examination,e.secondary_diagnoses,e.clinical_impression,e.diagnostic_orders,p.user_id,p.specialty_context_id`
 const encounterFrom = ` FROM clinical_encounters e JOIN patients p ON p.id=e.patient_id AND p.annulled_at IS NULL JOIN specialties s ON s.id=e.specialty_id AND e.annulled_at IS NULL `
 
 func scanEncounter(row pgx.Row, extra ...any) (Encounter, error) {
 	var e Encounter
-	dest := []any{&e.ID, &e.Version, &e.PatientID, &e.PatientName, &e.instant, &e.SpecialtyID, &e.Specialty.ID, &e.Specialty.Code, &e.Specialty.Name, &e.Specialty.Description, &e.Type, &e.Complaint, &e.DiagnosisCode, &e.Diagnosis, &e.VitalSigns, &e.Prescriptions, &e.History, &e.Treatment, &e.FollowUp, &e.FollowUpDate, &e.Measurements.Weight, &e.Measurements.Height, &e.Measurements.Head, &e.Values, &e.Results, &e.Snapshot, &e.Context, &e.WorkspaceVersion, &e.Physical, &e.Secondary, &e.Impression, &e.Orders, &e.owner, &e.ContextID}
+	dest := []any{&e.ID, &e.Version, &e.PatientID, &e.PatientName, &e.instant, &e.SpecialtyID, &e.Specialty.ID, &e.Specialty.Code, &e.Specialty.Name, &e.Specialty.Description, &e.Type, &e.Complaint, &e.Disease, &e.DiagnosisCode, &e.Diagnosis, &e.VitalSigns, &e.Prescriptions, &e.History, &e.Treatment, &e.FollowUp, &e.FollowUpDate, &e.Measurements.Weight, &e.Measurements.Height, &e.Measurements.Head, &e.Values, &e.Results, &e.Snapshot, &e.Context, &e.WorkspaceVersion, &e.TemplateID, &e.TemplateName, &e.Physical, &e.Secondary, &e.Impression, &e.Orders, &e.owner, &e.ContextID}
 	err := row.Scan(append(dest, extra...)...)
 	e.Date = e.instant.UTC().Format(time.RFC3339Nano)
 	if err == nil {
@@ -140,7 +143,7 @@ func (s *Service) encounterContext(ctx context.Context, tx pgx.Tx, p Patient, da
 }
 func applyEncounter(e *Encounter, evaluation wizard.Evaluation) error {
 	p := evaluation.Projections
-	for key, dest := range map[string]**string{"chiefComplaint": &e.Complaint, "historyOfPresentIllness": &e.History, "physicalExamination": &e.Physical, "primaryDiagnosisDescription": &e.Diagnosis, "treatmentPlan": &e.Treatment, "followUpInstructions": &e.FollowUp, "followUpDate": &e.FollowUpDate} {
+	for key, dest := range map[string]**string{"chiefComplaint": &e.Complaint, "disease": &e.Disease, "historyOfPresentIllness": &e.History, "physicalExamination": &e.Physical, "primaryDiagnosisDescription": &e.Diagnosis, "treatmentPlan": &e.Treatment, "followUpInstructions": &e.FollowUp, "followUpDate": &e.FollowUpDate} {
 		if _, represented := p["encounter."+key]; key == "followUpDate" && !represented {
 			continue
 		}
@@ -175,8 +178,24 @@ func applyEncounter(e *Encounter, evaluation wizard.Evaluation) error {
 }
 func (s *Service) CreateEncounter(ctx context.Context, identity api.Identity, request map[string]any) (Encounter, error) {
 	var result Encounter
-	if err := api.Only(request, "patientId", "workspaceVersion", "consultationType", "values"); err != nil {
+	if err := api.Only(request, "patientId", "workspaceVersion", "consultationType", "values", "templateId", "templateVersion"); err != nil {
 		return result, err
+	}
+	var templateID *int64
+	if rawTemplateID, exists := request["templateId"]; exists && rawTemplateID != nil {
+		parsed, err := api.Integer(rawTemplateID, "templateId", 1)
+		if err != nil {
+			return result, err
+		}
+		templateID = &parsed
+	}
+	var templateVersion *int64
+	if rawTemplateVersion, exists := request["templateVersion"]; exists && rawTemplateVersion != nil {
+		parsed, err := api.Integer(rawTemplateVersion, "templateVersion", 0)
+		if err != nil {
+			return result, err
+		}
+		templateVersion = &parsed
 	}
 	patientID, err := api.Integer(request["patientId"], "patientId", 1)
 	if err != nil {
@@ -247,13 +266,29 @@ func (s *Service) CreateEncounter(ctx context.Context, identity api.Identity, re
 				return api.Failure(403, "FORBIDDEN", "No se pudo completar la solicitud.")
 			}
 		}
-		definition, err := wizard.Decode(setup.Definition)
+		resolved, err := s.workspaces.ResolveEncounterTemplate(ctx, tx, identity.UserID, p.ContextID, templateID, templateVersion)
 		if err != nil {
 			return err
 		}
-		form, ok := definition["encounterForm"].(map[string]any)
-		if !ok {
-			return api.Failure(409, "INVALID_WIZARD_DEFINITION", "La configuración no es válida.")
+		var form map[string]any
+		if resolved != nil {
+			form, err = wizard.Decode(resolved.FormDefinition)
+			if err != nil {
+				return err
+			}
+			if form == nil {
+				return api.Failure(409, "INVALID_WIZARD_DEFINITION", "La configuración de la plantilla no es válida.")
+			}
+		} else {
+			definition, err := wizard.Decode(setup.Definition)
+			if err != nil {
+				return err
+			}
+			var ok bool
+			form, ok = definition["encounterForm"].(map[string]any)
+			if !ok {
+				return api.Failure(409, "INVALID_WIZARD_DEFINITION", "La configuración no es válida.")
+			}
 		}
 		form = wizard.NewEncounterForm(form)
 		context, err := s.encounterContext(ctx, tx, p, date, nil)
@@ -266,6 +301,12 @@ func (s *Service) CreateEncounter(ctx context.Context, identity api.Identity, re
 		}
 		evaluation.DefaultStandingHeight()
 		e := Encounter{EncounterSummary: EncounterSummary{ContextID: p.ContextID, PatientID: p.ID, PatientName: p.FullName, Date: date.Format(time.RFC3339Nano), SpecialtyID: setup.Specialty.ID, Specialty: setup.Specialty, Type: kind, Prescriptions: json.RawMessage("[]"), WorkspaceVersion: setup.Version}, Secondary: json.RawMessage("[]"), Orders: json.RawMessage("[]"), instant: date, owner: identity.UserID}
+		if resolved != nil {
+			idCopy := resolved.ID
+			nameCopy := resolved.Name
+			e.TemplateID = &idCopy
+			e.TemplateName = &nameCopy
+		}
 		form = wizard.WithClinicalHistory(form)
 		e.Snapshot, err = json.Marshal(form)
 		if err != nil {
@@ -278,7 +319,7 @@ func (s *Service) CreateEncounter(ctx context.Context, identity api.Identity, re
 		if err := applyEncounter(&e, evaluation); err != nil {
 			return err
 		}
-		err = tx.QueryRow(ctx, `INSERT INTO clinical_encounters(patient_id,specialty_id,encounter_date,consultation_type,chief_complaint,history_of_present_illness,physical_examination,primary_diagnosis_description,treatment_plan,follow_up_instructions,follow_up_date,weight_kg,height_cm,head_circumference_cm,form_values,formula_results,form_definition_snapshot,formula_context,workspace_version,secondary_diagnoses,prescriptions,diagnostic_orders,version,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::date,$12,$13,$14,$15,$16,$17,$18,$19,'[]','[]','[]',0,clock_timestamp()) RETURNING id`, e.PatientID, e.SpecialtyID, date, e.Type, e.Complaint, e.History, e.Physical, e.Diagnosis, e.Treatment, e.FollowUp, e.FollowUpDate, e.Measurements.Weight, e.Measurements.Height, e.Measurements.Head, e.Values, e.Results, e.Snapshot, e.Context, e.WorkspaceVersion).Scan(&e.ID)
+		err = tx.QueryRow(ctx, `INSERT INTO clinical_encounters(patient_id,specialty_id,encounter_date,consultation_type,chief_complaint,disease,history_of_present_illness,physical_examination,primary_diagnosis_description,treatment_plan,follow_up_instructions,follow_up_date,weight_kg,height_cm,head_circumference_cm,form_values,formula_results,form_definition_snapshot,formula_context,workspace_version,encounter_template_id,encounter_template_name,secondary_diagnoses,prescriptions,diagnostic_orders,version,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::date,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,'[]','[]','[]',0,clock_timestamp()) RETURNING id`, e.PatientID, e.SpecialtyID, date, e.Type, e.Complaint, e.Disease, e.History, e.Physical, e.Diagnosis, e.Treatment, e.FollowUp, e.FollowUpDate, e.Measurements.Weight, e.Measurements.Height, e.Measurements.Head, e.Values, e.Results, e.Snapshot, e.Context, e.WorkspaceVersion, e.TemplateID, e.TemplateName).Scan(&e.ID)
 		result = e
 		return err
 	})
@@ -372,7 +413,7 @@ func (s *Service) UpdateEncounter(ctx context.Context, userID string, id int64, 
 		if err := bindRevision(ctx, tx, userID, reason); err != nil {
 			return err
 		}
-		err = tx.QueryRow(ctx, `UPDATE clinical_encounters SET encounter_date=$2,consultation_type=$3,chief_complaint=$4,history_of_present_illness=$5,physical_examination=$6,primary_diagnosis_description=$7,treatment_plan=$8,follow_up_instructions=$9,follow_up_date=$10::date,weight_kg=$11,height_cm=$12,head_circumference_cm=$13,form_values=$14,formula_results=$15,formula_context=$16,version=version+1,updated_at=greatest(clock_timestamp(),updated_at+interval '1 microsecond') WHERE id=$1 AND version=$17 RETURNING version`, id, date, kind, e.Complaint, e.History, e.Physical, e.Diagnosis, e.Treatment, e.FollowUp, e.FollowUpDate, e.Measurements.Weight, e.Measurements.Height, e.Measurements.Head, e.Values, e.Results, e.Context, *expected).Scan(&e.Version)
+		err = tx.QueryRow(ctx, `UPDATE clinical_encounters SET encounter_date=$2,consultation_type=$3,chief_complaint=$4,disease=$5,history_of_present_illness=$6,physical_examination=$7,primary_diagnosis_description=$8,treatment_plan=$9,follow_up_instructions=$10,follow_up_date=$11::date,weight_kg=$12,height_cm=$13,head_circumference_cm=$14,form_values=$15,formula_results=$16,formula_context=$17,version=version+1,updated_at=greatest(clock_timestamp(),updated_at+interval '1 microsecond') WHERE id=$1 AND version=$18 RETURNING version`, id, date, kind, e.Complaint, e.Disease, e.History, e.Physical, e.Diagnosis, e.Treatment, e.FollowUp, e.FollowUpDate, e.Measurements.Weight, e.Measurements.Height, e.Measurements.Head, e.Values, e.Results, e.Context, *expected).Scan(&e.Version)
 		result = e
 		return err
 	})

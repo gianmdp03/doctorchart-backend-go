@@ -7,6 +7,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"image"
+	"image/color"
+	"image/png"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +17,7 @@ import (
 	"testing"
 
 	"github.com/syntah/doctorchart-backend-go/internal/api"
+	"github.com/syntah/doctorchart-backend-go/internal/workspace"
 )
 
 func TestDocumentIssueAndContextualExport(t *testing.T) {
@@ -168,5 +172,123 @@ func TestDocumentIssueAndContextualExport(t *testing.T) {
 	var issuesAfter int
 	if err := pool.QueryRow(ctx, "SELECT count(*) FROM clinical_document_issues").Scan(&issuesAfter); err != nil || issuesBefore != issuesAfter {
 		t.Fatal("document issue survived an audit rollback", issuesAfter, err)
+	}
+}
+
+func TestSignaturesLifecycleAndSignedDocumentIssuance(t *testing.T) {
+	services, _ := integrityFixture(t, -1, -1)
+	s := services[0]
+	p := integrityPatient(t, s)
+	mux := http.NewServeMux()
+	s.workspaces.Routes(mux)
+	s.Routes(mux)
+	s.PrescriptionRoutes(mux)
+	s.PrintRoutes(mux)
+	handler := api.Gateway("sig-fixture", api.Dispatch(mux))
+
+	call := func(method, path, body string, headers map[string]string, want int) *httptest.ResponseRecorder {
+		t.Helper()
+		r := httptest.NewRequest(method, path, strings.NewReader(body))
+		r.Header.Set("X-Gateway-Secret", "sig-fixture")
+		r.Header.Set("X-User-Id", "integrity-owner")
+		r.Header.Set("X-Clinical-Author-Name", base64.RawURLEncoding.EncodeToString([]byte("Dra. Paula Gómez")))
+		r.Header.Set("X-User-Role", "COMPANY")
+		r.Header.Set("X-User-Plan", "BASIC")
+		r.Header.Set("X-User-Plan-Expires-At", "2099-01-01T00:00:00Z")
+		if body != "" {
+			r.Header.Set("Content-Type", "application/json")
+		}
+		for k, v := range headers {
+			r.Header.Set(k, v)
+		}
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, r)
+		if w.Code != want {
+			t.Fatalf("%s %s returned %d: %s", method, path, w.Code, w.Body)
+		}
+		return w
+	}
+
+	makePNG := func(rCol uint8) string {
+		img := image.NewNRGBA(image.Rect(0, 0, 120, 48))
+		for x := 10; x < 110; x++ {
+			img.SetNRGBA(x, 24, color.NRGBA{R: rCol, G: 20, B: 40, A: 255})
+		}
+		var buf bytes.Buffer
+		_ = png.Encode(&buf, img)
+		return "data:image/png;base64," + base64.StdEncoding.EncodeToString(buf.Bytes())
+	}
+
+	// 1. Create two signatures: first becomes favorite automatically.
+	w1 := call("POST", "/api/doctorchart/workspace/signatures", fmt.Sprintf(`{"name":"Dra. Paula","stampText":"Dra. Paula Gómez — MN 11111","imageBase64":%q}`, makePNG(10)), nil, 201)
+	var sig1 workspace.SignatureSummary
+	if err := json.Unmarshal(w1.Body.Bytes(), &sig1); err != nil || !sig1.IsFavorite {
+		t.Fatalf("expected first signature to be favorite: %v (%s)", err, w1.Body)
+	}
+	w2 := call("POST", "/api/doctorchart/workspace/signatures", fmt.Sprintf(`{"name":"Dra. Julieta","stampText":"Dra. Julieta Pérez — MN 54321","imageBase64":%q}`, makePNG(60)), nil, 201)
+	var sig2 workspace.SignatureSummary
+	if err := json.Unmarshal(w2.Body.Bytes(), &sig2); err != nil || sig2.IsFavorite {
+		t.Fatalf("expected second signature not to be favorite: %v (%s)", err, w2.Body)
+	}
+
+	// 2. Check image endpoint + ETag 304.
+	imgRes := call("GET", fmt.Sprintf("/api/doctorchart/workspace/signatures/%d/image", sig2.ID), "", nil, 200)
+	etag := imgRes.Header().Get("ETag")
+	if etag == "" || imgRes.Header().Get("Content-Type") != "image/png" {
+		t.Fatalf("unexpected image headers: etag=%q ct=%q", etag, imgRes.Header().Get("Content-Type"))
+	}
+	call("GET", fmt.Sprintf("/api/doctorchart/workspace/signatures/%d/image", sig2.ID), "", map[string]string{"If-None-Match": etag}, 304)
+
+	// 3. Create prescription and issue with default, explicit second signature, and none.
+	rxW := call("POST", fmt.Sprintf("/api/doctorchart/patients/%d/prescriptions?specialtyContextId=%d", p.ID, p.ContextID),
+		`{"type":"STUDY_ORDERS","prescriptions":[],"diagnosticOrders":["Ecografía abdominal"]}`, nil, 201)
+	var rx Prescription
+	if err := json.Unmarshal(rxW.Body.Bytes(), &rx); err != nil {
+		t.Fatal(err)
+	}
+	issuePath := fmt.Sprintf("/api/doctorchart/patients/%d/prescriptions/%d/documents?specialtyContextId=%d", p.ID, rx.ID, p.ContextID)
+
+	wDefault := call("POST", issuePath, `{"type":"STUDY_ORDERS"}`, nil, 201)
+	var docDefault documentIssue
+	if err := json.Unmarshal(wDefault.Body.Bytes(), &docDefault); err != nil {
+		t.Fatal(err)
+	}
+	wExplicit := call("POST", issuePath, fmt.Sprintf(`{"type":"STUDY_ORDERS","signatureId":%d}`, sig2.ID), nil, 201)
+	var docExplicit documentIssue
+	if err := json.Unmarshal(wExplicit.Body.Bytes(), &docExplicit); err != nil {
+		t.Fatal(err)
+	}
+	wNone := call("POST", issuePath, `{"type":"STUDY_ORDERS","signatureId":null}`, nil, 201)
+	var docNone documentIssue
+	if err := json.Unmarshal(wNone.Body.Bytes(), &docNone); err != nil {
+		t.Fatal(err)
+	}
+
+	pdfDefault := call("GET", fmt.Sprintf("/api/doctorchart/patients/%d/documents/%d/pdf?specialtyContextId=%d", p.ID, docDefault.ID, p.ContextID), "", nil, 200).Body.Bytes()
+	pdfExplicit := call("GET", fmt.Sprintf("/api/doctorchart/patients/%d/documents/%d/pdf?specialtyContextId=%d", p.ID, docExplicit.ID, p.ContextID), "", nil, 200).Body.Bytes()
+	pdfNone := call("GET", fmt.Sprintf("/api/doctorchart/patients/%d/documents/%d/pdf?specialtyContextId=%d", p.ID, docNone.ID, p.ContextID), "", nil, 200).Body.Bytes()
+
+	if !projectionFixturePDFContains(t, pdfDefault, "Dra. Paula Gómez — MN 11111") || projectionFixturePDFContains(t, pdfDefault, "Emitido sin firma digital") {
+		t.Fatal("default issued PDF did not use favorite signature cleanly")
+	}
+	if !projectionFixturePDFContains(t, pdfExplicit, "Dra. Julieta Pérez — MN 54321") || projectionFixturePDFContains(t, pdfExplicit, "Emitido sin firma digital") {
+		t.Fatal("explicit issued PDF did not use selected signature cleanly")
+	}
+	if !projectionFixturePDFContains(t, pdfNone, "Emitido sin firma digital") {
+		t.Fatal("unsigned issued PDF missing unsigned footer")
+	}
+
+	// 4. Delete favorite signature #1 -> signature #2 is promoted, and historical PDF remains intact.
+	call("DELETE", fmt.Sprintf("/api/doctorchart/workspace/signatures/%d", sig1.ID), "", nil, 204)
+	listRes := call("GET", "/api/doctorchart/workspace/signatures", "", nil, 200)
+	var sigList struct {
+		Items []workspace.SignatureSummary `json:"items"`
+	}
+	if err := json.Unmarshal(listRes.Body.Bytes(), &sigList); err != nil || len(sigList.Items) != 1 || !sigList.Items[0].IsFavorite || sigList.Items[0].ID != sig2.ID {
+		t.Fatalf("expected signature #2 to be promoted to favorite: %s", listRes.Body)
+	}
+	reprint := call("GET", fmt.Sprintf("/api/doctorchart/patients/%d/documents/%d/pdf?specialtyContextId=%d", p.ID, docDefault.ID, p.ContextID), "", nil, 200).Body.Bytes()
+	if !bytes.Equal(reprint, pdfDefault) {
+		t.Fatal("deleting signature altered previously issued immutable PDF")
 	}
 }

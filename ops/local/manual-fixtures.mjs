@@ -175,6 +175,8 @@ export async function seedManual(root, backend, settings, verifyOnly = false) {
     const workspace = await setup(owner, item, index === 0);
     const example = await patient(owner, workspace, index, index === 0, true);
     const context = workspace.specialtyContextId;
+    const templatesRes = await owner('GET', '/workspace/encounter-templates', undefined, context);
+    const preferredTemplate = templatesRes.templates.find(t => t.sourceDefaultCode === 'pediatrics_early_childhood') ?? templatesRes.templates[0];
     const fields = new Set(workspace.definition.encounterForm.categories.flatMap(c => c.enabled ? c.fields.map(f => f.key) : []));
     const values = Object.fromEntries(Object.entries({
       chiefComplaint: 'Primera consulta ficticia en ' + item.name, diagnosis: 'Ejemplo sintético para probar la interfaz',
@@ -182,8 +184,8 @@ export async function seedManual(root, backend, settings, verifyOnly = false) {
       followUpInstructions: 'Seguimiento registrado para el ensayo',
     }).filter(([field]) => fields.has(field)));
     const first = await owner('POST', '/encounters', {patientId: example.id, workspaceVersion: workspace.version,
-      consultationType: 'FIRST_VISIT', values}, context, 201);
-    contexts[item.code] = {context, workspace, patient: example.id, visit: first, values};
+      consultationType: 'FIRST_VISIT', ...(templatesRes.templates.length > 1 ? {templateId: preferredTemplate.id} : {}), values}, context, 201);
+    contexts[item.code] = {context, workspace, patient: example.id, visit: first, values, templateId: preferredTemplate?.id};
   }
   for (const [index, code] of ['pediatrics', 'cardiology'].entries()) {
     const workspace = await setup(other, catalog.find(item => item.code === code), index === 0);
@@ -204,6 +206,7 @@ async function seedClinicalAndAgenda({root, call, owner, doctorToken, contexts, 
   const extra = await patient(owner, pediatric.workspace, 99, true, false);
   const followup = await owner('POST', '/encounters', {
     patientId: pediatric.patient, workspaceVersion: pediatric.workspace.version, consultationType: 'FOLLOW_UP',
+    templateId: pediatric.templateId,
     values: {...pediatric.values, chiefComplaint: 'Seguimiento ficticio', weightKg: 22, heightCm: 118},
   }, scope, 201);
   await owner('PUT', '/encounters/' + followup.id, {
@@ -212,6 +215,7 @@ async function seedClinicalAndAgenda({root, call, owner, doctorToken, contexts, 
   }, scope);
   const duplicate = await owner('POST', '/encounters', {
     patientId: pediatric.patient, workspaceVersion: pediatric.workspace.version, consultationType: 'FOLLOW_UP',
+    templateId: pediatric.templateId,
     values: {...pediatric.values, chiefComplaint: 'Registro de ejemplo para anular'},
   }, scope, 201);
   await owner('DELETE', '/encounters/' + duplicate.id, {reason: 'Duplicado ficticio'}, scope, 204);

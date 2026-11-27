@@ -33,6 +33,7 @@ func projectEncounterText(e *Encounter, projected map[string]any) error {
 		"chiefComplaint": &e.Complaint, "historyOfPresentIllness": &e.History,
 		"physicalExamination": &e.Physical, "primaryDiagnosisDescription": &e.Diagnosis,
 		"treatmentPlan": &e.Treatment, "followUpInstructions": &e.FollowUp,
+		"disease": &e.Disease,
 	} {
 		if value, exists := projected["encounter."+key]; exists {
 			text, err := nullableText(value)

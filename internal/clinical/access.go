@@ -39,6 +39,7 @@ var accessOperations = map[string]string{
 	"GET /api/doctorchart/patients/{patientId}/prescriptions/{recordId}/pdf":        "PRESCRIPTION_PDF",
 	"GET /api/doctorchart/patients/{patientId}/encounters/{recordId}/print":         "ENCOUNTER_PRINT_DATA",
 	"GET /api/doctorchart/patients/{patientId}/encounters/{recordId}/pdf":           "ENCOUNTER_PDF",
+	"GET /api/doctorchart/patients/{patientId}/clinical-history/pdf":                "CLINICAL_HISTORY_PDF",
 	"GET /api/doctorchart/patients/{patientId}/studies":                             "STUDIES_READ",
 	"GET /api/doctorchart/patients/{patientId}/studies/{studyId}":                   "STUDY_READ",
 	"GET /api/doctorchart/patients/{patientId}/studies/{studyId}/file":              "STUDY_DOWNLOAD",

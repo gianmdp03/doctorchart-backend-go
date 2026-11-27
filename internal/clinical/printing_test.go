@@ -238,3 +238,60 @@ func TestClinicalStudyOrderPDF(t *testing.T) {
 		}
 	}
 }
+
+func TestClinicalPDFWithHandwrittenSignatureAndStamp(t *testing.T) {
+	service := &Service{zone: time.UTC}
+	doc := printDocument{
+		Source:       "PRESCRIPTION_RECORD",
+		ID:           7,
+		Code:         "DC-0123456789abcdef0123456789abcdef",
+		at:           time.Date(2026, 11, 26, 12, 0, 0, 0, time.UTC),
+		IssuanceZone: "UTC",
+		emitted:      true,
+		Patient:      printPatient{Name: "Sofía Martín", Insurance: json.RawMessage("null")},
+		Author:       printAuthor{UserID: "doc-sig-1", name: "Dra. Paula Gómez"},
+		Medications:  json.RawMessage(`[]`),
+		Orders:       []string{"Laboratorio clínico"},
+		signature:    testSignatureAsset(1, "Julieta", "Dra. Julieta Pérez — MN 54321", "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"),
+	}
+	data, err := service.printPDF(doc, url.Values{"type": {"STUDY_ORDERS"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pdf, err := pdfapi.ReadContext(context.Background(), bytes.NewReader(data), model.NewDefaultConfiguration())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := pdf.EnsurePageCount(); err != nil || pdf.PageCount != 1 {
+		t.Fatalf("unexpected page count: %d err=%v", pdf.PageCount, err)
+	}
+	for _, want := range []string{"Firma y sello del profesional", "Dra. Julieta Pérez — MN 54321"} {
+		if !projectionFixturePDFContains(t, data, want) {
+			t.Errorf("signed PDF missing %q", want)
+		}
+	}
+	for _, omitted := range []string{"Emitido sin firma digital", "Vista previa sin firma digital"} {
+		if projectionFixturePDFContains(t, data, omitted) {
+			t.Errorf("signed PDF should not contain %q", omitted)
+		}
+	}
+
+	// Without stampText, only "Firma y sello del profesional" appears.
+	doc.signature.StampText = ""
+	noStamp, err := service.printPDF(doc, url.Values{"type": {"STUDY_ORDERS"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !projectionFixturePDFContains(t, noStamp, "Firma y sello del profesional") ||
+		projectionFixturePDFContains(t, noStamp, "Emitido sin firma digital") {
+		t.Fatal("signed PDF without stampText did not render expected footer")
+	}
+
+	// Unsupported characters in stampText are rejected cleanly with 422.
+	doc.signature.StampText = "Dra. Julieta 🩺"
+	_, err = service.printPDF(doc, url.Values{"type": {"STUDY_ORDERS"}})
+	failure, ok := err.(*api.Error)
+	if !ok || failure.Status != 422 || failure.Code != "PDF_UNSUPPORTED_CHARACTER" {
+		t.Fatalf("expected 422 PDF_UNSUPPORTED_CHARACTER, got %v", err)
+	}
+}

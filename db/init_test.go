@@ -58,7 +58,7 @@ func TestBaselineEmptyRestartAndSequences(t *testing.T) {
 		t.Fatal(err)
 	}
 	var count int
-	if err := pool.QueryRow("SELECT count(*) FROM pg_tables WHERE schemaname='public'").Scan(&count); err != nil || count != 57 {
+	if err := pool.QueryRow("SELECT count(*) FROM pg_tables WHERE schemaname='public'").Scan(&count); err != nil || count != 61 {
 		t.Fatal(count, err)
 	}
 	var generation int64

@@ -1,21 +1,53 @@
 {
   "provisional_specialties": [
-    {"code":"allergy_immunology"},
-    {"code":"cardiology"},
-    {"code":"endocrinology"},
-    {"code":"gastroenterology"},
-    {"code":"geriatrics"},
-    {"code":"gynecology"},
-    {"code":"internal_medicine"},
-    {"code":"neurology"},
-    {"code":"obstetrics"},
-    {"code":"ophthalmology"},
-    {"code":"otolaryngology"},
-    {"code":"psychiatry"},
-    {"code":"pulmonology"},
-    {"code":"rheumatology"},
-    {"code":"traumatology_orthopedics"},
-    {"code":"urology"}
+    {
+      "code": "allergy_immunology"
+    },
+    {
+      "code": "cardiology"
+    },
+    {
+      "code": "endocrinology"
+    },
+    {
+      "code": "gastroenterology"
+    },
+    {
+      "code": "geriatrics"
+    },
+    {
+      "code": "gynecology"
+    },
+    {
+      "code": "internal_medicine"
+    },
+    {
+      "code": "neurology"
+    },
+    {
+      "code": "obstetrics"
+    },
+    {
+      "code": "ophthalmology"
+    },
+    {
+      "code": "otolaryngology"
+    },
+    {
+      "code": "psychiatry"
+    },
+    {
+      "code": "pulmonology"
+    },
+    {
+      "code": "rheumatology"
+    },
+    {
+      "code": "traumatology_orthopedics"
+    },
+    {
+      "code": "urology"
+    }
   ],
   "specialties": [
     {
@@ -46,7 +78,7 @@
         "VIEW_GROWTH",
         "PRINT_DOCUMENT"
       ]
-    },
+    },
     {
       "id": 2,
       "code": "general_medicine",
@@ -340,6 +372,14 @@
               "key": "reason",
               "title": "Motivo de consulta",
               "fields": [
+                {
+                  "key": "sys_disease",
+                  "label": "Enfermedad",
+                  "type": "TEXT",
+                  "required": false,
+                  "system": true,
+                  "placeholder": "Ej.: Bronquitis aguda (opcional)"
+                },
                 {
                   "key": "chiefComplaint",
                   "type": "TEXTAREA",
@@ -710,6 +750,14 @@
               "title": "Motivo de consulta",
               "fields": [
                 {
+                  "key": "sys_disease",
+                  "label": "Enfermedad",
+                  "type": "TEXT",
+                  "required": false,
+                  "system": true,
+                  "placeholder": "Ej.: Bronquitis aguda (opcional)"
+                },
+                {
                   "key": "chiefComplaint",
                   "type": "TEXTAREA",
                   "label": "Motivo de consulta",
@@ -838,7 +886,7 @@
         },
         "schemaVersion": 1
       }
-    },
+    },
     {
       "id": 2,
       "version": 0,
@@ -1130,6 +1178,14 @@
               "title": "Motivo y evolución",
               "enabled": true,
               "fields": [
+                {
+                  "key": "sys_disease",
+                  "label": "Enfermedad",
+                  "type": "TEXT",
+                  "required": false,
+                  "system": true,
+                  "placeholder": "Ej.: Bronquitis aguda (opcional)"
+                },
                 {
                   "key": "chiefComplaint",
                   "label": "Motivo de consulta",
@@ -1559,6 +1615,14 @@
               "title": "Motivo y evolución",
               "enabled": true,
               "fields": [
+                {
+                  "key": "sys_disease",
+                  "label": "Enfermedad",
+                  "type": "TEXT",
+                  "required": false,
+                  "system": true,
+                  "placeholder": "Ej.: Bronquitis aguda (opcional)"
+                },
                 {
                   "key": "chiefComplaint",
                   "label": "Motivo de consulta",
@@ -2001,6 +2065,14 @@
               "title": "Motivo y síntomas",
               "enabled": true,
               "fields": [
+                {
+                  "key": "sys_disease",
+                  "label": "Enfermedad",
+                  "type": "TEXT",
+                  "required": false,
+                  "system": true,
+                  "placeholder": "Ej.: Bronquitis aguda (opcional)"
+                },
                 {
                   "key": "chiefComplaint",
                   "label": "Motivo de consulta",
@@ -2537,6 +2609,14 @@
               "title": "Motivo y síntomas",
               "enabled": true,
               "fields": [
+                {
+                  "key": "sys_disease",
+                  "label": "Enfermedad",
+                  "type": "TEXT",
+                  "required": false,
+                  "system": true,
+                  "placeholder": "Ej.: Bronquitis aguda (opcional)"
+                },
                 {
                   "key": "chiefComplaint",
                   "label": "Motivo de consulta",
@@ -4326,6 +4406,456 @@
     {
       "id": "dose-ff2d81cb-e702-4ad2-92d2-54444a40d5a1",
       "calendar_id": "argentina-2026-v1"
+    }
+  ],
+  "specialty_encounter_template_defaults": [
+    {
+      "specialty_code": "pediatrics",
+      "code": "pediatrics_newborn",
+      "display_order": 0,
+      "name": "Recién nacidos",
+      "description": "Control neonatal con antropometría, perímetro cefálico, alimentación, examen físico y pautas iniciales.",
+      "form_definition": {
+        "categories": [
+          {
+            "key": "reason",
+            "title": "Motivo de consulta",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "sys_disease",
+                "label": "Enfermedad",
+                "type": "TEXT",
+                "required": false,
+                "system": true,
+                "placeholder": "Ej.: Ictericia neonatal (opcional)"
+              },
+              {
+                "key": "chiefComplaint",
+                "type": "TEXTAREA",
+                "label": "Motivo de consulta",
+                "required": true
+              },
+              {
+                "key": "presentIllness",
+                "type": "TEXTAREA",
+                "label": "Evolución",
+                "required": false
+              }
+            ]
+          },
+          {
+            "key": "measurements",
+            "title": "Antropometría",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "weightKg",
+                "type": "NUMBER",
+                "unit": "kg",
+                "label": "Peso",
+                "minimum": 0,
+                "required": true
+              },
+              {
+                "key": "heightCm",
+                "type": "NUMBER",
+                "unit": "cm",
+                "label": "Longitud",
+                "minimum": 0,
+                "required": true
+              },
+              {
+                "key": "headCircumferenceCm",
+                "type": "NUMBER",
+                "unit": "cm",
+                "label": "Perímetro cefálico",
+                "minimum": 0,
+                "required": false
+              }
+            ]
+          },
+          {
+            "key": "neonatal_feeding",
+            "title": "Alimentación y adaptación",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "feedingNotes",
+                "type": "TEXTAREA",
+                "label": "Alimentación / lactancia",
+                "required": false
+              },
+              {
+                "key": "neonatalObservations",
+                "type": "TEXTAREA",
+                "label": "Observaciones neonatales",
+                "required": false
+              }
+            ]
+          },
+          {
+            "key": "physical_exam",
+            "title": "Examen físico",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "physicalExam",
+                "type": "TEXTAREA",
+                "label": "Examen físico",
+                "required": false
+              }
+            ]
+          },
+          {
+            "key": "development",
+            "title": "Desarrollo",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "meetsMilestones",
+                "type": "BOOLEAN",
+                "label": "Cumple pautas de desarrollo",
+                "required": false
+              },
+              {
+                "key": "milestoneNotes",
+                "type": "TEXTAREA",
+                "label": "Detalle de las pautas pendientes",
+                "required": false,
+                "visibleWhen": {
+                  "equals": false,
+                  "fieldKey": "meetsMilestones"
+                }
+              }
+            ]
+          },
+          {
+            "key": "assessment",
+            "title": "Evaluación",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "diagnosis",
+                "type": "TEXTAREA",
+                "label": "Evaluación / diagnóstico",
+                "required": false
+              }
+            ]
+          },
+          {
+            "key": "plan",
+            "title": "Plan e indicaciones",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "treatment",
+                "type": "TEXTAREA",
+                "label": "Plan terapéutico",
+                "required": false
+              },
+              {
+                "key": "followUpInstructions",
+                "type": "TEXTAREA",
+                "label": "Indicaciones y pautas de alarma",
+                "required": false
+              },
+              {
+                "key": "followUpDate",
+                "type": "DATE",
+                "label": "Próximo control",
+                "required": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "specialty_code": "pediatrics",
+      "code": "pediatrics_early_childhood",
+      "display_order": 1,
+      "name": "Primera infancia",
+      "description": "Seguimiento integral de primera infancia: antropometría completa, pautas de desarrollo, examen físico y plan.",
+      "form_definition": {
+        "categories": [
+          {
+            "key": "reason",
+            "title": "Motivo de consulta",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "sys_disease",
+                "label": "Enfermedad",
+                "type": "TEXT",
+                "required": false,
+                "system": true,
+                "placeholder": "Ej.: Bronquitis aguda (opcional)"
+              },
+              {
+                "key": "chiefComplaint",
+                "type": "TEXTAREA",
+                "label": "Motivo de consulta",
+                "required": true
+              },
+              {
+                "key": "presentIllness",
+                "type": "TEXTAREA",
+                "label": "Evolución",
+                "required": false
+              }
+            ]
+          },
+          {
+            "key": "measurements",
+            "title": "Antropometría",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "weightKg",
+                "type": "NUMBER",
+                "unit": "kg",
+                "label": "Peso",
+                "minimum": 0,
+                "required": true
+              },
+              {
+                "key": "heightCm",
+                "type": "NUMBER",
+                "unit": "cm",
+                "label": "Longitud / talla",
+                "minimum": 0,
+                "required": true
+              },
+              {
+                "key": "headCircumferenceCm",
+                "type": "NUMBER",
+                "unit": "cm",
+                "label": "Perímetro cefálico",
+                "minimum": 0,
+                "required": false
+              },
+              {
+                "key": "bloodPressure",
+                "type": "TEXT",
+                "label": "Tensión arterial",
+                "required": false
+              }
+            ]
+          },
+          {
+            "key": "physical_exam",
+            "title": "Examen físico",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "physicalExam",
+                "type": "TEXTAREA",
+                "label": "Examen físico",
+                "required": false
+              }
+            ]
+          },
+          {
+            "key": "development",
+            "title": "Desarrollo",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "meetsMilestones",
+                "type": "BOOLEAN",
+                "label": "Cumple pautas de desarrollo",
+                "required": false
+              },
+              {
+                "key": "milestoneNotes",
+                "type": "TEXTAREA",
+                "label": "Detalle de las pautas pendientes",
+                "required": false,
+                "visibleWhen": {
+                  "equals": false,
+                  "fieldKey": "meetsMilestones"
+                }
+              }
+            ]
+          },
+          {
+            "key": "assessment",
+            "title": "Evaluación",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "diagnosis",
+                "type": "TEXTAREA",
+                "label": "Evaluación / diagnóstico",
+                "required": false
+              }
+            ]
+          },
+          {
+            "key": "plan",
+            "title": "Plan e indicaciones",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "treatment",
+                "type": "TEXTAREA",
+                "label": "Plan terapéutico",
+                "required": false
+              },
+              {
+                "key": "followUpInstructions",
+                "type": "TEXTAREA",
+                "label": "Indicaciones de seguimiento",
+                "required": false
+              },
+              {
+                "key": "followUpDate",
+                "type": "DATE",
+                "label": "Próximo control",
+                "required": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "specialty_code": "pediatrics",
+      "code": "pediatrics_older_children",
+      "display_order": 2,
+      "name": "Niños mayores y adolescentes",
+      "description": "Atención de niños mayores y adolescentes: antropometría, tensión arterial, hábitos, examen físico y plan.",
+      "form_definition": {
+        "categories": [
+          {
+            "key": "reason",
+            "title": "Motivo de consulta",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "sys_disease",
+                "label": "Enfermedad",
+                "type": "TEXT",
+                "required": false,
+                "system": true,
+                "placeholder": "Ej.: Faringitis aguda (opcional)"
+              },
+              {
+                "key": "chiefComplaint",
+                "type": "TEXTAREA",
+                "label": "Motivo de consulta",
+                "required": true
+              },
+              {
+                "key": "presentIllness",
+                "type": "TEXTAREA",
+                "label": "Evolución",
+                "required": false
+              }
+            ]
+          },
+          {
+            "key": "measurements",
+            "title": "Antropometría y signos vitales",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "weightKg",
+                "type": "NUMBER",
+                "unit": "kg",
+                "label": "Peso",
+                "minimum": 0,
+                "required": true
+              },
+              {
+                "key": "heightCm",
+                "type": "NUMBER",
+                "unit": "cm",
+                "label": "Talla",
+                "minimum": 0,
+                "required": true
+              },
+              {
+                "key": "bloodPressure",
+                "type": "TEXT",
+                "label": "Tensión arterial",
+                "required": false
+              }
+            ]
+          },
+          {
+            "key": "physical_exam",
+            "title": "Examen físico",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "physicalExam",
+                "type": "TEXTAREA",
+                "label": "Examen físico",
+                "required": false
+              }
+            ]
+          },
+          {
+            "key": "lifestyle_school",
+            "title": "Hábitos y contexto",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "habitsAndActivity",
+                "type": "TEXTAREA",
+                "label": "Hábitos, alimentación y actividad física",
+                "required": false
+              },
+              {
+                "key": "schoolAndContextNotes",
+                "type": "TEXTAREA",
+                "label": "Escolaridad y contexto",
+                "required": false
+              }
+            ]
+          },
+          {
+            "key": "assessment",
+            "title": "Evaluación",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "diagnosis",
+                "type": "TEXTAREA",
+                "label": "Evaluación / diagnóstico",
+                "required": false
+              }
+            ]
+          },
+          {
+            "key": "plan",
+            "title": "Plan e indicaciones",
+            "enabled": true,
+            "fields": [
+              {
+                "key": "treatment",
+                "type": "TEXTAREA",
+                "label": "Plan terapéutico",
+                "required": false
+              },
+              {
+                "key": "followUpInstructions",
+                "type": "TEXTAREA",
+                "label": "Indicaciones de seguimiento",
+                "required": false
+              },
+              {
+                "key": "followUpDate",
+                "type": "DATE",
+                "label": "Próximo control",
+                "required": false
+              }
+            ]
+          }
+        ]
+      }
     }
   ]
 }

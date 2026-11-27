@@ -77,6 +77,65 @@ func (v *Validator) Validate(definition map[string]any) error {
 	return v.validate(definition, true)
 }
 
+// ValidateEncounterForm validates a standalone encounterForm definition and enforces sys_disease.
+func (v *Validator) ValidateEncounterForm(form map[string]any) error {
+	if form == nil {
+		return invalidDefinition([]api.FieldError{{Path: "/encounterForm", Code: "INVALID_STRUCTURE"}})
+	}
+	wrapped := map[string]any{
+		"schemaVersion": json.Number("1"),
+		"patientForm":   minimalPatientForm(),
+		"encounterForm": form,
+		"modulesConfig": map[string]any{"MEDICATION_CATALOG": false, "AI_ASSISTANT": false, "GROWTH_CHARTS": false},
+	}
+	if err := v.Validate(wrapped); err != nil {
+		return err
+	}
+	if !HasEncounterDiseaseField(wrapped) {
+		return &api.Error{
+			Status:  400,
+			Code:    "INVALID_DEFINITION",
+			Message: "El campo Enfermedad está bloqueado por el sistema y no se puede eliminar ni ocultar.",
+			Errors:  []api.FieldError{{Path: "/encounterForm", Code: "MISSING_SYSTEM_FIELD"}},
+		}
+	}
+	return nil
+}
+
+// ValidateEncounterFormTransition validates an encounterForm update against its previous definition.
+func (v *Validator) ValidateEncounterFormTransition(previous, next map[string]any) error {
+	if next == nil {
+		return invalidDefinition([]api.FieldError{{Path: "/encounterForm", Code: "INVALID_STRUCTURE"}})
+	}
+	nextWrapped := map[string]any{
+		"schemaVersion": json.Number("1"),
+		"patientForm":   minimalPatientForm(),
+		"encounterForm": next,
+		"modulesConfig": map[string]any{"MEDICATION_CATALOG": false, "AI_ASSISTANT": false, "GROWTH_CHARTS": false},
+	}
+	var prevWrapped map[string]any
+	if previous != nil {
+		prevWrapped = map[string]any{
+			"schemaVersion": json.Number("1"),
+			"patientForm":   minimalPatientForm(),
+			"encounterForm": previous,
+			"modulesConfig": map[string]any{"MEDICATION_CATALOG": false, "AI_ASSISTANT": false, "GROWTH_CHARTS": false},
+		}
+	}
+	if err := v.Transition(prevWrapped, nextWrapped); err != nil {
+		return err
+	}
+	if previous != nil && HasEncounterDiseaseField(prevWrapped) && !HasEncounterDiseaseField(nextWrapped) {
+		return &api.Error{
+			Status:  400,
+			Code:    "INVALID_DEFINITION",
+			Message: "El campo Enfermedad está bloqueado por el sistema y no se puede eliminar ni ocultar.",
+			Errors:  []api.FieldError{{Path: "/encounterForm", Code: "MISSING_SYSTEM_FIELD"}},
+		}
+	}
+	return nil
+}
+
 // ValidateStored retains structural checks for snapshots and definitions
 // already accepted under the historical projection rules.
 func (v *Validator) ValidateStored(definition map[string]any) error {
@@ -207,7 +266,12 @@ func (v *Validator) validate(definition map[string]any, rejectCollisions bool) e
 							issue(fieldPath+"/required", "MISSING_PATIENT_CORE")
 						}
 					}
-				} else if flag(data["system"]) || contains(mandatory, key) || (!health && (strings.HasPrefix(key, "sys_allerg") || strings.HasPrefix(key, "sys_condition") || strings.HasPrefix(key, "sys_medication") || key == "sys_historySource")) {
+				} else if section == "encounterForm" && key == "sys_disease" {
+					_, hasVisibleWhen := data["visibleWhen"]
+					if !flag(data["system"]) || data["type"] != "TEXT" || flag(data["required"]) || hasVisibleWhen || !flag(category["enabled"]) {
+						issue(fieldPath+"/system", "INVALID_SYSTEM_FIELD")
+					}
+				} else if flag(data["system"]) || contains(mandatory, key) || key == "sys_disease" || (!health && (strings.HasPrefix(key, "sys_allerg") || strings.HasPrefix(key, "sys_condition") || strings.HasPrefix(key, "sys_medication") || key == "sys_historySource")) {
 					issue(fieldPath+"/system", "INVALID_SYSTEM_FIELD")
 				}
 			}

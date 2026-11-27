@@ -102,6 +102,34 @@ func seed(ctx context.Context, tx pgx.Tx, validator *wizard.Validator) error {
 		if err := seedProvisional(ctx, tx, validator, seeds["provisional_specialties"]); err != nil {
 			return err
 		}
+		for _, row := range seeds["specialty_encounter_template_defaults"] {
+			specialtyCode, _ := row["specialty_code"].(string)
+			var specID int64
+			err := tx.QueryRow(ctx, "SELECT id FROM specialties WHERE lower(code)=lower($1)", specialtyCode).Scan(&specID)
+			if errors.Is(err, pgx.ErrNoRows) {
+				continue
+			}
+			if err != nil {
+				return err
+			}
+			formDef, _ := row["form_definition"].(map[string]any)
+			if err := validator.ValidateEncounterForm(formDef); err != nil {
+				return fmt.Errorf("invalid encounter template default %v: %w", row["code"], err)
+			}
+			rawForm, err := json.Marshal(formDef)
+			if err != nil {
+				return err
+			}
+			var order int64
+			if num, ok := row["display_order"].(json.Number); ok {
+				order, _ = num.Int64()
+			}
+			if _, err := tx.Exec(ctx, `INSERT INTO specialty_encounter_template_defaults(specialty_id,code,name,description,form_definition,display_order,active)
+				VALUES($1,$2,$3,$4,$5,$6,true) ON CONFLICT (specialty_id,code) DO NOTHING`,
+				specID, row["code"], row["name"], row["description"], rawForm, order); err != nil {
+				return fmt.Errorf("seed encounter template default %v: %w", row["code"], err)
+			}
+		}
 		for _, row := range seeds["chart_definitions"] {
 			var exists bool
 			if err := tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM chart_definitions WHERE chart_code=$1)", row["chart_code"]).Scan(&exists); err != nil {

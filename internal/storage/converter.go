@@ -3,9 +3,12 @@ package storage
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"image"
+	"image/png"
 	"io"
 	"mime"
 	"mime/multipart"
@@ -17,10 +20,23 @@ import (
 	"time"
 
 	"github.com/syntah/doctorchart-backend-go/internal/api"
+	"golang.org/x/image/webp"
 )
 
 // The study endpoint owns this selection; Angular never selects a processing profile.
-const studyProfile = "doctorchart-study"
+const (
+	studyProfile          = "doctorchart-study"
+	logoProfile           = "avatar"
+	maxConvertedLogoBytes = 200 * 1024
+)
+
+type ConvertedLogo struct {
+	WebP   []byte
+	PNG    []byte
+	Width  int
+	Height int
+	SHA256 string
+}
 
 // Bound converter responses independently from the original upload limit.
 const maxConverterResponseBytes = 25 << 20
@@ -193,4 +209,115 @@ func (s *Store) convertStudy(ctx context.Context, data []byte, name, contentType
 		return data, name, contentType, nil
 	}
 	return output, outputName, mimeType, nil
+}
+
+// ConvertClinicLogo sends the uploaded clinic logo through the shared image converter
+// using the authorized "avatar" profile (512x512 WebP, metadata stripped) and produces
+// a sanitized PNG copy for native PDF embedding.
+func (s *Store) ConvertClinicLogo(ctx context.Context, data []byte) (ConvertedLogo, error) {
+	var result ConvertedLogo
+	if err := ctx.Err(); err != nil {
+		return result, err
+	}
+	if len(data) == 0 {
+		return result, api.Failure(400, "INVALID_LOGO_IMAGE", "Seleccioná una imagen para el logo del consultorio.")
+	}
+	if len(data) > MaxBytes {
+		return result, api.Failure(413, "LOGO_FILE_TOO_LARGE", "El logo supera el tamaño máximo permitido de 10 MB.")
+	}
+	contentType := http.DetectContentType(data)
+	if contentType != "image/jpeg" && contentType != "image/png" && contentType != "image/webp" {
+		return result, api.Failure(415, "UNSUPPORTED_LOGO_TYPE", "El logo debe estar en formato JPG, PNG o WebP.")
+	}
+	if s.converter == nil {
+		return result, converterUnavailable()
+	}
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("file", "logo")
+	if err != nil {
+		return result, converterUnavailable()
+	}
+	if _, err = part.Write(data); err != nil {
+		return result, converterUnavailable()
+	}
+	for k, v := range map[string]string{
+		"profile": logoProfile,
+		"width":   "512",
+		"height":  "512",
+	} {
+		if err = writer.WriteField(k, v); err != nil {
+			return result, converterUnavailable()
+		}
+	}
+	if err = writer.Close(); err != nil {
+		return result, converterUnavailable()
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.converter.endpoint, &body)
+	if err != nil {
+		return result, converterUnavailable()
+	}
+	req.Header.Set("Authorization", "Bearer "+s.converter.key)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	response, err := s.converter.client.Do(req)
+	if err != nil {
+		if ctx.Err() != nil {
+			return result, ctx.Err()
+		}
+		return result, converterUnavailable()
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		switch response.StatusCode {
+		case 400, 415, 422:
+			return result, api.Failure(400, "INVALID_LOGO_IMAGE", "La imagen del logo no es válida o está dañada.")
+		case 413:
+			return result, api.Failure(413, "LOGO_FILE_TOO_LARGE", "El logo supera los límites permitidos por el optimizador de imágenes.")
+		default:
+			return result, converterUnavailable()
+		}
+	}
+
+	webpBytes, err := io.ReadAll(io.LimitReader(response.Body, maxConvertedLogoBytes+1))
+	if err != nil {
+		if ctx.Err() != nil {
+			return result, ctx.Err()
+		}
+		return result, converterInvalidResponse()
+	}
+	if len(webpBytes) == 0 || len(webpBytes) > maxConvertedLogoBytes {
+		return result, converterInvalidResponse()
+	}
+	mimeType, _, err := mime.ParseMediaType(response.Header.Get("Content-Type"))
+	if err != nil || mimeType != "image/webp" {
+		return result, converterInvalidResponse()
+	}
+
+	img, err := webp.Decode(bytes.NewReader(webpBytes))
+	if err != nil {
+		return result, converterInvalidResponse()
+	}
+	bounds := img.Bounds()
+	w, h := bounds.Dx(), bounds.Dy()
+	if w < 16 || w > 512 || h < 16 || h > 512 {
+		return result, converterInvalidResponse()
+	}
+	var pngBuf bytes.Buffer
+	if err := png.Encode(&pngBuf, img); err != nil {
+		return result, converterInvalidResponse()
+	}
+	if pngBuf.Len() == 0 || pngBuf.Len() > 1048576 {
+		return result, converterInvalidResponse()
+	}
+	sum := sha256.Sum256(webpBytes)
+	return ConvertedLogo{
+		WebP:   webpBytes,
+		PNG:    pngBuf.Bytes(),
+		Width:  w,
+		Height: h,
+		SHA256: hex.EncodeToString(sum[:]),
+	}, nil
 }

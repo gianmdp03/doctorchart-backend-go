@@ -361,7 +361,7 @@ func (s *Service) download(w http.ResponseWriter, r *http.Request) {
 type downloadResponse struct {
 	http.ResponseWriter
 	status int
-	bytes int64
+	bytes  int64
 }
 
 func (w *downloadResponse) WriteHeader(status int) {

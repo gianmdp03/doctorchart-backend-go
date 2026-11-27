@@ -108,7 +108,7 @@ func run() error {
 			return err
 		}
 	}
-	workspaces := workspace.New(pool, validator).WithReviewAuthority(reviews)
+	workspaces := workspace.New(pool, validator).WithReviewAuthority(reviews).WithLogoConverter(files)
 	workspaces.Routes(mux)
 	clinics.NewWithBookings(pool, entitlements, c.SchedulesEnabled, c.BookingsEnabled).WithPublicBookings(c.PublicBookingsEnabled, c.GatewaySecret).WithStaff(c.StaffEnabled, c.StaffOrigin).WithNotifications(notices).Routes(mux)
 	clinicalService, err := clinical.New(pool, workspaces, validator, rules, files)

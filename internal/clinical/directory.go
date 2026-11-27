@@ -19,19 +19,20 @@ import (
 )
 
 type PatientList struct {
-	ID         int64   `json:"id"`
-	ContextID  int64   `json:"specialtyContextId"`
-	Name       string  `json:"fullName"`
-	Birth      string  `json:"birthDate"`
-	NationalID *string `json:"nationalId"`
-	Phone      *string `json:"phone"`
-	Gender     *string `json:"gender"`
-	Encounters int64   `json:"totalEncounters"`
-	LastDate   *string `json:"lastEncounterDate"`
-	Months     *int    `json:"ageInMonths"`
-	Age        string  `json:"ageDisplay"`
-	Group      string  `json:"ageGroup"`
-	Pending    bool    `json:"hasPendingVaccine"`
+	ID                   int64   `json:"id"`
+	ContextID            int64   `json:"specialtyContextId"`
+	Name                 string  `json:"fullName"`
+	Birth                string  `json:"birthDate"`
+	NationalID           *string `json:"nationalId"`
+	Phone                *string `json:"phone"`
+	Gender               *string `json:"gender"`
+	Encounters           int64   `json:"totalEncounters"`
+	LastDate             *string `json:"lastEncounterDate"`
+	LastEncounterDisease *string `json:"lastEncounterDisease"`
+	Months               *int    `json:"ageInMonths"`
+	Age                  string  `json:"ageDisplay"`
+	Group                string  `json:"ageGroup"`
+	Pending              bool    `json:"hasPendingVaccine"`
 }
 type pagination struct {
 	number, size int64
@@ -158,6 +159,20 @@ func (s *Service) ListPatients(ctx context.Context, userID string, query url.Val
 	if api.JavaLength(search) > 200 {
 		return nil, listError("La búsqueda admite hasta 200 caracteres.")
 	}
+	disease := strings.TrimSpace(query.Get("disease"))
+	if api.JavaLength(disease) > 200 {
+		return nil, listError("El filtro de enfermedad admite hasta 200 caracteres.")
+	}
+	diseasePattern := ""
+	if disease != "" {
+		normalizedDisease := strings.NewReplacer(
+			"á", "a", "é", "e", "í", "i", "ó", "o", "ú", "u",
+			"à", "a", "è", "e", "ì", "i", "ò", "o", "ù", "u",
+			"ä", "a", "ë", "e", "ï", "i", "ö", "o", "ü", "u",
+			"â", "a", "ê", "e", "î", "i", "ô", "o", "û", "u",
+		).Replace(strings.ToLower(disease))
+		diseasePattern = "%" + strings.NewReplacer("!", "!!", "%", "!%", "_", "!_").Replace(normalizedDisease) + "%"
+	}
 	pattern := "%" + strings.NewReplacer("!", "!!", "%", "!%", "_", "!_").Replace(strings.ToLower(search)) + "%"
 	canonicalPhone, _ := telephone.Normalize(search)
 	filter := query.Get("filter")
@@ -222,13 +237,14 @@ func (s *Service) ListPatients(ctx context.Context, userID string, query url.Val
 	if category == "pending" {
 		category = pending
 	}
-	where := `$3::date IS NOT NULL AND p.user_id=$1 AND p.annulled_at IS NULL AND ($6::bigint=0 AND (SELECT count(*) FROM doctor_specialty_contexts scope_c JOIN doctor_workspaces scope_w ON scope_w.id=scope_c.workspace_id WHERE scope_w.user_id=$1)=1 OR p.specialty_context_id=$6) AND (lower(p.full_name) LIKE $2 ESCAPE '!' OR lower(p.national_id) LIKE $2 ESCAPE '!' OR lower(p.phone) LIKE $2 ESCAPE '!' OR p.phone=NULLIF($7, '')) AND (` + category + `) AND ($4::date IS NULL OR p.birth_date>$4::date) AND ($5::date IS NULL OR p.birth_date<=$5::date)`
+	latestJoin := ` LEFT JOIN LATERAL (SELECT e.disease FROM clinical_encounters e WHERE e.patient_id=p.id AND e.annulled_at IS NULL ORDER BY e.encounter_date DESC,e.id DESC LIMIT 1) latest_enc ON true`
+	where := `$3::date IS NOT NULL AND p.user_id=$1 AND p.annulled_at IS NULL AND ($6::bigint=0 AND (SELECT count(*) FROM doctor_specialty_contexts scope_c JOIN doctor_workspaces scope_w ON scope_w.id=scope_c.workspace_id WHERE scope_w.user_id=$1)=1 OR p.specialty_context_id=$6) AND (lower(p.full_name) LIKE $2 ESCAPE '!' OR lower(p.national_id) LIKE $2 ESCAPE '!' OR lower(p.phone) LIKE $2 ESCAPE '!' OR p.phone=NULLIF($7, '')) AND (` + category + `) AND ($4::date IS NULL OR p.birth_date>$4::date) AND ($5::date IS NULL OR p.birth_date<=$5::date) AND ($8='' OR translate(lower(coalesce(latest_enc.disease, '')), 'áéíóúàèìòùäëïöüâêîôû', 'aeiouaeiouaeiouaeiou') LIKE $8 ESCAPE '!')`
 	var total int64
-	err = tx.QueryRow(ctx, "SELECT count(*) FROM patients p WHERE "+where, userID, pattern, todayText, bounds.after, bounds.through, api.SpecialtyContextID(ctx), canonicalPhone).Scan(&total)
+	err = tx.QueryRow(ctx, "SELECT count(*) FROM patients p"+latestJoin+" WHERE "+where, userID, pattern, todayText, bounds.after, bounds.through, api.SpecialtyContextID(ctx), canonicalPhone, diseasePattern).Scan(&total)
 	if err != nil {
 		return nil, err
 	}
-	rows, err := tx.Query(ctx, `SELECT p.specialty_context_id,p.id,p.full_name,p.birth_date::text,p.national_id,p.phone,p.gender,(SELECT count(*) FROM clinical_encounters e WHERE e.patient_id=p.id AND e.annulled_at IS NULL),(SELECT max(e.encounter_date) FROM clinical_encounters e WHERE e.patient_id=p.id AND e.annulled_at IS NULL),`+pending+` FROM patients p WHERE `+where+` ORDER BY `+page.order+` LIMIT $8 OFFSET $9`, userID, pattern, todayText, bounds.after, bounds.through, api.SpecialtyContextID(ctx), canonicalPhone, page.size, page.number*page.size)
+	rows, err := tx.Query(ctx, `SELECT p.specialty_context_id,p.id,p.full_name,p.birth_date::text,p.national_id,p.phone,p.gender,(SELECT count(*) FROM clinical_encounters e WHERE e.patient_id=p.id AND e.annulled_at IS NULL),(SELECT max(e.encounter_date) FROM clinical_encounters e WHERE e.patient_id=p.id AND e.annulled_at IS NULL),latest_enc.disease,`+pending+` FROM patients p`+latestJoin+` WHERE `+where+` ORDER BY `+page.order+` LIMIT $9 OFFSET $10`, userID, pattern, todayText, bounds.after, bounds.through, api.SpecialtyContextID(ctx), canonicalPhone, diseasePattern, page.size, page.number*page.size)
 	if err != nil {
 		return nil, err
 	}
@@ -236,7 +252,7 @@ func (s *Service) ListPatients(ctx context.Context, userID string, query url.Val
 	for rows.Next() {
 		var item PatientList
 		var last *time.Time
-		if err := rows.Scan(&item.ContextID, &item.ID, &item.Name, &item.Birth, &item.NationalID, &item.Phone, &item.Gender, &item.Encounters, &last, &item.Pending); err != nil {
+		if err := rows.Scan(&item.ContextID, &item.ID, &item.Name, &item.Birth, &item.NationalID, &item.Phone, &item.Gender, &item.Encounters, &last, &item.LastEncounterDisease, &item.Pending); err != nil {
 			rows.Close()
 			return nil, err
 		}

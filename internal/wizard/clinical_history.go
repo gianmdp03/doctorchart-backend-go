@@ -56,7 +56,11 @@ func WithSystemHistory(raw json.RawMessage) (json.RawMessage, error) {
 	}
 	for _, section := range []string{"patientForm", "encounterForm"} {
 		if form, ok := definition[section].(map[string]any); ok {
-			definition[section] = WithClinicalHistory(form)
+			updated := WithClinicalHistory(form)
+			if section == "encounterForm" {
+				updated = EnsureEncounterDiseaseField(updated)
+			}
+			definition[section] = updated
 		}
 	}
 	return json.Marshal(definition)

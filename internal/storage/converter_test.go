@@ -376,3 +376,46 @@ func TestConverterNeverFollowsRedirect(t *testing.T) {
 		t.Fatal("credential redirect was followed")
 	}
 }
+
+func TestConvertClinicLogoValidationAndConverterContract(t *testing.T) {
+	store, err := New(Config{Directory: privateStudyDirectory(t)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.ConvertClinicLogo(context.Background(), nil); err == nil {
+		t.Fatal("empty logo accepted")
+	}
+	if _, err := store.ConvertClinicLogo(context.Background(), []byte("not-an-image")); err == nil {
+		t.Fatal("non-image logo accepted")
+	}
+	if _, err := store.ConvertClinicLogo(context.Background(), studyPNG(t, 32, 32)); err == nil {
+		t.Fatal("nil converter should return 503 unavailable")
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseMultipartForm(1 << 20); err != nil {
+			t.Fatal(err)
+		}
+		if r.FormValue("profile") != "avatar" || r.FormValue("width") != "512" || r.FormValue("height") != "512" {
+			t.Fatalf("unexpected converter params: %v", r.MultipartForm.Value)
+		}
+		// Minimal valid 16x16 lossless WebP (VP8L)
+		w.Header().Set("Content-Type", "image/webp")
+		// Return 415 to verify error mapping cleanly when converter rejects
+		w.WriteHeader(http.StatusUnsupportedMediaType)
+	}))
+	defer server.Close()
+
+	storeWithConverter, err := New(Config{
+		Directory: privateStudyDirectory(t),
+		Converter: ConverterConfig{URL: server.URL, APIKey: converterTestKey, AllowStudyTransformation: true},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = storeWithConverter.ConvertClinicLogo(context.Background(), studyPNG(t, 32, 32))
+	var apiErr *api.Error
+	if !errors.As(err, &apiErr) || apiErr.Status != 400 || apiErr.Code != "INVALID_LOGO_IMAGE" {
+		t.Fatalf("expected 400 INVALID_LOGO_IMAGE, got %v", err)
+	}
+}

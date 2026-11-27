@@ -34,6 +34,8 @@ type Service struct {
 	calculators map[string]calculatorMetadata
 	files       *storage.Store
 	exports     chan struct{}
+	pdfCache    *pdfCache
+	pdfLimiter  *pdfLimiter
 }
 
 func New(pool *pgxpool.Pool, workspaces *workspace.Store, forms *wizard.Validator, rules *billing.Rules, files *storage.Store) (*Service, error) {
@@ -49,7 +51,19 @@ func New(pool *pgxpool.Pool, workspaces *workspace.Store, forms *wizard.Validato
 	if err := json.Unmarshal(calculatorJSON, &calculators); err != nil {
 		return nil, err
 	}
-	return &Service{pool: pool, workspaces: workspaces, forms: forms, rules: rules, zone: zone, growth: growth, calculators: calculators, files: files, exports: make(chan struct{}, 2)}, nil
+	return &Service{
+		pool:        pool,
+		workspaces:  workspaces,
+		forms:       forms,
+		rules:       rules,
+		zone:        zone,
+		growth:      growth,
+		calculators: calculators,
+		files:       files,
+		exports:     make(chan struct{}, 2),
+		pdfCache:    newPDFCache(pdfCacheMaxEntries, pdfCacheMaxBytes, pdfCacheTTL),
+		pdfLimiter:  newPDFLimiter(pdfRateWindow, pdfRateLimit),
+	}, nil
 }
 
 type Measurements struct {

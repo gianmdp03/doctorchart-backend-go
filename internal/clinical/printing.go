@@ -6,10 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/syntah/doctorchart-backend-go/internal/api"
+	"github.com/syntah/doctorchart-backend-go/internal/workspace"
 )
 
 type printPatient struct {
@@ -43,6 +46,8 @@ type printDocument struct {
 	at            time.Time
 	version       int64
 	emitted       bool
+	signature     *workspace.SignatureAsset
+	logo          *workspace.LogoAsset
 }
 
 func printAge(birth, reference time.Time) *string {
@@ -75,9 +80,29 @@ func printAge(birth, reference time.Time) *string {
 	return &result
 }
 func (s *Service) printable(ctx context.Context, user string, patientID, id int64, encounter bool) (printDocument, error) {
+	return s.printableWithSignature(ctx, user, patientID, id, encounter, "DEFAULT", nil)
+}
+
+func (s *Service) printableWithSignature(ctx context.Context, user string, patientID, id int64, encounter bool, sigMode string, sigID *int64) (printDocument, error) {
 	var doc printDocument
 	err := s.transaction(ctx, true, func(tx pgx.Tx) error {
-		return s.readPrintable(ctx, tx, user, patientID, id, encounter, &doc)
+		if err := s.readPrintable(ctx, tx, user, patientID, id, encounter, &doc); err != nil {
+			return err
+		}
+		if s.workspaces != nil {
+			sig, err := s.workspaces.ResolveSignature(ctx, tx, user, sigMode, sigID)
+			if err != nil {
+				return err
+			}
+			doc.signature = sig
+			resolvedLicense, logo, err := s.workspaces.ResolvePrintConfig(ctx, tx, user, doc.Author.license)
+			if err != nil {
+				return err
+			}
+			doc.Author.license = resolvedLicense
+			doc.logo = logo
+		}
+		return nil
 	})
 	return doc, err
 }
@@ -201,6 +226,31 @@ func (s *Service) readPrintable(ctx context.Context, tx pgx.Tx, user string, pat
 	doc.Issued = api.FormatInstant(doc.at)
 	return nil
 }
+func parseSignatureQuery(r *http.Request) (string, *int64, error) {
+	rawID := strings.TrimSpace(r.URL.Query().Get("signatureId"))
+	rawMode := strings.TrimSpace(r.URL.Query().Get("signatureMode"))
+	if rawID != "" && rawMode != "" {
+		return "", nil, api.Invalid("Indicá signatureId o signatureMode, no ambos.")
+	}
+	if rawMode != "" {
+		if strings.EqualFold(rawMode, "none") {
+			return "NONE", nil, nil
+		}
+		if strings.EqualFold(rawMode, "default") {
+			return "DEFAULT", nil, nil
+		}
+		return "", nil, api.Invalid("El modo de firma no es válido.")
+	}
+	if rawID != "" {
+		id, err := strconv.ParseInt(rawID, 10, 64)
+		if err != nil || id < 1 {
+			return "", nil, api.Invalid("El identificador de firma no es válido.")
+		}
+		return "SELECTED", &id, nil
+	}
+	return "DEFAULT", nil, nil
+}
+
 func (s *Service) PrintRoutes(mux *http.ServeMux) {
 	s.documentRoutes(mux)
 	handler := func(encounter, pdf bool) http.HandlerFunc {
@@ -217,9 +267,13 @@ func (s *Service) PrintRoutes(mux *http.ServeMux) {
 			if err == nil {
 				err = parseErr
 			}
+			sigMode, sigID := "DEFAULT", (*int64)(nil)
+			if err == nil && pdf {
+				sigMode, sigID, err = parseSignatureQuery(r)
+			}
 			var doc printDocument
 			if err == nil {
-				doc, err = s.printable(r.Context(), api.User(r.Context()).UserID, patientID, id, encounter)
+				doc, err = s.printableWithSignature(r.Context(), api.User(r.Context()).UserID, patientID, id, encounter, sigMode, sigID)
 			}
 			if err != nil {
 				api.WriteError(w, err)
@@ -253,4 +307,42 @@ func (s *Service) PrintRoutes(mux *http.ServeMux) {
 	s.handle(mux, "GET /api/doctorchart/patients/{patientId}/prescriptions/{recordId}/pdf", handler(false, true))
 	s.handle(mux, "GET /api/doctorchart/patients/{patientId}/encounters/{recordId}/print", handler(true, false))
 	s.handle(mux, "GET /api/doctorchart/patients/{patientId}/encounters/{recordId}/pdf", handler(true, true))
+	s.handle(mux, "GET /api/doctorchart/patients/{patientId}/clinical-history/pdf", func(w http.ResponseWriter, r *http.Request) {
+		if err := prescriptionRole(r); err != nil {
+			api.WriteError(w, err)
+			return
+		}
+		patientID, err := pathID(r, "patientId")
+		if err != nil {
+			api.WriteError(w, err)
+			return
+		}
+		var encounterID *int64
+		if rawEnc := strings.TrimSpace(r.URL.Query().Get("encounterId")); rawEnc != "" {
+			parsed, parseErr := strconv.ParseInt(rawEnc, 10, 64)
+			if parseErr != nil || parsed < 1 {
+				api.WriteError(w, api.Invalid("El identificador de consulta no es válido."))
+				return
+			}
+			encounterID = &parsed
+		}
+		sigMode, sigID, err := parseSignatureQuery(r)
+		if err != nil {
+			api.WriteError(w, err)
+			return
+		}
+		growthRef := r.URL.Query().Get("growthReference")
+		pdfBytes, filename, err := s.ClinicalHistoryPDF(r.Context(), api.User(r.Context()), patientID, encounterID, sigMode, sigID, growthRef)
+		if err != nil {
+			api.WriteError(w, err)
+			return
+		}
+		accessReference(r.Context(), encounterID, &patientID, nil)
+		w.Header().Set("Content-Type", "application/pdf")
+		w.Header().Set("Content-Disposition", `inline; filename="`+filename+`"`)
+		w.Header().Set("Cache-Control", "private, no-cache, no-store, max-age=0, must-revalidate")
+		w.Header().Set("Content-Length", fmt.Sprint(len(pdfBytes)))
+		w.WriteHeader(200)
+		_, _ = w.Write(pdfBytes)
+	})
 }

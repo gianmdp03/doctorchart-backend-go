@@ -17,9 +17,10 @@ import (
 )
 
 type Store struct {
-	pool      *pgxpool.Pool
-	validator *wizard.Validator
-	reviews   ReviewAuthority
+	pool          *pgxpool.Pool
+	validator     *wizard.Validator
+	reviews       ReviewAuthority
+	logoConverter LogoConverter
 }
 
 func New(pool *pgxpool.Pool, validator *wizard.Validator) *Store {
@@ -28,6 +29,11 @@ func New(pool *pgxpool.Pool, validator *wizard.Validator) *Store {
 
 func (s *Store) WithReviewAuthority(authority ReviewAuthority) *Store {
 	s.reviews = authority
+	return s
+}
+
+func (s *Store) WithLogoConverter(converter LogoConverter) *Store {
+	s.logoConverter = converter
 	return s
 }
 
@@ -332,13 +338,21 @@ func (s *Store) Profile(ctx context.Context, userID string) (any, error) {
 		if w == nil {
 			return nil
 		}
+		identity, err := readPrintIdentityTx(ctx, tx, userID)
+		if err != nil {
+			return err
+		}
 		result = struct {
-			ID        int64   `json:"id"`
-			UserID    string  `json:"userId"`
-			Specialty Summary `json:"specialty"`
-			Completed bool    `json:"isSpecialtyLocked"`
-			Created   string  `json:"createdAt"`
-		}{w.ID, userID, w.Specialty, w.Completed, api.FormatInstant(w.Created)}
+			ID                  int64   `json:"id"`
+			UserID              string  `json:"userId"`
+			Specialty           Summary `json:"specialty"`
+			Completed           bool    `json:"isSpecialtyLocked"`
+			Created             string  `json:"createdAt"`
+			ProfessionalLicense string  `json:"professionalLicense"`
+			LicenseConfigured   bool    `json:"licenseConfigured"`
+			HasClinicLogo       bool    `json:"hasClinicLogo"`
+			ClinicLogoSHA256    *string `json:"clinicLogoSha256"`
+		}{w.ID, userID, w.Specialty, w.Completed, api.FormatInstant(w.Created), identity.ProfessionalLicense, identity.LicenseConfigured, identity.HasLogo, identity.LogoSHA256}
 		return nil
 	})
 	return result, err

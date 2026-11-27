@@ -19,23 +19,26 @@ import (
 )
 
 type documentIssue struct {
-	ID            int64      `json:"id"`
-	Code          string     `json:"code"`
-	Source        string     `json:"source"`
-	SourceID      int64      `json:"sourceId"`
-	SourceVersion int64      `json:"sourceVersion"`
-	Type          string     `json:"type"`
-	Specialty     string     `json:"specialty"`
-	Issuer        string     `json:"issuer"`
-	IssuedAt      time.Time  `json:"issuedAt"`
-	SHA256        string     `json:"sha256"`
-	Status        string     `json:"status"`
-	AnnulledAt    *time.Time `json:"annulledAt"`
-	Reason        *string    `json:"reason"`
-	SourceStatus  string     `json:"sourceStatus"`
+	ID                 int64      `json:"id"`
+	Code               string     `json:"code"`
+	Source             string     `json:"source"`
+	SourceID           int64      `json:"sourceId"`
+	SourceVersion      int64      `json:"sourceVersion"`
+	Type               string     `json:"type"`
+	Specialty          string     `json:"specialty"`
+	Issuer             string     `json:"issuer"`
+	IssuedAt           time.Time  `json:"issuedAt"`
+	SHA256             string     `json:"sha256"`
+	Status             string     `json:"status"`
+	AnnulledAt         *time.Time `json:"annulledAt"`
+	Reason             *string    `json:"reason"`
+	SourceStatus       string     `json:"sourceStatus"`
+	SignatureID        *int64     `json:"signatureId"`
+	SignatureName      *string    `json:"signatureName"`
+	SignatureStampText *string    `json:"signatureStampText"`
 }
 
-func (s *Service) issueDocument(ctx context.Context, patientID, sourceID int64, encounter bool, selection string) (documentIssue, error) {
+func (s *Service) issueDocument(ctx context.Context, patientID, sourceID int64, encounter bool, selection, sigMode string, sigID *int64) (documentIssue, error) {
 	var item documentIssue
 	owner := api.User(ctx).UserID
 	err := s.transaction(ctx, false, func(tx pgx.Tx) error {
@@ -45,6 +48,19 @@ func (s *Service) issueDocument(ctx context.Context, patientID, sourceID int64, 
 		var doc printDocument
 		if err := s.readPrintable(ctx, tx, owner, patientID, sourceID, encounter, &doc); err != nil {
 			return err
+		}
+		if s.workspaces != nil {
+			sig, err := s.workspaces.ResolveSignature(ctx, tx, owner, sigMode, sigID)
+			if err != nil {
+				return err
+			}
+			doc.signature = sig
+			resolvedLicense, logo, err := s.workspaces.ResolvePrintConfig(ctx, tx, owner, doc.Author.license)
+			if err != nil {
+				return err
+			}
+			doc.Author.license = resolvedLicense
+			doc.logo = logo
 		}
 		if selection == "" {
 			selection = doc.Type
@@ -76,13 +92,27 @@ func (s *Service) issueDocument(ctx context.Context, patientID, sourceID int64, 
 		if doc.Author.Specialty != nil {
 			specialty = *doc.Author.Specialty
 		}
+		var sigIDParam *int64
+		var sigNameParam, sigStampParam, sigSHA256Param *string
+		if doc.signature != nil {
+			idVal := doc.signature.ID
+			nameVal := doc.signature.Name
+			stampVal := doc.signature.StampText
+			shaVal := doc.signature.SHA256
+			sigIDParam = &idVal
+			sigNameParam = &nameVal
+			sigStampParam = &stampVal
+			sigSHA256Param = &shaVal
+		}
 		item = documentIssue{Code: doc.Code, Source: doc.Source, SourceID: sourceID, SourceVersion: doc.version,
 			Type: selection, Specialty: specialty, Issuer: owner, IssuedAt: doc.at,
-			SHA256: fmt.Sprintf("%x", sha256.Sum256(pdf)), Status: "ISSUED", SourceStatus: "CURRENT"}
+			SHA256: fmt.Sprintf("%x", sha256.Sum256(pdf)), Status: "ISSUED", SourceStatus: "CURRENT",
+			SignatureID: sigIDParam, SignatureName: sigNameParam, SignatureStampText: sigStampParam}
 		err = tx.QueryRow(ctx, `INSERT INTO clinical_document_issues
-			(code,owner_user_id,specialty_context_id,patient_id,source,source_id,source_version,document_type,issuer_specialty,issued_at,pdf,sha256)
-			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id,issued_at`,
-			item.Code, owner, api.SpecialtyContextID(ctx), patientID, item.Source, sourceID, doc.version, item.Type, specialty, doc.at, pdf, item.SHA256).
+			(code,owner_user_id,specialty_context_id,patient_id,source,source_id,source_version,document_type,issuer_specialty,issued_at,pdf,sha256,signature_id,signature_name,signature_stamp_text,signature_sha256)
+			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id,issued_at`,
+			item.Code, owner, api.SpecialtyContextID(ctx), patientID, item.Source, sourceID, doc.version, item.Type, specialty, doc.at, pdf, item.SHA256,
+			sigIDParam, sigNameParam, sigStampParam, sigSHA256Param).
 			Scan(&item.ID, &item.IssuedAt)
 		if err != nil {
 			return err
@@ -103,7 +133,8 @@ func (s *Service) documentList(ctx context.Context, patient, before int64) ([]do
 		rows, err := tx.Query(ctx, `SELECT d.id,d.code,d.source,d.source_id,d.source_version,d.document_type,d.issuer_specialty,d.owner_user_id,
 			d.issued_at,d.sha256,a.annulled_at,a.reason,
 			CASE WHEN COALESCE(e.annulled_at,r.annulled_at) IS NOT NULL THEN 'ANNULLED'
-			     WHEN COALESCE(e.version,r.version) IS DISTINCT FROM d.source_version THEN 'CHANGED' ELSE 'CURRENT' END
+			     WHEN COALESCE(e.version,r.version) IS DISTINCT FROM d.source_version THEN 'CHANGED' ELSE 'CURRENT' END,
+			d.signature_id,d.signature_name,d.signature_stamp_text
 			FROM clinical_document_issues d LEFT JOIN clinical_document_annulments a ON a.document_id=d.id
 			LEFT JOIN clinical_encounters e ON d.source='ENCOUNTER' AND e.id=d.source_id AND e.patient_id=d.patient_id
 			LEFT JOIN patient_prescription_records r ON d.source='PRESCRIPTION_RECORD' AND r.id=d.source_id AND r.patient_id=d.patient_id
@@ -116,7 +147,8 @@ func (s *Service) documentList(ctx context.Context, patient, before int64) ([]do
 		for rows.Next() {
 			var item documentIssue
 			err = rows.Scan(&item.ID, &item.Code, &item.Source, &item.SourceID, &item.SourceVersion, &item.Type, &item.Specialty, &item.Issuer,
-				&item.IssuedAt, &item.SHA256, &item.AnnulledAt, &item.Reason, &item.SourceStatus)
+				&item.IssuedAt, &item.SHA256, &item.AnnulledAt, &item.Reason, &item.SourceStatus,
+				&item.SignatureID, &item.SignatureName, &item.SignatureStampText)
 			if err != nil {
 				return err
 			}
@@ -152,14 +184,27 @@ func (s *Service) documentRoutes(mux *http.ServeMux) {
 				var body map[string]any
 				body, err = api.Decode(w, r)
 				if err == nil {
-					err = api.Only(body, "type")
+					err = api.Only(body, "type", "signatureId")
 				}
 				selection, ok := body["type"].(string)
 				if value, present := body["type"]; err == nil && present && (!ok || value == nil || selection != "PRESCRIPTION" && selection != "STUDY_ORDERS") {
 					err = api.Invalid("El tipo de documento no es válido.")
 				}
+				sigMode, sigID := "DEFAULT", (*int64)(nil)
+				if rawSig, present := body["signatureId"]; err == nil && present {
+					if rawSig == nil {
+						sigMode = "NONE"
+					} else {
+						var parsed int64
+						parsed, err = api.Integer(rawSig, "signatureId", 1)
+						if err == nil {
+							sigMode = "SELECTED"
+							sigID = &parsed
+						}
+					}
+				}
 				if err == nil {
-					item, err = s.issueDocument(r.Context(), patient, record, source == "encounters", selection)
+					item, err = s.issueDocument(r.Context(), patient, record, source == "encounters", selection, sigMode, sigID)
 				}
 			}
 			clinicalReply(w, item, err, http.StatusCreated)

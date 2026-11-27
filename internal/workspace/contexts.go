@@ -114,6 +114,9 @@ func (s *Store) AddContext(ctx context.Context, user string, request map[string]
 		if err = saveWorkspace(ctx, tx, w); err != nil {
 			return err
 		}
+		if err = seedContextEncounterTemplatesTx(ctx, tx, w.ID, w.ContextID, spec.ID, d.Published, true); err != nil {
+			return err
+		}
 		result = &w.Setup
 		return nil
 	})

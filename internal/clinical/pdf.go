@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/go-pdf/fpdf"
@@ -37,6 +38,16 @@ func (s *Service) printPDF(doc printDocument, metadata url.Values) ([]byte, erro
 		kind = "STUDY_ORDERS"
 	default:
 		kind = "PRESCRIPTION"
+	}
+	now := time.Now()
+	cacheKey := pdfCacheKey(doc, kind, s.documentZone(doc.IssuanceZone))
+	if s.pdfCache != nil {
+		if cached, ok := s.pdfCache.get(cacheKey, now); ok {
+			return cached, nil
+		}
+	}
+	if s.pdfLimiter != nil && !s.pdfLimiter.allow(doc.Author.UserID, now) {
+		return nil, api.Failure(429, "PDF_RATE_LIMITED", "Se generaron demasiados PDFs en pocos segundos. Esperá unos instantes y reintentá.")
 	}
 	pdf := fpdf.NewCustom(&fpdf.InitType{OrientationStr: "P", UnitStr: "pt", Size: fpdf.SizeType{Wd: 595, Ht: 842}})
 	pdf.SetMargins(42, 34, 42)
@@ -132,7 +143,7 @@ func (s *Service) printPDF(doc printDocument, metadata url.Values) ([]byte, erro
 	})
 	pdf.AddPage()
 	pdf.SetY(69)
-	text(left, 365, 31, title, "B", 24, ink, "L")
+	text(left, 365.0, 31, title, "B", 24, ink, "L")
 	titleBottom := pdf.GetY()
 	pdf.SetY(70)
 	dateLabel := "Fecha del registro"
@@ -147,17 +158,44 @@ func (s *Service) printPDF(doc printDocument, metadata url.Values) ([]byte, erro
 	name := strings.TrimSpace(doc.Author.name)
 	specialty := strings.TrimSpace(pointer(doc.Author.Specialty))
 	license := strings.TrimSpace(doc.Author.license)
-	if name != "" || specialty != "" || license != "" {
-		text(left, width, 13, "Profesional tratante", "B", 8.5, muted, "L")
-		if name != "" {
-			text(left, width, 19, name, "B", 14, ink, "L")
+	hasLogo := doc.logo != nil && len(doc.logo.PNG) > 0
+	if name != "" || specialty != "" || license != "" || hasLogo {
+		authorStartY := pdf.GetY()
+		authorW := width
+		logoBottom := authorStartY
+		if hasLogo {
+			lw, lh := float64(doc.logo.Width), float64(doc.logo.Height)
+			if lw <= 0 {
+				lw = 56
+			}
+			if lh <= 0 {
+				lh = 56
+			}
+			scale := min(56.0/lw, 56.0/lh)
+			drawW, drawH := lw*scale, lh*scale
+			logoName := "logo-" + doc.logo.SHA256
+			if len(logoName) > 20 {
+				logoName = logoName[:20]
+			}
+			opts := fpdf.ImageOptions{ImageType: "PNG", ReadDpi: false}
+			pdf.RegisterImageOptionsReader(logoName, opts, bytes.NewReader(doc.logo.PNG))
+			pdf.ImageOptions(logoName, right-drawW, authorStartY, drawW, drawH, false, opts, 0, "")
+			logoBottom = authorStartY + drawH
+			authorW = width - drawW - 16
 		}
-		if specialty != "" {
-			text(left, width, 15, specialty, "", 10, muted, "L")
+		if name != "" || specialty != "" || license != "" {
+			text(left, authorW, 13, "Profesional tratante", "B", 8.5, muted, "L")
+			if name != "" {
+				text(left, authorW, 19, name, "B", 14, ink, "L")
+			}
+			if specialty != "" {
+				text(left, authorW, 15, specialty, "", 10, muted, "L")
+			}
+			if license != "" {
+				text(left, authorW, 15, "Matrícula profesional: "+license, "", 10, muted, "L")
+			}
 		}
-		if license != "" {
-			text(left, width, 15, "Matrícula profesional: "+license, "", 10, muted, "L")
-		}
+		pdf.SetY(max(pdf.GetY(), logoBottom))
 		pdf.Ln(17)
 	}
 
@@ -295,16 +333,65 @@ func (s *Service) printPDF(doc printDocument, metadata url.Values) ([]byte, erro
 		room(36)
 		field(left, width, heading, api.JavaTrim(*doc.Instructions), "", 10)
 	}
-	room(86)
-	pdf.Ln(41)
-	rule(right-182, right, pdf.GetY())
-	pdf.Ln(5)
-	text(right-182, 182, 15, "Firma y sello del profesional", "B", 9, ink, "C")
-	status := "Vista previa sin firma digital"
-	if doc.emitted {
-		status = "Emitido sin firma digital"
+	if doc.signature != nil {
+		stamp := strings.TrimSpace(doc.signature.StampText)
+		if stamp != "" {
+			stamp = translate(stamp)
+		}
+		w, h := float64(doc.signature.Width), float64(doc.signature.Height)
+		if w <= 0 {
+			w = 156
+		}
+		if h <= 0 {
+			h = 54
+		}
+		scale := min(156.0/w, 54.0/h)
+		drawW, drawH := w*scale, h*scale
+		stampLines := 0
+		if stamp != "" && contentErr == nil {
+			font("", 8.5, muted)
+			stampLines = len(pdf.SplitText(stamp, 182))
+		}
+		totalHeight := 16.0 + drawH + 4.0 + 5.0 + 15.0 + float64(stampLines)*13.0 + 6.0
+		room(totalHeight)
+		pdf.Ln(16)
+		sigY := pdf.GetY()
+		sigX := (right - 182) + (182-drawW)/2
+		imgName := "sig-" + doc.signature.SHA256
+		if len(imgName) > 20 {
+			imgName = imgName[:20]
+		}
+		opts := fpdf.ImageOptions{ImageType: "PNG", ReadDpi: false}
+		pdf.RegisterImageOptionsReader(imgName, opts, bytes.NewReader(doc.signature.ImagePNG))
+		pdf.ImageOptions(imgName, sigX, sigY, drawW, drawH, false, opts, 0, "")
+		lineY := sigY + drawH + 4
+		rule(right-182, right, lineY)
+		pdf.SetY(lineY + 5)
+		text(right-182, 182, 15, "Firma y sello del profesional", "B", 9, ink, "C")
+		if stamp != "" {
+			text(right-182, 182, 13, stamp, "", 8.5, ink, "C")
+		}
+		if license != "" && (stamp == "" || !strings.Contains(stamp, license)) {
+			text(right-182, 182, 13, "Matrícula profesional: "+license, "", 8.5, muted, "C")
+		}
+	} else {
+		room(100)
+		pdf.Ln(41)
+		rule(right-182, right, pdf.GetY())
+		pdf.Ln(5)
+		text(right-182, 182, 15, "Firma y sello del profesional", "B", 9, ink, "C")
+		if name != "" {
+			text(right-182, 182, 13, name, "B", 8.5, ink, "C")
+		}
+		if license != "" {
+			text(right-182, 182, 13, "Matrícula profesional: "+license, "", 8.5, muted, "C")
+		}
+		status := "Vista previa sin firma digital"
+		if doc.emitted {
+			status = "Emitido sin firma digital"
+		}
+		text(right-182, 182, 13, status, "", 8.5, muted, "C")
 	}
-	text(right-182, 182, 13, status, "", 8.5, muted, "C")
 	var buffer bytes.Buffer
 	if contentErr != nil {
 		return nil, contentErr
@@ -312,5 +399,9 @@ func (s *Service) printPDF(doc printDocument, metadata url.Values) ([]byte, erro
 	if err := pdf.Output(&buffer); err != nil {
 		return nil, api.Failure(500, "PDF_GENERATION_FAILED", "Error al generar el documento PDF clínico: "+err.Error())
 	}
-	return buffer.Bytes(), nil
+	out := buffer.Bytes()
+	if s.pdfCache != nil {
+		s.pdfCache.put(cacheKey, out, now)
+	}
+	return out, nil
 }

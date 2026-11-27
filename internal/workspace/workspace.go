@@ -164,6 +164,9 @@ func (s *Store) Select(ctx context.Context, userID string, request map[string]an
 		if err := saveWorkspace(ctx, tx, w); err != nil {
 			return err
 		}
+		if err := seedContextEncounterTemplatesTx(ctx, tx, w.ID, w.ContextID, specialty.ID, d.Published, !w.Completed); err != nil {
+			return err
+		}
 		result = &w.Setup
 		return nil
 	})
@@ -233,6 +236,14 @@ func (s *Store) Edit(ctx context.Context, userID, operation string, request map[
 			if err := s.validator.Transition(previous, definition); err != nil {
 				return err
 			}
+			if wizard.HasEncounterDiseaseField(previous) && !wizard.HasEncounterDiseaseField(definition) {
+				return &api.Error{
+					Status:  400,
+					Code:    "INVALID_DEFINITION",
+					Message: "El campo Enfermedad está bloqueado por el sistema y no se puede eliminar ni ocultar.",
+					Errors:  []api.FieldError{{Path: "/encounterForm", Code: "MISSING_SYSTEM_FIELD"}},
+				}
+			}
 			step, err = normalizeStep(step, previous, definition)
 			if err != nil {
 				return err
@@ -300,6 +311,11 @@ func (s *Store) Edit(ctx context.Context, userID, operation string, request map[
 			w.Draft = d.Published
 			w.DraftSourceVersion = &d.PublishedVersion
 			w.Step = firstStep(definition)
+			if !w.Completed {
+				if err := seedContextEncounterTemplatesTx(ctx, tx, w.ID, w.ContextID, w.Specialty.ID, d.Published, true); err != nil {
+					return err
+				}
+			}
 		}
 		if err := saveWorkspace(ctx, tx, w); err != nil {
 			return err

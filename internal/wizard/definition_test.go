@@ -117,3 +117,50 @@ func TestFormulaDomainBoundaries(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateEncounterFormAndTransition(t *testing.T) {
+	validator, err := NewValidator()
+	if err != nil {
+		t.Fatal(err)
+	}
+	base := EnsureEncounterDiseaseField(object(fixtureDefinition(t)["encounterForm"]))
+	if err := validator.ValidateEncounterForm(base); err != nil {
+		t.Fatalf("expected valid encounterForm: %v", err)
+	}
+
+	withoutDisease := map[string]any{
+		"categories": []any{
+			map[string]any{
+				"key":     "reason",
+				"title":   "Motivo",
+				"enabled": true,
+				"fields": []any{
+					map[string]any{"key": "chiefComplaint", "label": "Motivo", "type": "TEXTAREA", "required": true},
+				},
+			},
+		},
+	}
+	if err := validator.ValidateEncounterForm(withoutDisease); err == nil {
+		t.Fatal("expected missing sys_disease to fail")
+	}
+	if err := validator.ValidateEncounterFormTransition(base, withoutDisease); err == nil {
+		t.Fatal("expected transition removing sys_disease to fail")
+	}
+
+	changedType := map[string]any{
+		"categories": []any{
+			map[string]any{
+				"key":     "reason",
+				"title":   "Motivo",
+				"enabled": true,
+				"fields": []any{
+					map[string]any{"key": "sys_disease", "label": "Enfermedad", "type": "TEXT", "required": false, "system": true},
+					map[string]any{"key": "readingA", "label": "Lectura A", "type": "TEXT", "required": false},
+				},
+			},
+		},
+	}
+	if err := validator.ValidateEncounterFormTransition(base, changedType); err == nil {
+		t.Fatal("expected field type change to fail transition")
+	}
+}

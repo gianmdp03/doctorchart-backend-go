@@ -227,7 +227,16 @@ func (v *Validator) evaluate(form, values, context, previous map[string]any) (Ev
 			}
 		}
 		if value, ok := value.(string); ok && (kind == "TEXT" || kind == "TEXTAREA") {
-			if telephoneField(key) {
+			if key == "sys_disease" {
+				trimmed := api.JavaTrim(value)
+				if trimmed == "" {
+					result.Values[key] = nil
+				} else if api.JavaLength(trimmed) > 240 {
+					issue(key, "OUT_OF_RANGE")
+				} else {
+					result.Values[key] = trimmed
+				}
+			} else if telephoneField(key) {
 				// Full-form edits echo stored fields. Validate only new phone values.
 				if saved, exists := previous[key].(string); exists && saved == value {
 					continue
@@ -370,6 +379,8 @@ func projectValue(key string, value any, projections map[string]any) {
 		value = historyLines(value)
 	case "chiefComplaint", "complaint":
 		target = "encounter.chiefComplaint"
+	case "sys_disease", "disease":
+		target = "encounter.disease"
 	case "presentIllness", "historyOfPresentIllness":
 		target = "encounter.historyOfPresentIllness"
 	case "physicalExam", "physicalExamination":

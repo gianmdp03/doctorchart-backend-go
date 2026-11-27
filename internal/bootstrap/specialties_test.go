@@ -79,6 +79,26 @@ func TestDefaultSpecialtyDefinitions(t *testing.T) {
 			t.Fatal("initial publication differs from draft")
 		}
 	}
+	defaults := seeds["specialty_encounter_template_defaults"]
+	if len(defaults) != 3 {
+		t.Fatalf("expected 3 pediatric encounter template defaults, got %d", len(defaults))
+	}
+	for _, row := range defaults {
+		if row["specialty_code"] != "pediatrics" {
+			t.Fatalf("unexpected specialty_code %v", row["specialty_code"])
+		}
+		raw, err := json.Marshal(row["form_definition"])
+		if err != nil {
+			t.Fatal(err)
+		}
+		form, err := wizard.Decode(raw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := validator.ValidateEncounterForm(form); err != nil {
+			t.Fatalf("invalid pediatric default template %v: %v", row["code"], err)
+		}
+	}
 }
 
 func TestMissingSpecialtiesAddedWithoutReplacingExistingConfiguration(t *testing.T) {

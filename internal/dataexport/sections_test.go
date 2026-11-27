@@ -17,6 +17,8 @@ func TestExportSchemaCoverage(t *testing.T) {
 		"booking_public_details":      "challenge_hash",
 		"clinical_access_events":      "request_id",
 		"clinical_document_issues":    "pdf",
+		"doctor_clinic_logos":         "image_webp image_png",
+		"doctor_signatures":           "image_png",
 		"notification_outbox":         "dedup_key recovery_id payload attempts lease_until lease_id last_code portal_code_id",
 		"patient_medical_studies":     "media_asset_id stored_file_name",
 		"patients":                    "media_identity",
