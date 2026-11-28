@@ -356,6 +356,10 @@ func (s *Service) detail(ctx context.Context, tx pgx.Tx, p *Patient) error {
 	if measurements.Weight != nil || measurements.Height != nil || measurements.Head != nil {
 		p.Measurements = &measurements
 	}
+	return projectPatientInsurance(p)
+}
+
+func projectPatientInsurance(p *Patient) error {
 	insurance, err := wizard.Decode(p.Insurance)
 	if err != nil {
 		return err

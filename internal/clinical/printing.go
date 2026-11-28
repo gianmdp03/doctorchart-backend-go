@@ -317,14 +317,10 @@ func (s *Service) PrintRoutes(mux *http.ServeMux) {
 			api.WriteError(w, err)
 			return
 		}
-		var encounterID *int64
-		if rawEnc := strings.TrimSpace(r.URL.Query().Get("encounterId")); rawEnc != "" {
-			parsed, parseErr := strconv.ParseInt(rawEnc, 10, 64)
-			if parseErr != nil || parsed < 1 {
-				api.WriteError(w, api.Invalid("El identificador de consulta no es válido."))
-				return
-			}
-			encounterID = &parsed
+		encounterID, err := strconv.ParseInt(strings.TrimSpace(r.URL.Query().Get("encounterId")), 10, 64)
+		if err != nil || encounterID < 1 {
+			api.WriteError(w, api.Invalid("Indicá un identificador de consulta válido."))
+			return
 		}
 		sigMode, sigID, err := parseSignatureQuery(r)
 		if err != nil {
@@ -337,7 +333,7 @@ func (s *Service) PrintRoutes(mux *http.ServeMux) {
 			api.WriteError(w, err)
 			return
 		}
-		accessReference(r.Context(), encounterID, &patientID, nil)
+		accessReference(r.Context(), &encounterID, &patientID, nil)
 		w.Header().Set("Content-Type", "application/pdf")
 		w.Header().Set("Content-Disposition", `inline; filename="`+filename+`"`)
 		w.Header().Set("Cache-Control", "private, no-cache, no-store, max-age=0, must-revalidate")
