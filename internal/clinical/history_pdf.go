@@ -272,10 +272,92 @@ func renderClinicalHistoryPDF(data clinicalHistoryPDFData) ([]byte, error) {
 		pdf.SetY(pdf.GetY() + 8)
 	}
 
+	type field struct {
+		label, value string
+	}
+	valueOf := func(value *string) string {
+		if value == nil {
+			return ""
+		}
+		return strings.TrimSpace(*value)
+	}
+	row := func(fill [3]int, prominent bool, fields ...field) {
+		var visible []field
+		for _, item := range fields {
+			if item.value = strings.TrimSpace(item.value); item.value != "" {
+				visible = append(visible, item)
+			}
+		}
+		if len(visible) == 0 {
+			return
+		}
+		const pad, labelLine, gap = 11.0, 11.0, 2.0
+		col := width / float64(len(visible))
+		valueStyle, valueSize, valueLine := "", 10.0, 13.0
+		if prominent {
+			valueStyle, valueSize, valueLine = "B", 13.0, 17.0
+		}
+		labelHeight, valueHeight := labelLine, valueLine
+		for _, item := range visible {
+			font("B", 8, muted)
+			labelHeight = max(labelHeight, labelLine*float64(len(pdf.SplitText(translate(item.label), col-2*pad))))
+			font(valueStyle, valueSize, ink)
+			valueHeight = max(valueHeight, valueLine*float64(len(pdf.SplitText(translate(item.value), col-2*pad))))
+		}
+		height := 2*pad + labelHeight + gap + valueHeight
+		room(height)
+		top := pdf.GetY()
+		pdf.SetFillColor(fill[0], fill[1], fill[2])
+		pdf.SetDrawColor(border[0], border[1], border[2])
+		pdf.SetLineWidth(0.55)
+		pdf.RoundedRect(left, top, width, height, 6, "1234", "FD")
+		for i, item := range visible {
+			column := left + float64(i)*col
+			if i > 0 {
+				pdf.Line(column, top+pad, column, top+height-pad)
+			}
+			pdf.SetY(top + pad)
+			text(column+pad, col-2*pad, labelLine, item.label, "B", 8, muted, "L")
+			pdf.SetY(top + pad + labelHeight + gap)
+			text(column+pad, col-2*pad, valueLine, item.value, valueStyle, valueSize, ink, "L")
+		}
+		pdf.SetY(top + height + 6)
+	}
+	white := [3]int{255, 255, 255}
+	notes := func(fields ...field) {
+		var visible []field
+		for _, item := range fields {
+			if item.value = strings.TrimSpace(item.value); item.value != "" {
+				visible = append(visible, item)
+			}
+		}
+		lineCount := func(value string, w float64) int {
+			font("", 10, ink)
+			return len(pdf.SplitText(translate(value), w))
+		}
+		for len(visible) > 0 {
+			item := visible[0]
+			visible = visible[1:]
+			if len(visible) > 0 && lineCount(item.value, width/2-22) <= 3 && lineCount(visible[0].value, width/2-22) <= 3 {
+				row(white, false, item, visible[0])
+				visible = visible[1:]
+			} else if lineCount(item.value, width-22) <= 7 {
+				row(white, false, item)
+			} else {
+				// Let long notes flow across pages without a fixed-height box.
+				font("B", 8, muted)
+				labelHeight := 11 * float64(len(pdf.SplitText(translate(item.label), width-22)))
+				room(labelHeight + 26)
+				text(left+11, width-22, 11, item.label, "B", 8, muted, "L")
+				text(left+11, width-22, 13, item.value, "", 10, ink, "L")
+				pdf.Ln(8)
+			}
+		}
+	}
+
 	const docTitle = "Registro de Consulta Clínica"
 	enc := data.Encounter
 	encounterLocal := enc.instant.In(data.Zone)
-	specialty := enc.Specialty.Name
 	pdf.SetTitle(docTitle+" · "+data.Patient.FullName+" | DoctorChart", true)
 
 	pdf.SetHeaderFunc(func() {
@@ -315,7 +397,7 @@ func renderClinicalHistoryPDF(data clinicalHistoryPDFData) ([]byte, error) {
 
 	// Attending physician block (license printed ONLY if non-empty)
 	hasLogo := data.Logo != nil && len(data.Logo.PNG) > 0
-	if data.AuthorName != "" || specialty != "" || data.AuthorLicense != "" || hasLogo {
+	if data.AuthorName != "" || data.AuthorLicense != "" || hasLogo {
 		authorStartY := pdf.GetY()
 		authorW := width
 		logoBottom := authorStartY
@@ -339,51 +421,44 @@ func renderClinicalHistoryPDF(data clinicalHistoryPDFData) ([]byte, error) {
 			logoBottom = authorStartY + drawH
 			authorW = width - drawW - 16
 		}
-		if data.AuthorName != "" || specialty != "" || data.AuthorLicense != "" {
+		if data.AuthorName != "" || data.AuthorLicense != "" {
 			text(left, authorW, 11, "Profesional tratante", "B", 8, muted, "L")
 			if data.AuthorName != "" {
 				text(left, authorW, 16, data.AuthorName, "B", 12, ink, "L")
 			}
-			metaParts := []string{}
-			if specialty != "" {
-				metaParts = append(metaParts, specialty)
-			}
 			if data.AuthorLicense != "" {
-				metaParts = append(metaParts, "Matrícula profesional: "+data.AuthorLicense)
-			}
-			if len(metaParts) > 0 {
-				text(left, authorW, 13, strings.Join(metaParts, "  ·  "), "", 9, muted, "L")
+				text(left, authorW, 13, "Matrícula profesional: "+data.AuthorLicense, "", 9, muted, "L")
 			}
 		}
 		pdf.SetY(max(pdf.GetY(), logoBottom))
 		pdf.Ln(8)
 	}
 
-	// Section 1: Patient Demographics & Coverage
-	sectionHeading("Datos del paciente")
 	p := data.Patient
 	birthStr := formatLocalDate(p.BirthDate)
+	ageStr := ""
 	if birth, err := time.Parse("2006-01-02", p.BirthDate); err == nil {
 		day := time.Date(encounterLocal.Year(), encounterLocal.Month(), encounterLocal.Day(), 0, 0, 0, 0, time.UTC)
 		if age := printAge(birth, day); age != nil {
-			birthStr += " (" + *age + ")"
+			ageStr = *age
 		}
 	}
-	dniStr := "No informado"
-	if p.NationalID != nil && strings.TrimSpace(*p.NationalID) != "" {
-		dniStr = strings.TrimSpace(*p.NationalID)
+	dniStr := valueOf(p.NationalID)
+	if dniStr == "" {
+		dniStr = "No informado"
 	}
-	genderStr := "No especificado"
-	if p.Gender != nil {
-		switch strings.ToUpper(strings.TrimSpace(*p.Gender)) {
-		case "MALE":
-			genderStr = "Varón"
-		case "FEMALE":
-			genderStr = "Mujer"
-		case "OTHER":
-			genderStr = "Otro"
-		}
+	gender := strings.ToUpper(valueOf(p.Gender))
+	genderLabel := "No especificado"
+	patientFill, badgeFill := softBg, [3]int{222, 237, 230}
+	switch gender {
+	case "MALE":
+		genderLabel, patientFill, badgeFill = "Varón", [3]int{239, 248, 250}, [3]int{211, 233, 241}
+	case "FEMALE":
+		genderLabel, patientFill, badgeFill = "Mujer", [3]int{253, 245, 248}, [3]int{247, 225, 236}
+	case "OTHER":
+		genderLabel = "Otro"
 	}
+
 	coverage := "Particular / Sin cobertura registrada"
 	if ins, err := wizard.Decode(p.Insurance); err == nil && ins != nil {
 		if prov, ok := ins["providerName"].(string); ok && strings.TrimSpace(prov) != "" {
@@ -397,94 +472,72 @@ func renderClinicalHistoryPDF(data clinicalHistoryPDFData) ([]byte, error) {
 		}
 	}
 
-	boxY := pdf.GetY()
-	pdf.SetFillColor(softBg[0], softBg[1], softBg[2])
+	const nameX, nameWidth, coverageX, coverageWidth = left + 59, 244.0, left + 325, 174.0
+	font("B", 16, ink)
+	nameHeight := 19 * float64(len(pdf.SplitText(translate(p.FullName), nameWidth)))
+	font("", 9.5, ink)
+	coverageHeight := 11 + 13*float64(len(pdf.SplitText(translate(coverage), coverageWidth)))
+	cardHeight := max(56, max(nameHeight, coverageHeight)+22)
+	room(30 + cardHeight)
+	sectionHeading("Datos del paciente")
+	top := pdf.GetY()
+	pdf.SetFillColor(patientFill[0], patientFill[1], patientFill[2])
 	pdf.SetDrawColor(border[0], border[1], border[2])
-	pdf.Rect(left, boxY, width, 74, "FD")
-	pdf.SetXY(left+10, boxY+8)
-	text(left+10, 245, 11, "Nombre completo", "B", 7.5, muted, "L")
-	text(left+10, 245, 15, p.FullName, "B", 11, ink, "L")
-	pdf.SetXY(left+265, boxY+8)
-	text(left+265, 236, 11, "DNI / Documento", "B", 7.5, muted, "L")
-	text(left+265, 236, 15, dniStr, "", 10, ink, "L")
+	pdf.SetLineWidth(0.55)
+	pdf.RoundedRect(left, top, width, cardHeight, 7, "1234", "FD")
+	drawConsultationPatientBadge(pdf, left+30, top+cardHeight/2, gender, badgeFill, accent)
+	pdf.SetY(top + (cardHeight-nameHeight)/2)
+	text(nameX, nameWidth, 19, p.FullName, "B", 16, ink, "L")
+	pdf.SetY(top + (cardHeight-coverageHeight)/2)
+	text(coverageX, coverageWidth, 11, "Cobertura", "B", 8, muted, "L")
+	text(coverageX, coverageWidth, 13, coverage, "", 9.5, ink, "L")
+	pdf.SetY(top + cardHeight + 5)
+	row(white, false, field{"Documento", dniStr}, field{"Nacimiento", birthStr}, field{"Edad en la consulta", ageStr}, field{"Sexo registrado", genderLabel})
 
-	pdf.SetY(boxY + 38)
-	text(left+10, 245, 11, "Fecha de nacimiento y edad en la consulta", "B", 7.5, muted, "L")
-	text(left+10, 245, 14, birthStr, "", 9.5, ink, "L")
-	pdf.SetY(boxY + 38)
-	text(left+265, 236, 11, "Sexo / Cobertura", "B", 7.5, muted, "L")
-	text(left+265, 236, 14, genderStr+" · "+coverage, "", 9.5, ink, "L")
-	pdf.SetY(boxY + 80)
-
-	room(70)
+	room(80)
 	sectionHeading("Datos de la consulta")
-	dt := encounterLocal.Format("02/01/2006 15:04")
-	headerLine := dt + "  ·  " + consultationTypeLabel(enc.Type)
-	if enc.TemplateName != nil && *enc.TemplateName != "" {
-		headerLine += "  ·  " + *enc.TemplateName
-	}
-	if enc.Specialty.Name != "" {
-		headerLine += "  (" + enc.Specialty.Name + ")"
-	}
-	pdf.SetFillColor(238, 244, 242)
-	pdf.SetX(left)
-	font("B", 9.5, ink)
-	pdf.CellFormat(width, 18, translate("  "+headerLine), "1", 1, "L", true, 0, "")
-	pdf.Ln(4)
+	row(softBg, false,
+		field{"Fecha de atención", encounterLocal.Format("02/01/2006 15:04")},
+		field{"Tipo de atención", consultationTypeLabel(enc.Type)},
+		field{"Especialidad", enc.Specialty.Name},
+		field{"Ficha", valueOf(enc.TemplateName)},
+	)
+	notes(
+		field{"Motivo de consulta", valueOf(enc.Complaint)},
+		field{"Enfermedad", valueOf(enc.Disease)},
+		field{"Enfermedad actual / Evolución", valueOf(enc.History)},
+		field{"Examen físico", valueOf(enc.Physical)},
+	)
 
-	printRow := func(label, val string) {
-		if strings.TrimSpace(val) == "" {
-			return
-		}
-		room(24)
-		text(left+6, width-6, 11, label, "B", 8, muted, "L")
-		text(left+6, width-6, 13, strings.TrimSpace(val), "", 9.5, ink, "L")
-		pdf.Ln(3)
-	}
-	if enc.Disease != nil {
-		printRow("Enfermedad", *enc.Disease)
-	}
-	if enc.Complaint != nil {
-		printRow("Motivo de consulta", *enc.Complaint)
-	}
-	if enc.History != nil {
-		printRow("Enfermedad actual / Evolución", *enc.History)
-	}
-	if enc.Physical != nil {
-		printRow("Examen físico", *enc.Physical)
-	}
-	// Measurements inline if any
-	var meas []string
+	var measurements []field
 	if enc.Measurements.Weight != nil {
-		meas = append(meas, fmt.Sprintf("Peso: %.2f kg", *enc.Measurements.Weight))
+		measurements = append(measurements, field{"Peso", fmt.Sprintf("%.2f kg", *enc.Measurements.Weight)})
 	}
 	if enc.Measurements.Height != nil {
-		meas = append(meas, fmt.Sprintf("Talla: %.1f cm", *enc.Measurements.Height))
+		measurements = append(measurements, field{"Longitud / talla", fmt.Sprintf("%.1f cm", *enc.Measurements.Height)})
 	}
 	if enc.Measurements.Head != nil {
-		meas = append(meas, fmt.Sprintf("Perímetro cefálico: %.1f cm", *enc.Measurements.Head))
+		measurements = append(measurements, field{"Perímetro cefálico", fmt.Sprintf("%.1f cm", *enc.Measurements.Head)})
 	}
-	if len(meas) > 0 {
-		printRow("Mediciones", strings.Join(meas, "  ·  "))
-	}
-	if enc.Diagnosis != nil {
-		diag := *enc.Diagnosis
-		if enc.DiagnosisCode != nil && strings.TrimSpace(*enc.DiagnosisCode) != "" {
-			diag = "[" + strings.TrimSpace(*enc.DiagnosisCode) + "] " + diag
-		}
-		printRow("Diagnóstico", diag)
-	}
-	if enc.Treatment != nil {
-		printRow("Tratamiento / Plan", *enc.Treatment)
-	}
-	if enc.FollowUp != nil {
-		fu := *enc.FollowUp
-		if enc.FollowUpDate != nil && strings.TrimSpace(*enc.FollowUpDate) != "" {
-			fu += " (Próximo control: " + formatLocalDate(*enc.FollowUpDate) + ")"
-		}
-		printRow("Seguimiento", fu)
+	if len(measurements) > 0 {
+		room(68)
+		text(left, width, 15, "Mediciones", "B", 10, accent, "L")
+		pdf.Ln(3)
+		row(patientFill, true, measurements...)
 	}
 
+	diagnosis := valueOf(enc.Diagnosis)
+	if code := valueOf(enc.DiagnosisCode); code != "" && diagnosis != "" {
+		diagnosis = "[" + code + "] " + diagnosis
+	}
+	notes(
+		field{"Diagnóstico", diagnosis},
+		field{"Tratamiento / Plan", valueOf(enc.Treatment)},
+		field{"Seguimiento", valueOf(enc.FollowUp)},
+		field{"Próximo control", formatLocalDate(valueOf(enc.FollowUpDate))},
+	)
+
+	var customFields []field
 	// Custom encounterForm fields not already projected above
 	if eForm, err := wizard.Decode(enc.Snapshot); err == nil {
 		if eVals, err := wizard.Decode(enc.Values); err == nil {
@@ -513,7 +566,7 @@ func renderClinicalHistoryPDF(data clinicalHistoryPDFData) ([]byte, error) {
 								continue
 							}
 							if formatted := formatCustomValue(visible[k], f); formatted != "" {
-								printRow(lbl, formatted)
+								customFields = append(customFields, field{lbl, formatted})
 							}
 						}
 					}
@@ -538,10 +591,11 @@ func renderClinicalHistoryPDF(data clinicalHistoryPDFData) ([]byte, error) {
 				r := fResults[k]
 				calcParts = append(calcParts, fmt.Sprintf("%s: %g", k, *r.Value))
 			}
-			printRow("Cálculos clínicos", strings.Join(calcParts, "  ·  "))
+			customFields = append(customFields, field{"Cálculos clínicos", strings.Join(calcParts, "  ·  ")})
 		}
 	}
-	pdf.Ln(6)
+	notes(customFields...)
+	pdf.Ln(4)
 
 	if len(data.Charts) > 0 {
 		room(growthChartHeight + 30)
@@ -604,4 +658,34 @@ func renderClinicalHistoryPDF(data clinicalHistoryPDFData) ([]byte, error) {
 		return nil, api.Failure(500, "PDF_GENERATION_FAILED", "No se pudo generar el PDF de la consulta: "+err.Error())
 	}
 	return buf.Bytes(), nil
+}
+
+// Draw the patient detail as vectors so it stays sharp on paper.
+func drawConsultationPatientBadge(pdf *fpdf.Fpdf, x, y float64, gender string, fill, accent [3]int) {
+	pdf.SetFillColor(fill[0], fill[1], fill[2])
+	pdf.Circle(x, y, 19, "F")
+	pdf.SetFillColor(255, 253, 250)
+	pdf.SetDrawColor(accent[0], accent[1], accent[2])
+	pdf.SetLineWidth(0.9)
+
+	switch gender {
+	case "MALE":
+		pdf.Circle(x-8, y-7, 4.3, "FD")
+		pdf.Circle(x+8, y-7, 4.3, "FD")
+	case "FEMALE":
+		pdf.Ellipse(x-4, y-8, 3, 6.7, 16, "FD")
+		pdf.Ellipse(x+4, y-8, 3, 6.7, -16, "FD")
+	default:
+		pdf.Polygon([]fpdf.PointType{
+			{X: x, Y: y - 10}, {X: x + 3, Y: y - 3}, {X: x + 10, Y: y},
+			{X: x + 3, Y: y + 3}, {X: x, Y: y + 10}, {X: x - 3, Y: y + 3},
+			{X: x - 10, Y: y}, {X: x - 3, Y: y - 3},
+		}, "FD")
+		return
+	}
+	pdf.Ellipse(x, y+2, 10, 8.3, 0, "FD")
+	pdf.SetFillColor(accent[0], accent[1], accent[2])
+	pdf.Circle(x-3.7, y+1, 0.8, "F")
+	pdf.Circle(x+3.7, y+1, 0.8, "F")
+	pdf.CurveBezierCubic(x-2.2, y+4, x-1.2, y+6, x+1.2, y+6, x+2.2, y+4, "D")
 }

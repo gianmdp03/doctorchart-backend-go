@@ -8,6 +8,7 @@ import (
 	"image/color"
 	"image/png"
 	"math"
+	"strings"
 	"testing"
 	"time"
 
@@ -77,7 +78,7 @@ func TestRenderClinicalHistoryPDFWithChartsAndOptionalLicense(t *testing.T) {
 	if err := pdf.EnsurePageCount(); err != nil || pdf.PageCount < 1 {
 		t.Fatalf("unexpected page count: %d err=%v", pdf.PageCount, err)
 	}
-	for _, want := range []string{"Registro de Consulta Clínica", "Mateo Gómez", "Bronquitis aguda", "Dra. Valentina Gómez", "Curvas de crecimiento de la consulta", "31/12/2025 22:00", "14 meses", "Valor en la curva: 10.20 kg"} {
+	for _, want := range []string{"Registro de Consulta Clínica", "Mateo Gómez", "Bronquitis aguda", "Dra. Valentina Gómez", "Fecha de atención", "31/12/2025 22:00", "14 meses", "Varón", "Mediciones", "Curvas de crecimiento de la consulta", "Valor en la curva: 10.20 kg"} {
 		if !projectionFixturePDFContains(t, out, want) {
 			t.Errorf("history PDF missing %q", want)
 		}
@@ -105,6 +106,45 @@ func TestRenderClinicalHistoryPDFWithChartsAndOptionalLicense(t *testing.T) {
 	if !projectionFixturePDFContains(t, withLicense, "Valor en la curva: 65.00 cm") ||
 		!projectionFixturePDFContains(t, withLicense, "Fuera del rango del gráfico") {
 		t.Fatal("consultation PDF missing the out-of-frame measurement")
+	}
+}
+
+func TestRenderClinicalHistoryPDFKeepsLongNotesAndFollowingFields(t *testing.T) {
+	sex := "FEMALE"
+	history := "Inicio de evolución.\n" + strings.Repeat("Observación guardada en la consulta.\n", 100) + "Cierre de evolución"
+	followUp := "Seguimiento registrado"
+	date := "2026-02-20"
+	data := clinicalHistoryPDFData{
+		Patient: Patient{
+			FullName:  "Lucía de los Ángeles González Ramírez de la Torre",
+			BirthDate: "2021-01-01",
+			Gender:    &sex,
+			Insurance: json.RawMessage(`{"providerName":"Cobertura de ejemplo", "planName":"Plan familiar con atención ambulatoria", "affiliateNumber":"12345678"}`),
+		},
+		Encounter: Encounter{
+			EncounterSummary: EncounterSummary{
+				History: &history, FollowUp: &followUp, FollowUpDate: &date,
+			},
+			instant: time.Date(2026, 2, 14, 12, 0, 0, 0, time.UTC),
+		},
+		GeneratedAt: time.Date(2026, 2, 14, 15, 0, 0, 0, time.UTC),
+		Zone:        time.UTC,
+	}
+	out, err := renderClinicalHistoryPDF(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pdf, err := pdfapi.ReadContext(t.Context(), bytes.NewReader(out), model.NewDefaultConfiguration())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := pdf.EnsurePageCount(); err != nil || pdf.PageCount < 2 {
+		t.Fatalf("unexpected page count: %d err=%v", pdf.PageCount, err)
+	}
+	for _, want := range []string{"Mujer", "de la Torre", "12345678", "Inicio de evolución", "Cierre de evolución", "Seguimiento registrado", "20/02/2026", "Firma y sello del profesional"} {
+		if !projectionFixturePDFContains(t, out, want) {
+			t.Errorf("consultation PDF missing %q", want)
+		}
 	}
 }
 
